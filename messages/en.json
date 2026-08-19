@@ -1,0 +1,47 @@
+{
+  "common": {
+    "appName": "AutomotiveOA",
+    "tagline": "Workshop OS"
+  },
+  "nav": {
+    "board": "Case Board",
+    "checkin": "Check-in",
+    "customers": "Customers & Vehicles",
+    "followups": "Follow-ups",
+    "catalog": "Service Catalog",
+    "settings": "Shop Settings"
+  },
+  "titles": {
+    "board": "Repair Case Board",
+    "checkin": "Check-in",
+    "customers": "Customers & Vehicles",
+    "followups": "Follow-ups",
+    "catalog": "Service Catalog",
+    "settings": "Shop Settings"
+  },
+  "roles": {
+    "MANAGER": "Manager",
+    "ADVISOR": "Service Advisor"
+  },
+  "auth": {
+    "title": "Sign in",
+    "subtitle": "Workshop management system",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "invalidCredentials": "Incorrect email or password",
+    "signOut": "Sign out"
+  },
+  "shell": {
+    "language": "Language",
+    "account": "Account"
+  },
+  "board": {
+    "empty": "No repair cases yet — check-in arrives in M2"
+  },
+  "stub": {
+    "comingIn": "This feature arrives in {milestone}",
+    "backToBoard": "Back to board"
+  }
+}

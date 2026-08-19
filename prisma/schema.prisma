@@ -1,0 +1,80 @@
+// AutomotiveOA — M1 data foundation (CONTEXT.md: Shop, Staff, User).
+// Every tenant-owned row carries shop_id (ADR-001); scoping is enforced by the
+// tenant guard in lib/db.ts, never by hand-written WHERE clauses.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// The tenant: a garage business using the platform.
+model Shop {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  staff Staff[]
+  users User[]
+
+  @@map("shops")
+}
+
+/// Everyone who works at the Shop. A Staff record does NOT imply a login —
+/// technicians exist here so Jobs can carry an assignee (CONTEXT.md).
+model Staff {
+  id        String   @id @default(cuid())
+  shopId    String   @map("shop_id")
+  name      String
+  /// Free-text job title ("ที่ปรึกษาบริการ", "ช่างตัวถัง"…) — the staff cast
+  /// is a working assumption pending pilot interviews.
+  position  String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  shop Shop  @relation(fields: [shopId], references: [id])
+  user User?
+
+  @@unique([shopId, id]) // target for the same-shop composite FK from users
+  @@index([shopId])
+  @@map("staff")
+}
+
+/// A Staff member with a login. MVP: only Manager and Service Advisor.
+/// Any Staff can be promoted later without remodeling (CONTEXT.md).
+model User {
+  id           String   @id @default(cuid())
+  shopId       String   @map("shop_id")
+  staffId      String   @unique @map("staff_id")
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole
+  locale       Locale   @default(th)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  shop  Shop  @relation(fields: [shopId], references: [id])
+  // Composite FK on (shop_id, staff_id): the database itself rejects a User
+  // pointing at another Shop's Staff (ADR-001 defense in depth).
+  staff Staff @relation(fields: [shopId, staffId], references: [shopId, id])
+
+  @@unique([shopId, staffId])
+  @@index([shopId])
+  @@map("users")
+}
+
+enum UserRole {
+  MANAGER
+  ADVISOR
+}
+
+enum Locale {
+  th
+  en
+}

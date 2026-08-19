@@ -1,0 +1,199 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-plex-sans), var(--font-plex-thai), "Segoe UI",
+    "Leelawadee UI", "Noto Sans Thai", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-plex-mono), var(--font-plex-thai), "Cascadia Mono",
+    Consolas, "SF Mono", Menlo, monospace;
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  /* status hues (DESIGN.md D-3) — conventional, never the accent */
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --color-info: var(--info);
+  /* dark-technical extras from the M0 mockup */
+  --color-faint: var(--faint);
+  --color-surface-2: var(--surface-2);
+  --color-raise: var(--raise);
+  --color-border-strong: var(--border-strong);
+  --color-primary-dim: var(--primary-dim);
+  --color-primary-soft: var(--primary-soft);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/*
+ * Dark-only MVP (DESIGN.md D-1): <html> carries a permanent `dark` class and
+ * the real palette lives in `.dark`. `:root` keeps a neutral zinc light theme
+ * so light mode stays reachable later without re-tokenizing.
+ */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: #f97316;
+  --primary-foreground: #0c0a09;
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: #ef4444;
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: #f97316;
+  --chart-1: #f97316;
+  --chart-2: #3b82f6;
+  --chart-3: #22c55e;
+  --chart-4: #f5a623;
+  --chart-5: #ef4444;
+  --radius: 0rem; /* sharp geometry — no soft radii on structure */
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: #f97316;
+  --sidebar-primary-foreground: #0c0a09;
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: #f97316;
+  /* status hues */
+  --ok: #22c55e;
+  --warn: #f5a623;
+  --bad: #ef4444;
+  --info: #3b82f6;
+  /* dark-technical extras */
+  --faint: #6b6b74;
+  --surface-2: #161618;
+  --raise: #1c1c1f;
+  --border-strong: #3b3b41;
+  --primary-dim: #9a4d10;
+  --primary-soft: rgba(249, 115, 22, 0.12);
+}
+
+/* M0 mockup palette, verbatim */
+.dark {
+  --background: #09090b;
+  --foreground: #f4f4f5;
+  --card: #101012;
+  --card-foreground: #f4f4f5;
+  --popover: #161618;
+  --popover-foreground: #f4f4f5;
+  --primary: #f97316;
+  --primary-foreground: #0c0a09;
+  --secondary: #161618;
+  --secondary-foreground: #f4f4f5;
+  --muted: #161618;
+  --muted-foreground: #a1a1aa;
+  --accent: #1c1c1f;
+  --accent-foreground: #f4f4f5;
+  --destructive: #ef4444;
+  --border: #26262a;
+  --input: #3b3b41;
+  --ring: #f97316;
+  --chart-1: #f97316;
+  --chart-2: #3b82f6;
+  --chart-3: #22c55e;
+  --chart-4: #f5a623;
+  --chart-5: #ef4444;
+  --sidebar: #101012;
+  --sidebar-foreground: #f4f4f5;
+  --sidebar-primary: #f97316;
+  --sidebar-primary-foreground: #0c0a09;
+  --sidebar-accent: #161618;
+  --sidebar-accent-foreground: #f4f4f5;
+  --sidebar-border: #26262a;
+  --sidebar-ring: #f97316;
+}
+
+/* 45° hatch fill drawn from currentColor — set a text color, get its hatch. */
+@utility hatch {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, currentColor 55%, transparent) 0 1px,
+    transparent 1px 4px
+  );
+}
+
+/* Faint hatch wash (chips, badges) — the mockup's primary-soft stripe treatment. */
+@utility hatch-soft {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, currentColor 14%, transparent) 0 1px,
+    transparent 1px 5px
+  );
+}
+
+/* Tracked-uppercase micro label (mockup .eyebrow / .sub). */
+@utility eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* Columns of money and counts: mono face, tabular numerals (mockup .num). */
+@utility num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  html {
+    @apply font-sans;
+  }
+  ::selection {
+    background: var(--primary-soft);
+  }
+}

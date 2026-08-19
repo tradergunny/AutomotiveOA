@@ -1,0 +1,47 @@
+{
+  "common": {
+    "appName": "AutomotiveOA",
+    "tagline": "Workshop OS"
+  },
+  "nav": {
+    "board": "แดชบอร์ด",
+    "checkin": "รับรถเข้าอู่",
+    "customers": "ลูกค้าและรถ",
+    "followups": "งานติดตาม",
+    "catalog": "แคตตาล็อกราคา",
+    "settings": "ตั้งค่าอู่"
+  },
+  "titles": {
+    "board": "แดชบอร์ดเคสซ่อม",
+    "checkin": "รับรถเข้าอู่",
+    "customers": "ลูกค้าและรถ",
+    "followups": "งานติดตาม",
+    "catalog": "แคตตาล็อกราคา",
+    "settings": "ตั้งค่าอู่"
+  },
+  "roles": {
+    "MANAGER": "ผู้จัดการ",
+    "ADVISOR": "ที่ปรึกษาบริการ"
+  },
+  "auth": {
+    "title": "เข้าสู่ระบบ",
+    "subtitle": "ระบบบริหารอู่ซ่อมรถ",
+    "email": "อีเมล",
+    "password": "รหัสผ่าน",
+    "submit": "เข้าสู่ระบบ",
+    "submitting": "กำลังเข้าสู่ระบบ…",
+    "invalidCredentials": "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
+    "signOut": "ออกจากระบบ"
+  },
+  "shell": {
+    "language": "ภาษา",
+    "account": "บัญชีผู้ใช้"
+  },
+  "board": {
+    "empty": "ยังไม่มีเคสซ่อม — การรับรถเข้าอู่จะมาใน M2"
+  },
+  "stub": {
+    "comingIn": "ฟีเจอร์นี้จะมาใน {milestone}",
+    "backToBoard": "กลับแดชบอร์ด"
+  }
+}
