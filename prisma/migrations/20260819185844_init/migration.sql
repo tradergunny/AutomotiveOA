@@ -47,6 +47,9 @@ CREATE TABLE "users" (
 CREATE INDEX "staff_shop_id_idx" ON "staff"("shop_id");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "staff_shop_id_id_key" ON "staff"("shop_id", "id");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "users_staff_id_key" ON "users"("staff_id");
 
 -- CreateIndex
@@ -55,6 +58,9 @@ CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 -- CreateIndex
 CREATE INDEX "users_shop_id_idx" ON "users"("shop_id");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "users_shop_id_staff_id_key" ON "users"("shop_id", "staff_id");
+
 -- AddForeignKey
 ALTER TABLE "staff" ADD CONSTRAINT "staff_shop_id_fkey" FOREIGN KEY ("shop_id") REFERENCES "shops"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
@@ -62,4 +68,4 @@ ALTER TABLE "staff" ADD CONSTRAINT "staff_shop_id_fkey" FOREIGN KEY ("shop_id") 
 ALTER TABLE "users" ADD CONSTRAINT "users_shop_id_fkey" FOREIGN KEY ("shop_id") REFERENCES "shops"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "users" ADD CONSTRAINT "users_staff_id_fkey" FOREIGN KEY ("staff_id") REFERENCES "staff"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "users" ADD CONSTRAINT "users_shop_id_staff_id_fkey" FOREIGN KEY ("shop_id", "staff_id") REFERENCES "staff"("shop_id", "id") ON DELETE RESTRICT ON UPDATE CASCADE;

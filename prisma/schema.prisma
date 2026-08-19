@@ -40,6 +40,7 @@ model Staff {
   shop Shop  @relation(fields: [shopId], references: [id])
   user User?
 
+  @@unique([shopId, id]) // target for the same-shop composite FK from users
   @@index([shopId])
   @@map("staff")
 }
@@ -59,8 +60,11 @@ model User {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   shop  Shop  @relation(fields: [shopId], references: [id])
-  staff Staff @relation(fields: [staffId], references: [id])
+  // Composite FK on (shop_id, staff_id): the database itself rejects a User
+  // pointing at another Shop's Staff (ADR-001 defense in depth).
+  staff Staff @relation(fields: [shopId, staffId], references: [shopId, id])
 
+  @@unique([shopId, staffId])
   @@index([shopId])
   @@map("users")
 }

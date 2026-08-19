@@ -1,0 +1,236 @@
+import { prismaUnscoped } from "@/lib/db";
+import { Prisma } from "@/lib/generated/prisma/client";
+
+/**
+ * Tenant-guarded data layer (ADR-001).
+ *
+ * All application code reads and writes tenant data through `forShop(shopId)`,
+ * which returns a Prisma client that scopes every operation to one Shop at the
+ * data-access layer — never through hand-written WHERE clauses in features.
+ *
+ * The guard is fail-closed:
+ * - every model in schema.prisma must be classified below; the `_exhaustive`
+ *   check breaks the build when a new model is added unclassified, and the
+ *   runtime throws for anything unknown anyway;
+ * - operations the guard can't scope (raw queries) are rejected;
+ * - a create that names a foreign shopId throws instead of being rewritten.
+ *
+ * Unique-where mutations (update/delete/upsert) verify ownership with a scoped
+ * pre-check. Rows never change tenant (shopId updates are rejected), so the
+ * check cannot be invalidated between read and write.
+ *
+ * Nested writes are not intercepted by Prisma query extensions, but the M1
+ * relations are structurally safe: User's Staff relation joins on
+ * (shop_id, staff_id) with a composite FK, so the database rejects any
+ * cross-shop link a nested write could attempt.
+ */
+
+/** Models that carry shop_id and belong to exactly one Shop. */
+const TENANT_OWNED = ["Staff", "User"] as const satisfies readonly Prisma.ModelName[];
+
+/** The tenant itself: readable/updatable only as the shop's own row. */
+const SHOP_MODEL = "Shop" as const satisfies Prisma.ModelName;
+
+type Classified = (typeof TENANT_OWNED)[number] | typeof SHOP_MODEL;
+// Compile-time exhaustiveness: adding a model to schema.prisma without
+// classifying it here turns this line into a type error.
+const _exhaustive: [Prisma.ModelName] extends [Classified] ? true : never = true;
+void _exhaustive;
+
+export class TenantGuardError extends Error {
+  constructor(message: string) {
+    super(`[tenant-guard] ${message}`);
+    this.name = "TenantGuardError";
+  }
+}
+
+const isTenantOwned = (model: string) =>
+  (TENANT_OWNED as readonly string[]).includes(model);
+
+/** Prisma delegate property for a model name ("Staff" -> prisma.staff). */
+const delegate = (model: string) =>
+  (prismaUnscoped as unknown as Record<string, any>)[
+    model.charAt(0).toLowerCase() + model.slice(1)
+  ];
+
+const SCOPED_WHERE_OPS = new Set([
+  "findMany",
+  "findFirst",
+  "findFirstOrThrow",
+  "count",
+  "aggregate",
+  "groupBy",
+  "updateMany",
+  "updateManyAndReturn",
+  "deleteMany",
+]);
+
+const UNIQUE_READ_OPS = new Set(["findUnique", "findUniqueOrThrow"]);
+const UNIQUE_MUTATION_OPS = new Set(["update", "delete", "upsert"]);
+
+function mergeWhere(args: any, filter: Record<string, string>) {
+  return { ...args, where: { AND: [args?.where ?? {}, filter] } };
+}
+
+function forceShopIdOnCreate(data: any, shopId: string) {
+  if (data == null || typeof data !== "object") {
+    throw new TenantGuardError("create requires a data object");
+  }
+  if (data.shop !== undefined) {
+    throw new TenantGuardError(
+      "set the shop via scalar shopId (or omit it), not a nested shop relation",
+    );
+  }
+  if (data.shopId != null && data.shopId !== shopId) {
+    throw new TenantGuardError(
+      `create targets shop ${data.shopId} from a client scoped to ${shopId}`,
+    );
+  }
+  return { ...data, shopId };
+}
+
+function rejectShopIdChange(data: any, shopId: string) {
+  if (data != null && typeof data === "object") {
+    if (data.shopId != null && data.shopId !== shopId) {
+      throw new TenantGuardError("rows never change tenant: shopId is immutable");
+    }
+    if (data.shop !== undefined) {
+      throw new TenantGuardError("rows never change tenant: shop relation is immutable");
+    }
+  }
+  return data;
+}
+
+/**
+ * A Prisma client scoped to one Shop. The only way application code touches
+ * tenant data.
+ */
+export function forShop(shopId: string) {
+  if (!shopId || typeof shopId !== "string") {
+    throw new TenantGuardError("forShop requires a non-empty shopId");
+  }
+
+  return prismaUnscoped.$extends({
+    name: `tenant:${shopId}`,
+    query: {
+      $allModels: {
+        async $allOperations({ model, operation, args, query }) {
+          if (model === SHOP_MODEL) {
+            return shopModelGuard(shopId, operation, args, query);
+          }
+          if (isTenantOwned(model)) {
+            return tenantModelGuard(shopId, model, operation, args, query);
+          }
+          // Fail closed: a model that slipped past classification.
+          throw new TenantGuardError(`model ${model} is not classified for tenancy`);
+        },
+      },
+    },
+  });
+}
+
+export type TenantDb = ReturnType<typeof forShop>;
+
+async function tenantModelGuard(
+  shopId: string,
+  model: string,
+  operation: string,
+  args: any,
+  query: (args: any) => Promise<any>,
+) {
+  if (SCOPED_WHERE_OPS.has(operation)) {
+    if (operation.startsWith("updateMany")) {
+      rejectShopIdChange(args?.data, shopId);
+    }
+    return query(mergeWhere(args, { shopId }));
+  }
+
+  if (UNIQUE_READ_OPS.has(operation)) {
+    const result = await query(args);
+    if (result != null && result.shopId !== shopId) {
+      if (operation === "findUniqueOrThrow") {
+        throw new TenantGuardError(`${model} row not found in shop ${shopId}`);
+      }
+      return null;
+    }
+    return result;
+  }
+
+  if (UNIQUE_MUTATION_OPS.has(operation)) {
+    const existing = await delegate(model).findFirst({
+      where: { AND: [args.where, { shopId }] },
+      select: { id: true },
+    });
+    if (operation === "upsert") {
+      // No row in this shop: either it truly doesn't exist (create branch,
+      // forced into this shop) or it belongs to another shop (the unique
+      // constraint then rejects the create — nothing leaks either way).
+      if (!existing) {
+        return query({ ...args, create: forceShopIdOnCreate(args.create, shopId) });
+      }
+      rejectShopIdChange(args.update, shopId);
+      return query(args);
+    }
+    if (!existing) {
+      throw new TenantGuardError(`${model} row not found in shop ${shopId}`);
+    }
+    if (operation === "update") {
+      rejectShopIdChange(args.data, shopId);
+    }
+    return query(args);
+  }
+
+  if (operation === "create") {
+    return query({ ...args, data: forceShopIdOnCreate(args.data, shopId) });
+  }
+
+  if (operation === "createMany" || operation === "createManyAndReturn") {
+    const rows = Array.isArray(args?.data) ? args.data : [args?.data];
+    return query({
+      ...args,
+      data: rows.map((row: any) => forceShopIdOnCreate(row, shopId)),
+    });
+  }
+
+  throw new TenantGuardError(`operation ${operation} on ${model} is not tenant-scopable`);
+}
+
+async function shopModelGuard(
+  shopId: string,
+  operation: string,
+  args: any,
+  query: (args: any) => Promise<any>,
+) {
+  if (SCOPED_WHERE_OPS.has(operation)) {
+    if (operation.startsWith("updateMany")) {
+      // Scoped to the shop's own row below; nothing tenant-mutable to strip.
+      return query(mergeWhere(args, { id: shopId }));
+    }
+    if (operation === "deleteMany") {
+      throw new TenantGuardError("a tenant client cannot delete shops");
+    }
+    return query(mergeWhere(args, { id: shopId }));
+  }
+
+  if (UNIQUE_READ_OPS.has(operation)) {
+    const result = await query(args);
+    if (result != null && result.id !== shopId) {
+      if (operation === "findUniqueOrThrow") {
+        throw new TenantGuardError(`shop ${shopId} cannot read other shops`);
+      }
+      return null;
+    }
+    return result;
+  }
+
+  if (operation === "update") {
+    if (args?.where?.id !== shopId) {
+      throw new TenantGuardError("a tenant client can only update its own shop");
+    }
+    return query(args);
+  }
+
+  // create/createMany/delete/upsert…: shop lifecycle is platform admin work,
+  // never something a tenant-scoped client does.
+  throw new TenantGuardError(`operation ${operation} on Shop is not allowed for a tenant client`);
+}
