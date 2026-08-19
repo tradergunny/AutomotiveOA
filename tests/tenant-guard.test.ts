@@ -132,8 +132,10 @@ describe("cross-tenant writes fail", () => {
   });
 
   it("create without shopId lands in the scoped shop", async () => {
+    // Prisma's input types require the shop; the guard fills it at runtime,
+    // so this exercises the code path a type-unsafe caller would hit.
     const created = await forShop(shopA.id).staff.create({
-      data: { name: `${run} created-in-A` },
+      data: { name: `${run} created-in-A` } as never,
     });
     expect(created.shopId).toBe(shopA.id);
     await prismaUnscoped.staff.delete({ where: { id: created.id } });
