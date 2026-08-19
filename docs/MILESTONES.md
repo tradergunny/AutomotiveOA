@@ -4,9 +4,9 @@ Work proceeds strictly milestone by milestone; each ends with a founder review g
 
 | # | Milestone | Deliverable | Gate |
 |---|-----------|-------------|------|
-| **M0** | **Visual mockup** ✅ *built, awaiting sign-off* | Clickable dark-mode mockup of the Case Board + Inspection/Damage Map in the locked aesthetic (artifact page, no code project) | Founder approves or vetoes the look |
+| **M0** | **Visual mockup** ✅ *approved 2026-08-20* | Clickable dark-mode mockup of the Case Board + Inspection/Damage Map in the locked aesthetic (artifact page, no code project) | Founder approves or vetoes the look |
 | **M0.5** | **Version control** ✅ *done* | Git repo at `C:\dev\AutomotiveOA`, pushed to private GitHub `tradergunny/AutomotiveOA`; `.gitignore` ready for the Next.js stack | — |
-| M1 | Scaffold & foundation | Next.js + TS + Tailwind + shadcn repo; dark theme tokens; TH/EN i18n plumbing; auth (Advisor/Manager); tenant-guarded data layer (ADR-001); Shop/Staff/User schema; seeded pilot Shop | Login works; shell renders in both languages |
+| **M1** | **Scaffold & foundation** ⏭ *next — brief: [milestones/M1-scaffold-foundation.md](milestones/M1-scaffold-foundation.md)* | Next.js + TS + Tailwind + shadcn repo; dark theme tokens; TH/EN i18n plumbing; auth (Advisor/Manager); tenant-guarded data layer (ADR-001); Shop/Staff/User schema; seeded pilot Shop | Login works; shell renders in both languages |
 | M2 | Customers, Vehicles & Check-in | Phone-lookup customer create/find; Vehicle by plate (body type); check-in flow opening a Repair Case with walkaround photos | A real check-in can be performed end-to-end |
 | M3 | Inspection | Damage Map component (from M0 mockup) + Service Checklist producing photographed Findings, including mid-repair additions | An inspection stores tappable-zone Findings with photos |
 | M4 | Jobs & money core | Group Findings → Jobs; catalog + quoted pricing (Manager override); authorization recording per Job (payer, channel); Part Lines; versioned Quotations + PDF | A priced, authorized case with a printable quotation exists |
