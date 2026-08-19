@@ -1,0 +1,820 @@
+<title>AutomotiveOA — M0 Mockup</title>
+<style>
+  :root{
+    --bg:#09090b; --surface:#101012; --surface2:#161618; --raise:#1c1c1f;
+    --border:#26262a; --border2:#3b3b41;
+    --fg:#f4f4f5; --muted:#a1a1aa; --faint:#6b6b74;
+    --primary:#f97316; --primary-soft:rgba(249,115,22,.12); --primary-dim:#9a4d10;
+    --ok:#22c55e; --warn:#f5a623; --bad:#ef4444; --info:#3b82f6;
+    --mono:"Cascadia Mono","Consolas","SF Mono","Menlo",monospace;
+    --sans:"Segoe UI","Leelawadee UI",-apple-system,"Noto Sans Thai","Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px;line-height:1.45;
+       -webkit-font-smoothing:antialiased}
+  ::selection{background:var(--primary-soft)}
+  button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;padding:0}
+  button:focus-visible,[tabindex]:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+  .app{display:flex;min-height:100vh}
+
+  /* ---------- sidebar ---------- */
+  .side{width:228px;flex:none;border-right:1px solid var(--border);background:var(--surface);
+        display:flex;flex-direction:column;padding:18px 14px;gap:4px;position:sticky;top:0;height:100vh}
+  .brand{position:relative;border:1px solid var(--border);padding:12px 12px 10px;margin-bottom:16px;background:var(--surface2)}
+  .brand .wm{font-family:var(--mono);font-size:14px;letter-spacing:.08em;font-weight:600}
+  .brand .wm em{color:var(--primary);font-style:normal}
+  .brand .sub{font-size:10px;letter-spacing:.22em;color:var(--faint);text-transform:uppercase;margin-top:3px}
+  .tk{position:absolute;width:8px;height:8px;border-color:var(--primary);border-style:solid;border-width:0}
+  .tk.tl{top:-1px;left:-1px;border-top-width:2px;border-left-width:2px}
+  .tk.tr{top:-1px;right:-1px;border-top-width:2px;border-right-width:2px}
+  .tk.bl{bottom:-1px;left:-1px;border-bottom-width:2px;border-left-width:2px}
+  .tk.br{bottom:-1px;right:-1px;border-bottom-width:2px;border-right-width:2px}
+
+  .nav{display:flex;flex-direction:column;gap:2px}
+  .nav button{display:flex;align-items:center;gap:10px;padding:9px 10px;color:var(--muted);
+              border:1px solid transparent;text-align:left;width:100%;font-size:13.5px}
+  .nav button svg{flex:none;opacity:.85}
+  .nav button:hover{color:var(--fg);background:var(--surface2)}
+  .nav button.on{color:var(--fg);background:var(--surface2);border-color:var(--border)}
+  .nav button.on .navdot{margin-left:auto;width:6px;height:6px;background:var(--primary)}
+  .mchip{margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--faint);
+         border:1px dashed var(--border2);padding:1px 5px;letter-spacing:.06em}
+  .side .foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding-top:14px;border-top:1px dashed var(--border)}
+  .idchip{display:flex;align-items:center;gap:9px;padding:7px 9px;border:1px solid var(--border);background:var(--surface2)}
+  .idchip .sq{flex:none;width:26px;height:26px;border:1px solid var(--border2);display:grid;place-items:center;
+              font-family:var(--mono);font-size:11px;color:var(--primary)}
+  .idchip .nm{font-size:12px;line-height:1.25}
+  .idchip .rl{font-size:10.5px;color:var(--faint)}
+
+  /* ---------- main / topbar ---------- */
+  .main{flex:1;min-width:0;display:flex;flex-direction:column}
+  .top{display:flex;align-items:center;gap:14px;padding:14px 26px;border-bottom:1px solid var(--border);
+       background:var(--surface);position:sticky;top:0;z-index:5}
+  .top h1{font-size:15.5px;font-weight:600;margin:0;letter-spacing:.01em}
+  .top .crumb{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .top .right{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .datechip{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .m0{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--primary);
+      border:1px solid var(--primary-dim);padding:3px 8px;
+      background:repeating-linear-gradient(-45deg,var(--primary-soft) 0 1px,transparent 1px 5px)}
+  .lang{display:flex;border:1px solid var(--border2)}
+  .lang button{font-family:var(--mono);font-size:11px;padding:4px 10px;color:var(--faint)}
+  .lang button.on{background:var(--primary);color:#0c0a09;font-weight:700}
+
+  .content{padding:22px 26px 60px;display:flex;flex-direction:column;gap:18px}
+
+  /* ---------- cards & common ---------- */
+  .card{position:relative;border:1px solid var(--border);background:var(--surface)}
+  .card>.hd{display:flex;align-items:center;gap:9px;padding:11px 14px;border-bottom:1px dashed var(--border)}
+  .card>.hd svg{color:var(--muted)}
+  .card>.hd .t{font-size:12.5px;font-weight:600;letter-spacing:.02em}
+  .card>.hd .n{font-family:var(--mono);font-size:10.5px;color:var(--primary);border:1px solid var(--border2);padding:1px 6px}
+  .card>.hd .sp{margin-left:auto}
+  .eyebrow{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--faint)}
+
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 8px;
+        border:1px solid var(--border2);color:var(--muted);white-space:nowrap}
+  .chip.mono{font-family:var(--mono);font-size:10.5px}
+  .chip .dot{width:6px;height:6px;flex:none}
+  .chip.ok{color:var(--ok);border-color:rgba(34,197,94,.35)}
+  .chip.warn{color:var(--warn);border-color:rgba(245,166,35,.4)}
+  .chip.bad{color:var(--bad);border-color:rgba(239,68,68,.4)}
+  .chip.info{color:var(--info);border-color:rgba(59,130,246,.4)}
+  .chip.acc{color:var(--primary);border-color:var(--primary-dim)}
+
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  /* ---------- stats ---------- */
+  .stats{display:flex;gap:12px;flex-wrap:wrap}
+  .stat{position:relative;border:1px solid var(--border);background:var(--surface);padding:10px 16px 9px;min-width:150px}
+  .stat .v{font-family:var(--mono);font-size:20px;font-variant-numeric:tabular-nums;margin-top:2px}
+  .stat .v small{font-size:12px;color:var(--faint)}
+  .stat.warnv .v{color:var(--warn)}
+
+  /* ---------- board groups ---------- */
+  .group{border:1px solid var(--border);background:var(--surface)}
+  .group .ghd{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;user-select:none;width:100%}
+  .group .ghd:hover{background:var(--surface2)}
+  .group .ghd .gt{font-size:12.5px;font-weight:600}
+  .group .ghd .gsub{font-size:11px;color:var(--faint)}
+  .group .ghd .cnt{font-family:var(--mono);font-size:11px;padding:1px 7px;border:1px solid var(--border2);color:var(--muted)}
+  .group .ghd .caret{margin-left:auto;color:var(--faint);transition:transform .15s}
+  .group.closed .caret{transform:rotate(-90deg)}
+  .group.closed .rows{display:none}
+  .group .stripe{width:3px;align-self:stretch;flex:none;margin:-9px 0 -9px -14px}
+  .rows{border-top:1px dashed var(--border)}
+  .row{display:grid;grid-template-columns:86px 118px minmax(220px,1fr) minmax(230px,1.1fr) 120px 110px 30px;
+       gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer}
+  .row:last-child{border-bottom:none}
+  .row:hover{background:var(--surface2)}
+  .row .rc{font-family:var(--mono);font-size:12px;color:var(--fg)}
+  .row:hover .rc{color:var(--primary)}
+  .row .plate{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--border2);
+              padding:2px 7px;justify-self:start;white-space:nowrap}
+  .row .veh{min-width:0}
+  .row .veh .v1{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .veh .v2{font-size:11.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .st{display:flex;gap:6px;flex-wrap:wrap}
+  .row .line{font-size:11px;color:var(--faint);white-space:nowrap}
+  .row .line.due{color:var(--warn)}
+  .row .bal{text-align:right;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums;color:var(--muted)}
+  .row .bal.owe{color:var(--warn)}
+  .row .bal.od{color:var(--bad)}
+  .row .go{color:var(--faint);text-align:right}
+  .row.hot .go{color:var(--primary)}
+  .jbar{display:inline-flex;height:6px;width:54px;border:1px solid var(--border2);overflow:hidden;vertical-align:middle}
+  .jbar i{background:var(--ok);height:100%}
+  .jbar em{background:repeating-linear-gradient(-45deg,rgba(245,166,35,.5) 0 1px,transparent 1px 4px);height:100%}
+
+  /* ---------- inspection ---------- */
+  .ihead{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .back{display:inline-flex;align-items:center;gap:6px;color:var(--faint);font-size:12px}
+  .back:hover{color:var(--fg)}
+  .ihead .rcid{font-family:var(--mono);font-size:19px;letter-spacing:.03em}
+  .ihead .rcid b{color:var(--primary);font-weight:600}
+  .igrid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,1fr);gap:18px;align-items:start}
+  .maparea{padding:6px 10px 12px;
+    background-image:radial-gradient(circle,rgba(63,63,70,.5) 1px,transparent 1px);background-size:22px 22px}
+  .maparea svg{display:block;width:100%;height:auto}
+  .seg{display:flex;border:1px solid var(--border2)}
+  .seg button{font-size:11.5px;padding:4px 12px;color:var(--faint)}
+  .seg button.on{background:var(--raise);color:var(--fg);box-shadow:inset 0 0 0 1px var(--border2)}
+  .seg button.on b{color:var(--primary)}
+  .legend{display:flex;gap:14px;align-items:center;padding:8px 14px;border-top:1px dashed var(--border);
+          font-size:11px;color:var(--faint);flex-wrap:wrap}
+  .sw{display:inline-block;width:14px;height:10px;border:1px solid var(--border2);vertical-align:-1px;margin-right:5px}
+  .sw.hw{background:repeating-linear-gradient(-45deg,rgba(245,166,35,.55) 0 1px,transparent 1px 4px);border-color:rgba(245,166,35,.5)}
+  .sw.hb{background:repeating-linear-gradient(-45deg,rgba(239,68,68,.55) 0 1px,transparent 1px 4px);border-color:rgba(239,68,68,.5)}
+  .sw.sel{border-color:var(--primary);background:var(--primary-soft)}
+  .hint{padding:8px 14px 2px;font-size:11.5px;color:var(--faint)}
+
+  /* svg zones */
+  .decor{fill:none;stroke:var(--border2);stroke-width:1.2;vector-effect:non-scaling-stroke}
+  .decor.soft{stroke:var(--border);stroke-dasharray:3 4}
+  .zone{fill:transparent;stroke:#5b5b64;stroke-width:1.3;cursor:pointer;vector-effect:non-scaling-stroke;
+        transition:fill .12s,stroke .12s}
+  .zone:hover{stroke:var(--primary);fill:var(--primary-soft)}
+  .zone:focus-visible{outline:none;stroke:var(--primary);stroke-width:2}
+  .zone.marked.sevw{fill:url(#hatchW);stroke:rgba(245,166,35,.6)}
+  .zone.marked.sevb{fill:url(#hatchB);stroke:rgba(239,68,68,.6)}
+  .zone.marked:hover{stroke:var(--primary)}
+  .cap{font-family:var(--mono);font-size:10px;fill:var(--faint);letter-spacing:.14em}
+  .badge circle{fill:#0c0a09;stroke:var(--primary);stroke-width:1.2}
+  .badge text{font-family:var(--mono);font-size:10px;fill:var(--primary);text-anchor:middle;dominant-baseline:central}
+  .badge.sevw circle{stroke:var(--warn)}.badge.sevw text{fill:var(--warn)}
+  .badge.sevb circle{stroke:var(--bad)}.badge.sevb text{fill:var(--bad)}
+
+  /* findings + checklist */
+  .rcol{display:flex;flex-direction:column;gap:18px;min-width:0}
+  .fitem{display:flex;flex-direction:column;gap:7px;padding:11px 14px;border-bottom:1px solid var(--border)}
+  .fitem:last-child{border-bottom:none}
+  .fitem .l1{display:flex;align-items:center;gap:8px}
+  .fitem .zn{font-size:13px;font-weight:600}
+  .fitem .src{font-family:var(--mono);font-size:9.5px;color:var(--faint);letter-spacing:.1em;border:1px dashed var(--border2);padding:1px 5px}
+  .fitem .rm{margin-left:auto;color:var(--faint);font-size:15px;line-height:1;padding:2px 6px}
+  .fitem .rm:hover{color:var(--bad)}
+  .fitem .l2{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .tchip{font-size:11px;padding:2px 9px;border:1px solid var(--border2);color:var(--faint)}
+  .tchip.on{color:var(--warn);border-color:rgba(245,166,35,.45);
+            background:repeating-linear-gradient(-45deg,rgba(245,166,35,.12) 0 1px,transparent 1px 4px)}
+  .achip{font-size:11px;padding:2px 9px;border:1px solid var(--primary-dim);color:var(--primary)}
+  .achip:hover{background:var(--primary-soft)}
+  .l3{display:flex;gap:6px;align-items:center}
+  .ph{width:40px;height:32px;border:1px solid var(--border2);display:grid;place-items:center;color:var(--faint);
+      background:repeating-linear-gradient(-45deg,rgba(63,63,70,.3) 0 1px,transparent 1px 5px)}
+  .ph.add{border-style:dashed;color:var(--primary)}
+  .ph.add:hover{border-color:var(--primary)}
+  .fempty{padding:18px 14px;font-size:12px;color:var(--faint)}
+
+  .clrow{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)}
+  .clrow:last-child{border-bottom:none}
+  .clrow .cn{font-size:13px;min-width:0;flex:1}
+  .clrow .cs{display:flex;border:1px solid var(--border2)}
+  .clrow .cs button{font-size:10.5px;padding:3px 9px;color:var(--faint);border-left:1px solid var(--border2)}
+  .clrow .cs button:first-child{border-left:none}
+  .clrow .cs button.s-ok{background:rgba(34,197,94,.14);color:var(--ok)}
+  .clrow .cs button.s-warn{background:rgba(245,166,35,.14);color:var(--warn)}
+  .clrow .cs button.s-bad{background:rgba(239,68,68,.14);color:var(--bad)}
+
+  .ibar{display:flex;align-items:center;gap:12px;padding:12px 16px}
+  .ibar .sum{font-size:12px;color:var(--muted)}
+  .btn{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;padding:8px 16px;
+       border:1px solid var(--primary-dim);color:var(--primary)}
+  .btn:hover{background:var(--primary-soft)}
+  .btn.pri{background:var(--primary);color:#0c0a09}
+  .btn.pri:hover{background:#fb8b3c}
+  .btn.ghost{border-color:var(--border2);color:var(--muted)}
+  .btn.ghost:hover{color:var(--fg)}
+
+  /* toast */
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(8px);opacity:0;
+         background:var(--raise);border:1px solid var(--primary-dim);padding:9px 16px;font-size:12.5px;
+         font-family:var(--mono);pointer-events:none;transition:all .18s;z-index:50;max-width:90vw}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .footnote{padding:10px 26px;border-top:1px dashed var(--border);color:var(--faint);font-size:11px;
+            font-family:var(--mono);display:flex;gap:14px;flex-wrap:wrap}
+
+  @media (max-width:1100px){
+    .igrid{grid-template-columns:1fr}
+    .row{grid-template-columns:80px 108px minmax(150px,1fr) minmax(170px,1fr) 96px 26px}
+    .row .line{display:none}
+  }
+  @media (max-width:840px){
+    .side{display:none}
+    .row{grid-template-columns:76px minmax(130px,1fr) minmax(140px,1fr) 90px 24px}
+    .row .plate{display:none}
+  }
+</style>
+
+<div class="app">
+  <aside class="side">
+    <div class="brand"><b class="tk tl"></b><b class="tk tr"></b><b class="tk bl"></b><b class="tk br"></b>
+      <div class="wm">AUTOMOTIVE<em>OA</em></div>
+      <div class="sub">Workshop OS</div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="foot">
+      <div class="idchip"><span class="sq">SG</span>
+        <span><span class="nm">อู่สมชายการช่าง</span><br><span class="rl">Somchai Garage · Bangkok</span></span>
+      </div>
+      <div class="idchip"><span class="sq">AN</span>
+        <span><span class="nm">คุณแอน</span><br><span class="rl" data-i="role_advisor">ที่ปรึกษาบริการ</span></span>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <span class="crumb">SG /</span>
+      <h1 id="screenTitle" data-i="t_board">แดชบอร์ดเคสซ่อม</h1>
+      <div class="right">
+        <span class="datechip" data-i="date_now">19 ส.ค. 2569 · 14:32</span>
+        <div class="lang" role="group" aria-label="Language">
+          <button id="langTh" class="on">TH</button><button id="langEn">EN</button>
+        </div>
+        <span class="m0">M0 MOCKUP</span>
+      </div>
+    </header>
+
+    <div class="content" id="screen-board">
+      <div class="stats" id="stats"></div>
+      <div id="groups" style="display:flex;flex-direction:column;gap:14px"></div>
+    </div>
+
+    <div class="content" id="screen-inspect" hidden>
+      <div class="ihead">
+        <button class="back" id="backBtn">‹ <span data-i="back">กลับแดชบอร์ด</span></button>
+        <span class="rcid">RC-<b>1024</b></span>
+        <span class="chip mono">กข 1234 กรุงเทพมหานคร</span>
+        <span class="chip">BMW 520d (G30) · 2021</span>
+        <span class="chip">คุณศิลา ธนโชติ</span>
+        <span class="chip warn"><span class="dot" style="background:var(--warn)"></span><span data-i="w_parts">รออะไหล่</span> · <span data-i="eta_val">ETA 22 ส.ค.</span></span>
+      </div>
+
+      <div class="igrid">
+        <div class="card"><b class="tk tl"></b><b class="tk tr"></b><b class="tk bl"></b><b class="tk br"></b>
+          <div class="hd">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 6.5 9 4 3.5 6.5v13L9 17l5 2.5 5.5-2.5v-13L14 9z"/><path d="M9 4v13M14 6.5v13"/></svg>
+            <span class="t" data-i="map_t">แผนผังความเสียหาย</span><span class="n">DAMAGE MAP</span>
+            <span class="sp"></span>
+            <div class="seg" id="bodySeg">
+              <button data-bt="sedan" class="on"><b>●</b> <span data-i="bt_sedan">เก๋ง</span></button>
+              <button data-bt="pickup"><span data-i="bt_pickup">กระบะ</span></button>
+            </div>
+          </div>
+          <div class="hint" data-i="map_hint">แตะตำแหน่งบนตัวถังเพื่อบันทึกความเสียหาย · แตะซ้ำเพื่อลบ</div>
+          <div class="maparea">
+            <svg id="mapSvg" viewBox="0 0 1000 700" role="group" aria-label="Vehicle damage map">
+              <defs>
+                <pattern id="hatchW" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(-45)">
+                  <rect width="6" height="6" fill="rgba(245,166,35,.08)"/>
+                  <line x1="0" y1="0" x2="0" y2="6" stroke="rgba(245,166,35,.55)" stroke-width="1.4"/>
+                </pattern>
+                <pattern id="hatchB" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(-45)">
+                  <rect width="6" height="6" fill="rgba(239,68,68,.08)"/>
+                  <line x1="0" y1="0" x2="0" y2="6" stroke="rgba(239,68,68,.55)" stroke-width="1.4"/>
+                </pattern>
+              </defs>
+              <g id="mapG"></g>
+            </svg>
+          </div>
+          <div class="legend">
+            <span><span class="sw hw"></span><span data-i="lg_minor">เสียหายเล็กน้อย</span></span>
+            <span><span class="sw hb"></span><span data-i="lg_major">เสียหายหนัก</span></span>
+            <span><span class="sw sel"></span><span data-i="lg_hover">กำลังเลือก</span></span>
+            <span><span class="sw"></span><span data-i="lg_ok">ปกติ</span></span>
+          </div>
+        </div>
+
+        <div class="rcol">
+          <div class="card"><b class="tk tl"></b><b class="tk tr"></b><b class="tk bl"></b><b class="tk br"></b>
+            <div class="hd">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>
+              <span class="t" data-i="fnd_t">รายการที่ตรวจพบ</span>
+              <span class="n" id="fndCount">0</span>
+            </div>
+            <div id="fndList"></div>
+          </div>
+
+          <div class="card">
+            <div class="hd">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a5 5 0 0 0-6.6 6.6L3 18l3 3 5.1-5.1a5 5 0 0 0 6.6-6.6L14.6 12l-2.6-2.6z"/></svg>
+              <span class="t" data-i="cl_t">รายการตรวจเช็กระบบ</span><span class="n">CHECKLIST</span>
+            </div>
+            <div id="clList"></div>
+          </div>
+
+          <div class="card ibar">
+            <span class="sum" id="isum"></span>
+            <span style="margin-left:auto"></span>
+            <button class="btn ghost" id="lineBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.3 9 9 0 0 1-2.6-.4L5 21l1-3.5a8 8 0 0 1-2-5A8.4 8.4 0 0 1 12.5 4 8.4 8.4 0 0 1 21 11.5z"/></svg>
+              <span data-i="btn_line">ส่งอัปเดต LINE</span></button>
+            <button class="btn pri" id="quoteBtn"><span data-i="btn_quote">สร้างใบเสนอราคา</span> →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footnote">
+      <span>AUTOMOTIVEOA · M0 VISUAL MOCKUP</span>
+      <span data-i="fn">ข้อมูลสมมติทั้งหมด · ไม่มีการบันทึกจริง</span>
+      <span style="margin-left:auto">CONTEXT.md · DESIGN.md</span>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+/* ---------------- i18n ---------------- */
+const STR={
+ th:{t_board:"แดชบอร์ดเคสซ่อม",t_inspect:"ตรวจสภาพรถ — RC-1024",back:"กลับแดชบอร์ด",role_advisor:"ที่ปรึกษาบริการ",
+  nav_board:"แดชบอร์ด",nav_checkin:"รับรถเข้าอู่",nav_cust:"ลูกค้าและรถ",nav_fu:"งานติดตาม",nav_cat:"แคตตาล็อกราคา",nav_set:"ตั้งค่าอู่",
+  s_active:"เคสที่เปิดอยู่",s_wait:"รอการอนุมัติ",s_ready:"พร้อมส่งมอบ",s_owe:"ยอดค้างชำระ",
+  g_auth:"รอการอนุมัติ",g_auth_s:"ลูกค้า/ประกันยังไม่ตอบ — ตามงานด่วน",
+  g_wait:"งานหยุดรอ",g_wait_s:"รออะไหล่ · ห้องพ่นสี · ประกัน",
+  g_prog:"กำลังซ่อม",g_prog_s:"งานเดินอยู่ตามแผน",
+  g_qc:"รอตรวจ QC",g_qc_s:"รอผู้จัดการเซ็นผ่าน",
+  g_ready:"พร้อมส่งมอบ",g_ready_s:"นัดลูกค้ามารับรถ",
+  g_due:"ส่งมอบแล้ว — ค้างชำระ",g_due_s:"ตามเก็บยอดคงเหลือ",
+  w_parts:"รออะไหล่",w_paint:"รอห้องพ่นสี",w_ins:"รอประกัน",w_tech:"รอช่าง",
+  j_prop:"เสนอราคา",j_qc:"รอ QC",j_done:"เสร็จ",j_prog:"กำลังซ่อม",
+  line_ago:h=>"LINE · "+h,line_none:"ยังไม่เคยส่ง",line_due:"ไม่ได้ส่ง 3 วัน",
+  map_t:"แผนผังความเสียหาย",map_hint:"แตะตำแหน่งบนตัวถังเพื่อบันทึกความเสียหาย · แตะซ้ำเพื่อลบ",
+  bt_sedan:"เก๋ง",bt_pickup:"กระบะ",lg_minor:"เสียหายเล็กน้อย",lg_major:"เสียหายหนัก",lg_hover:"กำลังเลือก",lg_ok:"ปกติ",
+  date_now:"19 ส.ค. 2569 · 14:32",eta_val:"ETA 22 ส.ค.",
+  fnd_t:"รายการที่ตรวจพบ",cl_t:"รายการตรวจเช็กระบบ",fn:"ข้อมูลสมมติทั้งหมด · ไม่มีการบันทึกจริง",
+  btn_line:"ส่งอัปเดต LINE",btn_quote:"สร้างใบเสนอราคา",
+  dt_scratch:"รอยขีดข่วน",dt_dent:"บุบ",dt_crack:"แตกร้าว",dt_broken:"เสียหายหนัก",
+  ac_repair:"ซ่อม",ac_paint:"ทำสี",ac_replace:"เปลี่ยน",ac_rp:"ซ่อม + ทำสี",
+  src_map:"จากแผนผัง",src_cl:"จากเช็กลิสต์",fempty:"ยังไม่มีรายการ — แตะบนแผนผังเพื่อเริ่ม",
+  cs_ok:"ปกติ",cs_warn:"ใกล้ครบกำหนด",cs_bad:"ต้องซ่อม/เปลี่ยน",
+  isum:(a,b)=>"พบ "+a+" รายการ · รูปถ่าย "+b+" รูป",
+  toast_only:"ในม็อกอัพ เปิดได้เฉพาะ RC-1024",toast_m:"ฟีเจอร์นี้จะมาใน ",toast_added:"เพิ่ม: ",toast_removed:"ลบ: ",
+  toast_photo:"กล้องถ่ายรูป — มาใน M3",toast_quote:"ใบเสนอราคา — มาใน M4",toast_line:"ส่ง LINE — มาใน M6",
+  cl_engine:"เครื่องยนต์ / น้ำมันเครื่อง",cl_brake:"ระบบเบรก / ผ้าเบรก",cl_tire:"ยางและช่วงล่าง",cl_batt:"แบตเตอรี่",cl_light:"ไฟส่องสว่าง",cl_air:"ระบบแอร์"},
+ en:{t_board:"Repair Case Board",t_inspect:"Inspection — RC-1024",back:"Back to board",role_advisor:"Service Advisor",
+  nav_board:"Case Board",nav_checkin:"Check-in",nav_cust:"Customers & Vehicles",nav_fu:"Follow-ups",nav_cat:"Service Catalog",nav_set:"Shop Settings",
+  s_active:"Active cases",s_wait:"Awaiting authorization",s_ready:"Ready for pickup",s_owe:"Balance outstanding",
+  g_auth:"Awaiting authorization",g_auth_s:"Customer / insurer hasn't answered — chase now",
+  g_wait:"Waiting",g_wait_s:"Parts · paint booth · insurer",
+  g_prog:"In progress",g_prog_s:"Work running to plan",
+  g_qc:"In QC",g_qc_s:"Needs manager sign-off",
+  g_ready:"Ready for pickup",g_ready_s:"Schedule customer handover",
+  g_due:"Delivered — balance due",g_due_s:"Collect outstanding balance",
+  w_parts:"Waiting: parts",w_paint:"Waiting: paint booth",w_ins:"Waiting: insurer",w_tech:"Waiting: technician",
+  j_prop:"Proposed",j_qc:"In QC",j_done:"Done",j_prog:"In progress",
+  line_ago:h=>"LINE · "+h,line_none:"never sent",line_due:"no update 3 days",
+  map_t:"Damage Map",map_hint:"Tap a body zone to record damage · tap again to remove",
+  bt_sedan:"Sedan",bt_pickup:"Pickup",lg_minor:"Minor damage",lg_major:"Severe damage",lg_hover:"Selecting",lg_ok:"OK",
+  date_now:"Aug 19, 2026 · 14:32",eta_val:"ETA Aug 22",
+  fnd_t:"Findings",cl_t:"Service Checklist",fn:"All data is fictional · nothing is saved",
+  btn_line:"Send LINE update",btn_quote:"Create quotation",
+  dt_scratch:"Scratch",dt_dent:"Dent",dt_crack:"Crack",dt_broken:"Broken",
+  ac_repair:"Repair",ac_paint:"Repaint",ac_replace:"Replace",ac_rp:"Repair + repaint",
+  src_map:"FROM MAP",src_cl:"FROM CHECKLIST",fempty:"No findings yet — tap the map to start",
+  cs_ok:"OK",cs_warn:"Due soon",cs_bad:"Needs work",
+  isum:(a,b)=>a+" findings · "+b+" photos",
+  toast_only:"Mockup: only RC-1024 opens",toast_m:"This feature arrives in ",toast_added:"Added: ",toast_removed:"Removed: ",
+  toast_photo:"Camera capture — arrives in M3",toast_quote:"Quotation — arrives in M4",toast_line:"LINE send — arrives in M6",
+  cl_engine:"Engine / engine oil",cl_brake:"Brakes / brake pads",cl_tire:"Tires & suspension",cl_batt:"Battery",cl_light:"Lights",cl_air:"Air conditioning"}
+};
+let L="th";
+const t=k=>{const v=STR[L][k];return typeof v==="function"?v:(v??k)};
+
+/* zone labels (data, not UI chrome — stays bilingual inline) */
+const ZL={
+ "front-bumper":["กันชนหน้า","Front bumper"],"grille":["กระจังหน้า","Grille"],"hood":["ฝากระโปรงหน้า","Hood"],
+ "windshield":["กระจกบังลมหน้า","Windshield"],"roof":["หลังคา","Roof"],"rear-glass":["กระจกบังลมหลัง","Rear glass"],
+ "trunk":["ฝากระโปรงท้าย","Trunk"],"bed":["กระบะท้าย","Bed"],"tailgate":["ฝาท้ายกระบะ","Tailgate"],
+ "rear-bumper":["กันชนหลัง","Rear bumper"],
+ "headlight-l":["ไฟหน้าซ้าย","Headlight L"],"headlight-r":["ไฟหน้าขวา","Headlight R"],
+ "taillight-l":["ไฟท้ายซ้าย","Taillight L"],"taillight-r":["ไฟท้ายขวา","Taillight R"],
+ "fender-fl":["บังโคลนหน้าซ้าย","Front fender L"],"fender-fr":["บังโคลนหน้าขวา","Front fender R"],
+ "door-fl":["ประตูหน้าซ้าย","Front door L"],"door-fr":["ประตูหน้าขวา","Front door R"],
+ "door-rl":["ประตูหลังซ้าย","Rear door L"],"door-rr":["ประตูหลังขวา","Rear door R"],
+ "quarter-l":["แก้มหลังซ้าย","Quarter L"],"quarter-r":["แก้มหลังขวา","Quarter R"],
+ "bedside-l":["ข้างกระบะซ้าย","Bedside L"],"bedside-r":["ข้างกระบะขวา","Bedside R"],
+ "sill-l":["ชายล่างซ้าย","Sill L"],"sill-r":["ชายล่างขวา","Sill R"],
+ "mirror-l":["กระจกมองข้างซ้าย","Mirror L"],"mirror-r":["กระจกมองข้างขวา","Mirror R"],
+ "wheel-fl":["ล้อหน้าซ้าย","Wheel FL"],"wheel-fr":["ล้อหน้าขวา","Wheel FR"],
+ "wheel-rl":["ล้อหลังซ้าย","Wheel RL"],"wheel-rr":["ล้อหลังขวา","Wheel RR"]};
+const zl=id=>ZL[id]?(L==="th"?ZL[id][0]:ZL[id][1]):id;
+
+/* ---------------- board data ---------------- */
+const CASES={
+ auth:[
+  {rc:"1031",plate:"กท 8842 กรุงเทพฯ",veh:"Toyota Camry 2.5 HEV",cust:"คุณนภา วงศ์สว่าง",
+   st:[["chip warn","j_prop","3"]],line:["2 ชม.","2 h"],bal:null},
+  {rc:"1029",plate:"ขก 445 ขอนแก่น",veh:"Isuzu D-Max V-Cross",cust:"คุณประเสริฐ ชัยมงคล",
+   st:[["chip warn","j_prop","1"],["jbar",3,1]],line:["1 วัน","1 d"],bal:null}],
+ wait:[
+  {rc:"1024",plate:"กข 1234 กรุงเทพฯ",veh:"BMW 520d (G30)",cust:"คุณศิลา ธนโชติ",hot:true,
+   st:[["chip warn","w_parts",null],["jbar",3,1]],line:["3 ชม.","3 h"],bal:null},
+  {rc:"1027",plate:"3กด 777 เชียงใหม่",veh:"Honda Civic FE",cust:"คุณอานนท์ ศรีบุญ",
+   st:[["chip warn","w_paint",null],["jbar",2,1]],line:["เมื่อวาน","1 d"],bal:null},
+  {rc:"1022",plate:"ฮอ 90 กรุงเทพฯ",veh:"Ford Ranger Raptor",cust:"บจก. เอบีซี โลจิสติกส์ · คุณเมธี",
+   st:[["chip warn","w_ins",null],["chip mono","VIR-889",null]],line:["3 วัน","3 d",true],bal:null}],
+ prog:[
+  {rc:"1030",plate:"งจ 2019 กรุงเทพฯ",veh:"Mazda 2 Skyactiv",cust:"คุณพิมพ์ชนก อารีย์",
+   st:[["chip","j_prog",null],["chip mono","ช่างต้น",null]],line:["4 ชม.","4 h"],bal:null},
+  {rc:"1028",plate:"1กร 5566 นนทบุรี",veh:"Toyota Hilux Revo",cust:"คุณสมหมาย จันทร์เพ็ญ",
+   st:[["chip","j_prog",null],["chip mono","ช่างเบิร์ด",null]],line:["6 ชม.","6 h"],bal:null}],
+ qc:[
+  {rc:"1025",plate:"ษร 3388 กรุงเทพฯ",veh:"Mercedes-Benz C220d",cust:"คุณกานต์ พงศ์ธร",
+   st:[["chip info","j_qc",null],["jbar",2,1]],line:["1 ชม.","1 h"],bal:null}],
+ ready:[
+  {rc:"1021",plate:"กข 9218 กรุงเทพฯ",veh:"Nissan Almera",cust:"คุณวราภรณ์ สุขใจ",
+   st:[["chip ok","j_done",null]],line:["30 นาที","30 m"],bal:0},
+  {rc:"1019",plate:"2ขข 154 สมุทรปราการ",veh:"Mitsubishi Triton",cust:"คุณจักรพันธ์ แก้วมณี",
+   st:[["chip ok","j_done",null]],line:["2 ชม.","2 h"],bal:4200}],
+ due:[
+  {rc:"1012",plate:"กว 707 กรุงเทพฯ",veh:"Honda CR-V e:HEV",cust:"บจก. ทรานส์ไทย · คุณศุภชัย",
+   st:[["chip warn","w_ins",null],["chip mono","VIR-812",null]],line:["12 ส.ค.","Aug 12"],bal:28400,od:true}]
+};
+const GROUPS=[["auth","g_auth","g_auth_s","var(--warn)"],["wait","g_wait","g_wait_s","var(--warn)"],
+ ["prog","g_prog","g_prog_s","var(--info)"],["qc","g_qc","g_qc_s","var(--info)"],
+ ["ready","g_ready","g_ready_s","var(--ok)"],["due","g_due","g_due_s","var(--bad)"]];
+
+const baht=n=>"฿"+n.toLocaleString("en-US");
+
+function renderStats(){
+ const owe=CASES.ready.concat(CASES.due).reduce((s,c)=>s+(c.bal||0),0);
+ const active=Object.entries(CASES).filter(([k])=>k!=="due").reduce((s,[,v])=>s+v.length,0);
+ const el=document.getElementById("stats");
+ el.innerHTML=[
+  ["s_active",active+"",""],["s_wait",CASES.auth.length+"",""],
+  ["s_ready",CASES.ready.length+"",""],["s_owe",baht(owe),"warnv"]
+ ].map(([k,v,c])=>`<div class="stat ${c}"><b class="tk tl"></b><b class="tk br"></b>
+   <div class="eyebrow" data-i="${k}">${t(k)}</div><div class="v">${v}</div></div>`).join("");
+}
+
+function stChips(st){
+ return st.map(s=>{
+  if(s[0]==="jbar"){const[,tot,done]=s;const pd=Math.round(done/tot*100);
+   return `<span class="chip" style="gap:7px"><span class="num">${done}/${tot}</span>
+     <span class="jbar"><i style="width:${pd}%"></i><em style="width:${100-pd}%"></em></span></span>`;}
+  const[cls,key,extra]=s;const lbl=STR[L][key]!==undefined?t(key):key;
+  return `<span class="${cls}">${lbl}${extra?' <span class="num">'+extra+"</span>":""}</span>`;
+ }).join("");
+}
+
+function renderBoard(){
+ renderStats();
+ const wrap=document.getElementById("groups");
+ wrap.innerHTML=GROUPS.map(([key,gt,gs,color])=>{
+  const rows=CASES[key].map(c=>{
+   const bal=c.bal==null?'<span class="bal">—</span>'
+    :c.bal===0?'<span class="bal num">฿0</span>'
+    :`<span class="bal num ${c.od?"od":"owe"}">${baht(c.bal)}</span>`;
+   const line=c.line[2]?`<span class="line due">${t("line_due")}</span>`
+    :`<span class="line">${t("line_ago")(L==="th"?c.line[0]:c.line[1])}</span>`;
+   return `<div class="row ${c.hot?"hot":""}" data-rc="${c.rc}" tabindex="0" role="button">
+     <span class="rc">RC-${c.rc}</span><span class="plate">${c.plate}</span>
+     <span class="veh"><span class="v1">${c.veh}</span><span class="v2">${c.cust}</span></span>
+     <span class="st">${stChips(c.st)}</span>${line}${bal}<span class="go">›</span></div>`;
+  }).join("");
+  return `<div class="group ${closedGroups.has(key)?"closed":""}" data-g="${key}">
+    <button class="ghd"><span class="stripe" style="background:${color}"></span>
+      <span class="gt">${t(gt)}</span><span class="cnt num">${CASES[key].length}</span>
+      <span class="gsub">${t(gs)}</span>
+      <svg class="caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+    </button><div class="rows">${rows}</div></div>`;
+ }).join("");
+ wrap.querySelectorAll(".ghd").forEach(h=>h.addEventListener("click",()=>{
+  const g=h.parentElement;g.classList.toggle("closed");
+  closedGroups[g.classList.contains("closed")?"add":"delete"](g.dataset.g);}));
+ wrap.querySelectorAll(".row").forEach(r=>{
+  const go=()=>{ if(r.dataset.rc==="1024") showInspect(); else toast(t("toast_only")); };
+  r.addEventListener("click",go);
+  r.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go();}});
+ });
+}
+
+/* ---------------- nav ---------------- */
+const NAV=[
+ ["nav_board",null,'<path d="M3 3h8v8H3zM13 3h8v5h-8zM13 12h8v9h-8zM3 15h8v6H3z"/>'],
+ ["nav_checkin","M2",'<path d="M5 17h14l-1.5-5.5a2 2 0 0 0-2-1.5H8.5a2 2 0 0 0-2 1.5L5 17z"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/><path d="M12 4v6m0 0 2.5-2.5M12 10 9.5 7.5"/>'],
+ ["nav_cust","M2",'<circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.5a3 3 0 0 1 0 5.5M17.5 20a5.5 5.5 0 0 0-3-4.9"/>'],
+ ["nav_fu","M7",'<path d="M18 8a6 6 0 1 0-12 0c0 7-2 8-2 8h16s-2-1-2-8"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/>'],
+ ["nav_cat","M4",'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/>'],
+ ["nav_set","M8",'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a7.9 7.9 0 0 0 .1-6l-2.1-.4-1-1.7.7-2A8 8 0 0 0 12 4l-1.2 1.8H8.7L7.6 4.1a8 8 0 0 0-5 3.4"/>']
+];
+function renderNav(){
+ const el=document.getElementById("nav");
+ el.innerHTML=NAV.map(([k,m,ic],i)=>`<button data-nk="${k}" class="${i===0?"on":""}">
+   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">${ic}</svg>
+   <span data-i="${k}">${t(k)}</span>${m?`<span class="mchip">${m}</span>`:'<span class="navdot"></span>'}</button>`).join("");
+ el.querySelectorAll("button").forEach((b,i)=>b.addEventListener("click",()=>{
+  if(i===0){showBoard();return;}
+  toast(t("toast_m")+NAV[i][1]);
+ }));
+}
+
+/* ---------------- damage map geometry ---------------- */
+/* helpers: r(rect) p(polygon) c(circle) — badge anchor auto = top-right of bbox */
+const r=(id,x,y,w,h,rx=0)=>({id,k:"r",x,y,w,h,rx});
+const p=(id,pts)=>({id,k:"p",pts});
+const c=(id,cx,cy,cr)=>({id,k:"c",cx,cy,cr});
+
+/* side profile in local coords (facing left), reused flipped for right side */
+function profileZones(sedan){
+ const S=sedan;
+ const z=[
+  r("front-bumper",152,96,30,52,3),
+  p("hood",[[186,90],[S?342:346,74],[S?342:346,86],[190,101]]),
+  p("fender-f",[[188,100],[340,85],[340,146],[310,146],[302,128],[248,128],[240,146],[188,146]]),
+  S?p("windshield",[[348,72],[376,46],[392,46],[364,74]])
+   :p("windshield",[[352,70],[374,42],[390,42],[368,72]]),
+  S?r("roof",378,40,148,11):r("roof",376,36,120,11),
+  S?r("door-f",360,78,88,68):r("door-f",362,76,86,70),
+  S?r("door-r",450,78,78,68):r("door-r",450,76,72,70),
+  S?p("quarter",[[530,78],[598,82],[700,96],[700,146],[652,146],[644,128],[590,128],[582,146],[530,146]])
+   :p("bedside",[[524,80],[712,80],[712,146],[664,146],[656,128],[602,128],[594,146],[524,146]]),
+  S?p("rear-glass",[[528,46],[554,46],[590,80],[560,80]])
+   :p("rear-glass",[[498,40],[514,40],[514,78],[498,78]]),
+  S?p("trunk",[[594,82],[704,96],[702,108],[592,94]]):null,
+  S?null:r("tailgate",700,82,18,64),
+  r("rear-bumper",S?696:716,102,26,46,3),
+  r("sill",316,146,S?266:274,9),
+  r("mirror",352,62,15,11,2),
+  c("wheel-f",274,150,34),
+  c("wheel-r",S?648:652,150,34)
+ ].filter(Boolean);
+ return z;
+}
+function profileDecor(sedan){
+ const S=sedan;
+ const d=[];
+ /* outline */
+ d.push(S?
+  "M152,148 L152,104 Q152,96 162,94 L186,90 L342,74 L376,46 Q380,40 390,40 L520,40 Q534,40 542,48 L590,80 L696,95 Q716,98 718,110 L722,120 L722,148 L716,148 A36,36 0 0 0 580,148 L342,148 A36,36 0 0 0 206,148 L152,148":
+  "M152,148 L152,104 Q152,96 162,94 L186,90 L346,72 L374,42 Q378,36 388,36 L486,36 Q496,36 498,44 L498,78 L712,78 Q730,78 732,92 L734,120 L734,148 L720,148 A36,36 0 0 0 584,148 L342,148 A36,36 0 0 0 206,148 L152,148");
+ /* windows */
+ d.push(S?"M366,76 L388,52 L446,52 L446,76 Z M452,76 L452,52 L516,52 L544,76 Z"
+         :"M368,74 L388,46 L444,46 L444,74 Z M450,74 L450,46 L488,46 L488,74 Z");
+ /* wheels inner */
+ d.push("M274,150 m-20,0 a20,20 0 1 0 40,0 a20,20 0 1 0 -40,0");
+ d.push(S?"M648,150 m-20,0 a20,20 0 1 0 40,0 a20,20 0 1 0 -40,0":"M652,150 m-20,0 a20,20 0 1 0 40,0 a20,20 0 1 0 -40,0");
+ /* door handles */
+ d.push(S?"M420,96 h16 M508,96 h16":"M420,94 h16 M502,94 h14");
+ if(!S) d.push("M524,80 L524,146 M712,86 h18"); /* bed front wall + tailgate cap */
+ return d;
+}
+/* top view (nose left) */
+function topZones(sedan){
+ const S=sedan, Y1=272, Y2=298, Y3=432, Y4=458; /* side bands: top=left, bottom=right */
+ const z=[
+  r("front-bumper",312,Y1+2,26,Y4-Y1-4,8),
+  r("hood",342,Y2,S?80:80,Y3-Y2),
+  p("windshield",[[424,Y2],[452,Y2],[446,Y3],[418,Y3]]),
+  S?r("roof",454,Y2,86,Y3-Y2):r("roof",454,Y2,62,Y3-Y2),
+  S?p("rear-glass",[[542,Y2],[568,Y2],[574,Y3],[548,Y3]]):r("rear-glass",518,Y2,14,Y3-Y2),
+  S?r("trunk",572,Y2,80,Y3-Y2):r("bed",536,Y2,118,Y3-Y2),
+  S?null:r("tailgate",656,Y2,16,Y3-Y2),
+  r("rear-bumper",S?656:674,Y1+2,26,Y4-Y1-4,8),
+  /* left band (top) */
+  r("fender-fl",342,Y1,80,24),r("door-fl",424,Y1,64,24),r("door-rl",490,Y1,58,24),
+  S?r("quarter-l",550,Y1,102,24):r("bedside-l",550,Y1,102,24),
+  /* right band (bottom) */
+  r("fender-fr",342,Y3+2,80,24),r("door-fr",424,Y3+2,64,24),r("door-rr",490,Y3+2,58,24),
+  S?r("quarter-r",550,Y3+2,102,24):r("bedside-r",550,Y3+2,102,24),
+  r("mirror-l",424,Y1-14,18,12,2),r("mirror-r",424,Y4+2,18,12,2)
+ ].filter(Boolean);
+ return z;
+}
+function topDecor(sedan){
+ const d=[];
+ d.push("M312,270 h368 a26,26 0 0 1 0,190 h-368 a26,26 0 0 1 0,-190 z".replace("a26,26 0 0 1 0,190","q30,0 30,95 q0,95 -30,95").replace("a26,26 0 0 1 0,-190","q-30,0 -30,-95 q0,-95 30,-95"));
+ d.push("M424,298 L452,298 M418,432 L446,432"); /* a-pillars */
+ if(!sedan) d.push("M544,306 h102 v118 h-102 z"); /* bed inner */
+ return d;
+}
+/* front & rear face views */
+function faceZones(front,sedan){
+ if(front){
+  return [
+   p("windshield",[[70,296],[220,296],[232,326],[58,326]]),
+   r("hood",56,330,178,16),
+   r("headlight-r",56,350,44,16,2),   /* viewer-left = car right */
+   r("headlight-l",190,350,44,16,2),
+   r("grille",106,348,78,20),
+   r("front-bumper",52,372,186,44,3),
+   r("mirror-r",38,318,14,12,2),r("mirror-l",238,318,14,12,2)
+  ];
+ }
+ return [
+  p("rear-glass",[[770,296],[940,296],[928,324],[782,324]]),
+  sedan?r("trunk",766,328,178,18):r("tailgate",766,328,178,40),
+  r("taillight-r",766,sedan?350:372,46,16,2),  /* viewer-left = car right */
+  r("taillight-l",898,sedan?350:372,46,16,2),
+  sedan?r("rear-bumper",762,372,186,44,3):r("rear-bumper",762,392,186,26,3)
+ ];
+}
+function faceDecor(front,sedan){
+ const d=[];
+ if(front){
+  d.push("M52,300 Q145,262 238,300 L242,372 Q242,420 232,420 L58,420 Q48,420 48,372 Z");
+  d.push("M84,420 v10 h34 v-10 M172,420 v10 h34 v-10");
+ } else {
+  d.push("M762,300 Q855,266 948,300 L952,372 Q952,420 942,420 L768,420 Q758,420 758,372 Z");
+  d.push("M794,420 v10 h34 v-10 M882,420 v10 h34 v-10");
+ }
+ return d;
+}
+
+const CAPS=[[500,238,"ด้านบน","TOP"],[145,492,"ด้านหน้า","FRONT"],[855,492,"ด้านหลัง","REAR"],
+            [500,16,"ด้านซ้าย","LEFT"],[500,694,"ด้านขวา","RIGHT"]];
+
+function shapeSvg(z,idPrefix){
+ const zone=`class="zone" data-zone="${idPrefix}" tabindex="0" role="button"`;
+ if(z.k==="r")return `<rect ${zone} x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="${z.rx}"><title></title></rect>`;
+ if(z.k==="c")return `<circle ${zone} cx="${z.cx}" cy="${z.cy}" r="${z.cr}"><title></title></circle>`;
+ return `<polygon ${zone} points="${z.pts.map(q=>q.join(",")).join(" ")}"><title></title></polygon>`;
+}
+function sideId(base,side){ /* map local profile ids to global */
+ const map={"front-bumper":"front-bumper","rear-bumper":"rear-bumper","hood":"hood","windshield":"windshield",
+  "roof":"roof","rear-glass":"rear-glass","trunk":"trunk","tailgate":"tailgate","sill":"sill-"+side,
+  "mirror":"mirror-"+side,"fender-f":"fender-f"+side,"door-f":"door-f"+side,"door-r":"door-r"+side,
+  "quarter":"quarter-"+side,"bedside":"bedside-"+side,"wheel-f":"wheel-f"+side,"wheel-r":"wheel-r"+side};
+ return map[base]||base;
+}
+function buildMap(variant){
+ const S=variant==="sedan";
+ let out="";
+ const dec=(paths,tf)=>paths.map(d=>`<path class="decor" ${tf?`transform="${tf}"`:""} d="${d}"/>`).join("");
+ /* left profile at top (y offset -10 via group), right profile flipped at bottom */
+ out+=`<g transform="translate(57,-6)">${dec(profileDecor(S))}${profileZones(S).map(z=>shapeSvg(z,sideId(z.id,"l"))).join("")}</g>`;
+ out+=`<g transform="translate(943,484) scale(-1,1)">${dec(profileDecor(S))}${profileZones(S).map(z=>shapeSvg(z,sideId(z.id,"r"))).join("")}</g>`;
+ out+=dec(topDecor(S))+topZones(S).map(z=>shapeSvg(z,z.id)).join("");
+ out+=dec(faceDecor(true,S))+faceZones(true,S).map(z=>shapeSvg(z,z.id)).join("");
+ out+=dec(faceDecor(false,S))+faceZones(false,S).map(z=>shapeSvg(z,z.id)).join("");
+ out+=CAPS.map(([x,y,th,en])=>`<text class="cap" x="${x}" y="${y}" text-anchor="middle">${L==="th"?th:en}</text>`).join("");
+ return out;
+}
+
+/* ---------------- inspection state ---------------- */
+const DT=["dt_scratch","dt_dent","dt_crack","dt_broken"];
+const ACT=["ac_repair","ac_paint","ac_replace","ac_rp"];
+let findings=new Map(); /* zone -> {types:Set, act, photos} */
+findings.set("front-bumper",{types:new Set(["dt_dent","dt_scratch"]),act:"ac_rp",photos:3});
+const CL=[["cl_engine","warn"],["cl_brake","bad"],["cl_tire","ok"],["cl_batt","ok"],["cl_light","ok"],["cl_air","ok"]];
+let clState=Object.fromEntries(CL.map(([k,s])=>[k,s]));
+let variant="sedan";
+const closedGroups=new Set();
+const sev=f=>(f.types.has("dt_crack")||f.types.has("dt_broken"))?"sevb":"sevw";
+const refocus=s=>{const el=document.querySelector(s);if(el)el.focus({preventScroll:true});};
+
+function drawMap(){
+ document.getElementById("mapG").innerHTML=buildMap(variant);
+ const g=document.getElementById("mapG");
+ g.querySelectorAll(".zone").forEach(el=>{
+  const id=el.dataset.zone;
+  el.querySelector("title").textContent=zl(id);
+  el.setAttribute("aria-label",zl(id));
+  if(findings.has(id))el.classList.add("marked",sev(findings.get(id)));
+  const toggle=()=>{
+   if(findings.has(id)){findings.delete(id);toast(t("toast_removed")+zl(id));}
+   else{findings.set(id,{types:new Set(["dt_scratch"]),act:"ac_repair",photos:0});toast(t("toast_added")+zl(id));}
+   drawMap();renderFindings();refocus(`.zone[data-zone="${id}"]`);
+  };
+  el.addEventListener("click",toggle);
+  el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();toggle();}});
+ });
+ /* badges */
+ findings.forEach((f,id)=>{
+  g.querySelectorAll(`.zone[data-zone="${id}"]`).forEach(el=>{
+   const bb=el.getBBox();
+   let x=bb.x+bb.width,y=bb.y;
+   const gc=g.getCTM(),ec=el.getCTM();
+   if(gc&&ec){const pt=new DOMPoint(x,y).matrixTransform(gc.inverse().multiply(ec));x=pt.x;y=pt.y;}
+   const b=document.createElementNS("http://www.w3.org/2000/svg","g");
+   b.setAttribute("class","badge "+sev(f));b.setAttribute("pointer-events","none");
+   b.innerHTML=`<circle cx="${x}" cy="${y}" r="8"/><text x="${x}" y="${y+0.5}">${f.types.size||1}</text>`;
+   g.appendChild(b);
+  });
+ });
+}
+
+function renderFindings(){
+ const list=document.getElementById("fndList");
+ const clBad=CL.filter(([k])=>clState[k]!=="ok");
+ const n=findings.size+clBad.length;
+ document.getElementById("fndCount").textContent=n;
+ let html="";
+ findings.forEach((f,id)=>{
+  html+=`<div class="fitem" data-z="${id}">
+   <div class="l1"><span class="zn">${zl(id)}</span><span class="src">${t("src_map")}</span>
+     <button class="rm" data-rm="${id}" aria-label="remove">×</button></div>
+   <div class="l2">${DT.map(d=>`<button class="tchip ${f.types.has(d)?"on":""}" data-dt="${d}">${t(d)}</button>`).join("")}
+     <span style="color:var(--faint)">·</span>
+     <button class="achip" data-act="1">${t(f.act)} ⟳</button></div>
+   <div class="l3">${Array.from({length:f.photos},()=>`<span class="ph">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.2"/></svg></span>`).join("")}
+     <button class="ph add" data-ph="${id}">+</button></div>
+  </div>`;
+ });
+ clBad.forEach(([k])=>{
+  const s=clState[k];
+  html+=`<div class="fitem"><div class="l1"><span class="zn">${t(k)}</span><span class="src">${t("src_cl")}</span></div>
+   <div class="l2"><span class="chip ${s==="bad"?"bad":"warn"}">${t(s==="bad"?"cs_bad":"cs_warn")}</span>
+   ${s==="bad"?`<button class="achip">${t("ac_replace")} ⟳</button>`:""}</div></div>`;
+ });
+ list.innerHTML=html||`<div class="fempty">${t("fempty")}</div>`;
+ const photos=[...findings.values()].reduce((s,f)=>s+f.photos,0);
+ document.getElementById("isum").textContent=t("isum")(n,photos);
+ /* wire chips */
+ list.querySelectorAll("[data-rm]").forEach(b=>b.addEventListener("click",()=>{
+  const id=b.dataset.rm;findings.delete(id);drawMap();renderFindings();refocus(`.zone[data-zone="${id}"]`);}));
+ list.querySelectorAll("[data-dt]").forEach(b=>b.addEventListener("click",()=>{
+  const z=b.closest(".fitem").dataset.z,f=findings.get(z),d=b.dataset.dt;
+  f.types.has(d)?f.types.delete(d):f.types.add(d);
+  if(!f.types.size)f.types.add("dt_scratch");
+  drawMap();renderFindings();refocus(`.fitem[data-z="${z}"] [data-dt="${d}"]`);}));
+ list.querySelectorAll("[data-act]").forEach(b=>b.addEventListener("click",()=>{
+  const z=b.closest(".fitem").dataset.z,f=findings.get(z);
+  f.act=ACT[(ACT.indexOf(f.act)+1)%ACT.length];renderFindings();refocus(`.fitem[data-z="${z}"] [data-act]`);}));
+ list.querySelectorAll("[data-ph]").forEach(b=>b.addEventListener("click",()=>toast(t("toast_photo"))));
+}
+
+function renderChecklist(){
+ const el=document.getElementById("clList");
+ el.innerHTML=CL.map(([k])=>{
+  const s=clState[k];
+  return `<div class="clrow"><span class="cn">${t(k)}</span>
+   <span class="cs">${["ok","warn","bad"].map(v=>
+    `<button data-cl="${k}" data-v="${v}" class="${s===v?"s-"+v:""}">${t(v==="ok"?"cs_ok":v==="warn"?"cs_warn":"cs_bad")}</button>`).join("")}</span></div>`;
+ }).join("");
+ el.querySelectorAll("[data-cl]").forEach(b=>b.addEventListener("click",()=>{
+  const k=b.dataset.cl,v=b.dataset.v;clState[k]=v;renderChecklist();renderFindings();
+  refocus(`[data-cl="${k}"][data-v="${v}"]`);}));
+}
+
+/* ---------------- shell ---------------- */
+function applyLang(){
+ document.querySelectorAll("[data-i]").forEach(el=>{const v=STR[L][el.dataset.i];if(typeof v==="string")el.textContent=v;});
+ document.getElementById("langTh").classList.toggle("on",L==="th");
+ document.getElementById("langEn").classList.toggle("on",L==="en");
+ renderNav();renderBoard();drawMap();renderFindings();renderChecklist();
+ document.getElementById("screenTitle").textContent=
+   document.getElementById("screen-inspect").hidden?t("t_board"):t("t_inspect");
+}
+function showInspect(){
+ document.getElementById("screen-board").style.display="none";
+ document.getElementById("screen-inspect").hidden=false;
+ drawMap();
+ document.getElementById("screenTitle").textContent=t("t_inspect");
+ window.scrollTo({top:0});
+}
+function showBoard(){
+ document.getElementById("screen-inspect").hidden=true;
+ document.getElementById("screen-board").style.display="";
+ document.getElementById("screenTitle").textContent=t("t_board");
+}
+let toastTimer;
+function toast(msg){
+ const el=document.getElementById("toast");el.textContent=msg;el.classList.add("show");
+ clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove("show"),1900);
+}
+
+document.getElementById("langTh").addEventListener("click",()=>{L="th";applyLang();});
+document.getElementById("langEn").addEventListener("click",()=>{L="en";applyLang();});
+document.getElementById("backBtn").addEventListener("click",showBoard);
+document.getElementById("quoteBtn").addEventListener("click",()=>toast(t("toast_quote")));
+document.getElementById("lineBtn").addEventListener("click",()=>toast(t("toast_line")));
+document.getElementById("bodySeg").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
+ variant=b.dataset.bt;
+ document.getElementById("bodySeg").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));
+ drawMap();
+}));
+
+renderNav();renderBoard();drawMap();renderFindings();renderChecklist();
+})();
+</script>

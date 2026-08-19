@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# Next.js build output
+.next/
+out/
+build/
+dist/
+
+# Production
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment & secrets — NEVER commit (LINE OA channel tokens, DB creds live here)
+.env
+.env*.local
+.env.production
+*.pem
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+/prisma/*.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Testing
+/coverage
+.nyc_output
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Vercel
+.vercel
+
+# Turbo
+.turbo

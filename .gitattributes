@@ -1,0 +1,11 @@
+# Normalize line endings — LF in the repo, checked out native on Windows
+* text=auto eol=lf
+
+# Binary files git should not touch
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
