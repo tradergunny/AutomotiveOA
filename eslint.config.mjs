@@ -14,7 +14,15 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Prisma generated client
     "lib/generated/**",
+    // Reference artifacts and docs, not app code
+    "docs/**",
   ]),
+  {
+    // The tenant guard intercepts every Prisma operation generically; its
+    // internals are inherently dynamic (args shapes vary per model/op).
+    files: ["lib/tenant.ts"],
+    rules: { "@typescript-eslint/no-explicit-any": "off" },
+  },
 ]);
 
 export default eslintConfig;

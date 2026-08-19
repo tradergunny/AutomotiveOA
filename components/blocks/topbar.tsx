@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useFormatter, useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { LocaleToggle } from "@/components/blocks/locale-toggle";
 
 const TITLE_KEYS: Record<string, string> = {
@@ -14,19 +14,24 @@ const TITLE_KEYS: Record<string, string> = {
   settings: "settings",
 };
 
-// Client-only clock: rendering the time on the server would hydrate stale.
+// Client-only clock in 30s buckets: the server snapshot is empty (0), so
+// hydration never mismatches, and the store re-syncs right after mount.
+const subscribeClock = (onChange: () => void) => {
+  const timer = setInterval(onChange, 30_000);
+  return () => clearInterval(timer);
+};
+
 function DateChip() {
   const format = useFormatter();
-  const [now, setNow] = useState<Date | null>(null);
-
-  useEffect(() => {
-    setNow(new Date());
-    const timer = setInterval(() => setNow(new Date()), 30_000);
-    return () => clearInterval(timer);
-  }, []);
+  const bucket = useSyncExternalStore(
+    subscribeClock,
+    () => Math.floor(Date.now() / 30_000),
+    () => 0,
+  );
+  const now = bucket ? new Date(bucket * 30_000) : null;
 
   return (
-    <span className="font-mono text-[11px] text-muted-foreground" suppressHydrationWarning>
+    <span className="font-mono text-[11px] text-muted-foreground">
       {now
         ? `${format.dateTime(now, { day: "numeric", month: "short", year: "numeric" })} · ${format.dateTime(now, { hour: "2-digit", minute: "2-digit", hour12: false })}`
         : ""}
