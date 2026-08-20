@@ -1,6 +1,9 @@
-// AutomotiveOA — M1 data foundation (CONTEXT.md: Shop, Staff, User).
+// AutomotiveOA — data foundation (CONTEXT.md language).
+// M1: Shop, Staff, User. M2: Customer, Vehicle, RepairCase, Photo.
 // Every tenant-owned row carries shop_id (ADR-001); scoping is enforced by the
-// tenant guard in lib/db.ts, never by hand-written WHERE clauses.
+// tenant guard in lib/tenant.ts, never by hand-written WHERE clauses. Cross-model
+// relations join on same-shop composite FKs so the database itself rejects
+// cross-shop links (defense in depth, per User→Staff in M1).
 
 generator client {
   provider = "prisma-client"
@@ -15,11 +18,18 @@ datasource db {
 model Shop {
   id        String   @id @default(cuid())
   name      String
+  /// Last issued Repair Case number, atomically incremented per check-in
+  /// (M2 brief §2). Starts at 1000 so the first case is RC-1001.
+  caseSeq   Int      @default(1000) @map("case_seq")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  staff Staff[]
-  users User[]
+  staff       Staff[]
+  users       User[]
+  customers   Customer[]
+  vehicles    Vehicle[]
+  repairCases RepairCase[]
+  photos      Photo[]
 
   @@map("shops")
 }
@@ -37,10 +47,12 @@ model Staff {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  shop Shop  @relation(fields: [shopId], references: [id])
-  user User?
+  shop           Shop         @relation(fields: [shopId], references: [id])
+  user           User?
+  openedCases    RepairCase[]
+  uploadedPhotos Photo[]
 
-  @@unique([shopId, id]) // target for the same-shop composite FK from users
+  @@unique([shopId, id]) // target for the same-shop composite FKs (users, cases, photos)
   @@index([shopId])
   @@map("staff")
 }
@@ -77,4 +89,131 @@ enum UserRole {
 enum Locale {
   th
   en
+}
+
+/// Always a person — the one the Shop talks to (CONTEXT.md). Phone is the
+/// per-Shop identity key: at check-in the advisor looks up by phone to decide
+/// existing-vs-new. History (spending, visits) is relationship data and never
+/// transfers with a sold car. Real fleet accounts are deferred (LATER.md).
+model Customer {
+  id        String   @id @default(cuid())
+  shopId    String   @map("shop_id")
+  name      String
+  /// Normalized to digits only (lib/normalize.ts) — the identity key.
+  phone     String
+  /// Optional company tag for corporate cars ("Somchai — ABC Logistics").
+  company   String?
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  shop            Shop         @relation(fields: [shopId], references: [id])
+  primaryVehicles Vehicle[]    @relation("VehiclePrimaryCustomer")
+  contactCases    RepairCase[] @relation("CaseContactCustomer")
+
+  @@unique([shopId, phone])
+  @@unique([shopId, id]) // target for the same-shop composite FKs
+  @@map("customers")
+}
+
+/// Selects the Damage Map artwork (DESIGN.md; the map itself arrives in M3).
+enum BodyType {
+  SEDAN
+  PICKUP
+}
+
+/// A car (CONTEXT.md). Plate is the everyday lookup key — a returning car
+/// wearing a new plate gets its plate edited IN PLACE (history stays, no
+/// duplicate Vehicle). Vehicle history is physical truth and stays with the
+/// car across owners; ownership changes re-link primaryCustomer at check-in.
+model Vehicle {
+  id                String   @id @default(cuid())
+  shopId            String   @map("shop_id")
+  /// Normalized: spaces/dashes stripped (lib/normalize.ts), e.g. "กข1234".
+  plate             String
+  /// Registration province, free text — optional, disambiguates identical plates.
+  province          String?
+  /// Optional; usually supplied by insurance cases.
+  vin               String?
+  bodyType          BodyType @map("body_type")
+  make              String?
+  model             String?
+  color             String?
+  primaryCustomerId String   @map("primary_customer_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  shop            Shop         @relation(fields: [shopId], references: [id])
+  primaryCustomer Customer     @relation("VehiclePrimaryCustomer", fields: [shopId, primaryCustomerId], references: [shopId, id])
+  cases           RepairCase[]
+
+  @@unique([shopId, plate])
+  @@unique([shopId, id]) // target for the same-shop composite FKs
+  @@map("vehicles")
+}
+
+/// Lifecycle (CONTEXT.md): Checked In → Ready → Delivered. Everything in
+/// between is derived from Jobs (M4+) and never set by hand. M2 only ever
+/// writes CHECKED_IN; READY/DELIVERED transitions arrive with the M5 board.
+enum RepairCaseStatus {
+  CHECKED_IN
+  READY
+  DELIVERED
+}
+
+/// The ticket for one vehicle visit (CONTEXT.md). Opened at check-in, closed
+/// at delivery. Carries its own contact person — usually the Vehicle's primary
+/// Customer, but whoever actually brought the car.
+model RepairCase {
+  id                String           @id @default(cuid())
+  shopId            String           @map("shop_id")
+  /// Human reference like RC-1024 — per-Shop sequence from Shop.caseSeq.
+  reference         String
+  status            RepairCaseStatus @default(CHECKED_IN)
+  vehicleId         String           @map("vehicle_id")
+  contactCustomerId String           @map("contact_customer_id")
+  /// Visit reason / customer-reported concerns, free text.
+  note              String?
+  odometerKm        Int?             @map("odometer_km")
+  checkedInAt       DateTime         @default(now()) @map("checked_in_at")
+  openedByStaffId   String           @map("opened_by_staff_id")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  shop            Shop     @relation(fields: [shopId], references: [id])
+  vehicle         Vehicle  @relation(fields: [shopId, vehicleId], references: [shopId, id])
+  contactCustomer Customer @relation("CaseContactCustomer", fields: [shopId, contactCustomerId], references: [shopId, id])
+  openedByStaff   Staff    @relation(fields: [shopId, openedByStaffId], references: [shopId, id])
+  photos          Photo[]
+
+  @@unique([shopId, reference])
+  @@unique([shopId, id]) // target for the same-shop composite FKs
+  @@index([shopId, status])
+  @@map("repair_cases")
+}
+
+/// A photo (CONTEXT.md: attaches at Repair Case / Finding / Job level). Every
+/// Photo belongs to its Repair Case; the finer Finding/Job links arrive with
+/// those models (M3/M4). M2 level: the check-in walkaround, shot by the
+/// advisor straight into the system.
+model Photo {
+  id                String   @id @default(cuid())
+  shopId            String   @map("shop_id")
+  caseId            String   @map("case_id")
+  /// Key into the photo store (lib/storage) — files are served only through
+  /// the authenticated, tenant-checked photo route, never a public URL.
+  storageKey        String   @unique @map("storage_key")
+  contentType       String   @map("content_type")
+  sizeBytes         Int      @map("size_bytes")
+  capturedAt        DateTime @default(now()) @map("captured_at")
+  uploadedByStaffId String   @map("uploaded_by_staff_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  shop       Shop       @relation(fields: [shopId], references: [id])
+  repairCase RepairCase @relation(fields: [shopId, caseId], references: [shopId, id])
+  uploadedBy Staff      @relation(fields: [shopId, uploadedByStaffId], references: [shopId, id])
+
+  @@index([shopId, caseId])
+  @@map("photos")
 }

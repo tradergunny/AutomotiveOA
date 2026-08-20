@@ -19,14 +19,28 @@ import { Prisma } from "@/lib/generated/prisma/client";
  * pre-check. Rows never change tenant (shopId updates are rejected), so the
  * check cannot be invalidated between read and write.
  *
- * Nested writes are not intercepted by Prisma query extensions, but the M1
- * relations are structurally safe: User's Staff relation joins on
- * (shop_id, staff_id) with a composite FK, so the database rejects any
- * cross-shop link a nested write could attempt.
+ * Nested writes are not intercepted by Prisma query extensions, but the
+ * relations are structurally safe: every tenant-owned relation joins on a
+ * same-shop composite FK — User→Staff in M1; Vehicle→Customer,
+ * RepairCase→{Vehicle, Customer, Staff}, and Photo→{RepairCase, Staff} in
+ * M2 — so the database rejects any cross-shop link a nested write could
+ * attempt.
+ *
+ * The unique-where ownership pre-check reads with the base client, outside
+ * any surrounding interactive transaction — so update/delete/upsert of a row
+ * created earlier in the SAME uncommitted transaction will not find it.
+ * Create-only transactions (e.g. check-in) are unaffected.
  */
 
 /** Models that carry shop_id and belong to exactly one Shop. */
-const TENANT_OWNED = ["Staff", "User"] as const satisfies readonly Prisma.ModelName[];
+const TENANT_OWNED = [
+  "Staff",
+  "User",
+  "Customer",
+  "Vehicle",
+  "RepairCase",
+  "Photo",
+] as const satisfies readonly Prisma.ModelName[];
 
 /** The tenant itself: readable/updatable only as the shop's own row. */
 const SHOP_MODEL = "Shop" as const satisfies Prisma.ModelName;
