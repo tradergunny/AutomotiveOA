@@ -22,3 +22,13 @@ export async function tenantDb() {
   const session = await requireSession();
   return forShop(session.shopId);
 }
+
+/**
+ * Session + tenant client together — for server actions that also need
+ * session facts (e.g. shopId on creates, which Prisma's input types require;
+ * the guard verifies it matches the scope either way).
+ */
+export async function tenantContext() {
+  const session = await requireSession();
+  return { session, db: forShop(session.shopId) };
+}

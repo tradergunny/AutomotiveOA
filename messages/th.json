@@ -1,7 +1,13 @@
 {
   "common": {
     "appName": "AutomotiveOA",
-    "tagline": "Workshop OS"
+    "tagline": "Workshop OS",
+    "save": "บันทึก",
+    "saving": "กำลังบันทึก…",
+    "cancel": "ยกเลิก",
+    "back": "ย้อนกลับ",
+    "edit": "แก้ไข",
+    "optional": "ไม่บังคับ"
   },
   "nav": {
     "board": "แดชบอร์ด",
@@ -17,7 +23,8 @@
     "customers": "ลูกค้าและรถ",
     "followups": "งานติดตาม",
     "catalog": "แคตตาล็อกราคา",
-    "settings": "ตั้งค่าอู่"
+    "settings": "ตั้งค่าอู่",
+    "cases": "เคสซ่อม"
   },
   "roles": {
     "MANAGER": "ผู้จัดการ",
@@ -43,5 +50,56 @@
   "stub": {
     "comingIn": "ฟีเจอร์นี้จะมาใน {milestone}",
     "backToBoard": "กลับแดชบอร์ด"
+  },
+  "caseStatus": {
+    "CHECKED_IN": "รับรถแล้ว",
+    "READY": "พร้อมส่งมอบ",
+    "DELIVERED": "ส่งมอบแล้ว"
+  },
+  "customers": {
+    "searchPlaceholder": "ค้นหาชื่อ เบอร์โทร บริษัท หรือทะเบียนรถ…",
+    "newCustomer": "เพิ่มลูกค้าใหม่",
+    "name": "ชื่อลูกค้า",
+    "phone": "เบอร์โทรศัพท์",
+    "company": "บริษัท",
+    "note": "บันทึกเพิ่มเติม",
+    "vehicles": "รถของลูกค้า",
+    "cases": "เคสซ่อม",
+    "addVehicle": "เพิ่มรถ",
+    "noVehicles": "ยังไม่มีรถ",
+    "noCases": "ยังไม่มีเคสซ่อม",
+    "empty": "ยังไม่มีลูกค้า — เพิ่มลูกค้าใหม่ หรือเริ่มจากการรับรถเข้าอู่",
+    "noResults": "ไม่พบลูกค้าที่ตรงกับ \"{q}\"",
+    "createTitle": "เพิ่มลูกค้าใหม่",
+    "editTitle": "แก้ไขข้อมูลลูกค้า",
+    "companyHint": "สำหรับรถบริษัท เช่น \"ABC Logistics\"",
+    "errors": {
+      "nameRequired": "กรุณากรอกชื่อลูกค้า",
+      "phoneInvalid": "เบอร์โทรต้องเป็นเลข 9–10 หลัก",
+      "phoneTaken": "เบอร์นี้มีลูกค้าในระบบอยู่แล้ว"
+    }
+  },
+  "vehicles": {
+    "plate": "ทะเบียนรถ",
+    "province": "จังหวัด",
+    "vin": "เลขตัวถัง (VIN)",
+    "bodyType": "ประเภทตัวถัง",
+    "make": "ยี่ห้อ",
+    "model": "รุ่น",
+    "color": "สี",
+    "owner": "ลูกค้าหลัก (เจ้าของ)",
+    "createTitle": "เพิ่มรถใหม่",
+    "editTitle": "แก้ไขข้อมูลรถ",
+    "plateEditNote": "รถคันเดิมเปลี่ยนทะเบียน? แก้ไขที่นี่ได้เลย — ประวัติรถยังอยู่ครบในคันเดียว",
+    "bodyTypes": {
+      "SEDAN": "รถเก๋ง",
+      "PICKUP": "รถกระบะ"
+    },
+    "errors": {
+      "plateRequired": "กรุณากรอกทะเบียนรถ",
+      "plateTaken": "ทะเบียนนี้มีรถในระบบอยู่แล้ว",
+      "bodyTypeRequired": "กรุณาเลือกประเภทตัวถัง",
+      "customerMissing": "ไม่พบข้อมูลลูกค้า"
+    }
   }
 }

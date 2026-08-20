@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 const ITEMS = [
   { href: "/", key: "board", icon: LayoutDashboard },
   { href: "/checkin", key: "checkin", icon: CarFront, milestone: "M2" },
-  { href: "/customers", key: "customers", icon: Users, milestone: "M2" },
+  { href: "/customers", key: "customers", icon: Users },
   { href: "/followups", key: "followups", icon: PhoneOutgoing, milestone: "M7" },
   { href: "/catalog", key: "catalog", icon: Tags, milestone: "M4" },
   { href: "/settings", key: "settings", icon: Settings, milestone: "M6" },
