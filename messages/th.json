@@ -56,6 +56,19 @@
     "READY": "พร้อมส่งมอบ",
     "DELIVERED": "ส่งมอบแล้ว"
   },
+  "cases": {
+    "checkedInAt": "รับรถเมื่อ",
+    "openedBy": "ผู้รับรถ",
+    "vehicle": "รถ",
+    "contact": "ผู้ติดต่อ",
+    "primaryCustomer": "ลูกค้าหลัก",
+    "note": "อาการ / หมายเหตุ",
+    "odometer": "เลขไมล์",
+    "odometerValue": "{km} กม.",
+    "photos": "รูปถ่ายรอบคัน",
+    "noPhotos": "ยังไม่มีรูปในเคสนี้",
+    "photoAlt": "รูปเคสที่ {n}"
+  },
   "customers": {
     "searchPlaceholder": "ค้นหาชื่อ เบอร์โทร บริษัท หรือทะเบียนรถ…",
     "newCustomer": "เพิ่มลูกค้าใหม่",

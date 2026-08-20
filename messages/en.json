@@ -56,6 +56,19 @@
     "READY": "Ready",
     "DELIVERED": "Delivered"
   },
+  "cases": {
+    "checkedInAt": "Checked in",
+    "openedBy": "Received by",
+    "vehicle": "Vehicle",
+    "contact": "Contact",
+    "primaryCustomer": "Primary customer",
+    "note": "Visit note",
+    "odometer": "Odometer",
+    "odometerValue": "{km} km",
+    "photos": "Walkaround photos",
+    "noPhotos": "No photos on this case yet",
+    "photoAlt": "Case photo {n}"
+  },
   "customers": {
     "searchPlaceholder": "Search name, phone, company, or plate…",
     "newCustomer": "New customer",
