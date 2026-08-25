@@ -45,7 +45,14 @@
     "account": "Account"
   },
   "board": {
-    "empty": "No repair cases yet — check-in arrives in M2"
+    "empty": "No open repair cases — start with a check-in",
+    "newCheckin": "New check-in",
+    "columns": {
+      "case": "Case",
+      "vehicle": "Vehicle",
+      "contact": "Contact",
+      "checkedIn": "Checked in"
+    }
   },
   "stub": {
     "comingIn": "This feature arrives in {milestone}",
