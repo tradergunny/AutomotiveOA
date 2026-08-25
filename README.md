@@ -6,7 +6,7 @@ Built first with a pilot shop, sold to other garages (see [ADR-001](docs/adr/ADR
 
 ## Status
 
-M1 (scaffold & foundation) built: bilingual app shell behind login, on a tenant-guarded data layer. Domain features arrive milestone by milestone — see [docs/MILESTONES.md](docs/MILESTONES.md).
+M2 (Customers, Vehicles & Check-in) built on the M1 foundation: the front desk looks a customer up by phone, finds or creates the Vehicle by plate, and opens a Repair Case with walkaround photos — all bilingual, behind login, on the tenant-guarded data layer. Domain features arrive milestone by milestone — see [docs/MILESTONES.md](docs/MILESTONES.md).
 
 ## Getting started (dev)
 
@@ -42,6 +42,16 @@ Open http://localhost:3000 and log in with a seeded pilot-shop account:
 | `ann@somchaigarage.dev` | `advisor123` | Service Advisor |
 
 Tests (`npm test`) need the dev database running.
+
+Check-in photos are stored in `.data/photos/` (gitignored) by the local storage driver; production swaps in Vercel Blob behind the same seam ([lib/storage.ts](lib/storage.ts)) at deploy time.
+
+### Authoring new migrations
+
+`npm run db:migrate` only **applies** committed migrations. To **create** one after editing `prisma/schema.prisma`, set `SHADOW_DATABASE_URL` in `.env` first (see `.env.example` — the `db:dev` server is single-store, so `prisma migrate dev` must use the dedicated shadow server it also runs, one port above the main TCP port), then:
+
+```bash
+npm run db:migrate:new
+```
 
 ## Documentation
 
