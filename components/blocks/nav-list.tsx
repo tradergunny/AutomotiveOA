@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 // telling staff when the feature lands (MILESTONES.md).
 const ITEMS = [
   { href: "/", key: "board", icon: LayoutDashboard },
-  { href: "/checkin", key: "checkin", icon: CarFront, milestone: "M2" },
+  { href: "/checkin", key: "checkin", icon: CarFront },
   { href: "/customers", key: "customers", icon: Users },
   { href: "/followups", key: "followups", icon: PhoneOutgoing, milestone: "M7" },
   { href: "/catalog", key: "catalog", icon: Tags, milestone: "M4" },

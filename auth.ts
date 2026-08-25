@@ -38,17 +38,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.staff.name,
           role: user.role,
           shopId: user.shopId,
+          staffId: user.staffId,
           locale: user.locale,
         };
       },
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
+    async jwt({ token, user }) {
       if (user) {
         token.userId = user.id;
         token.role = user.role;
         token.shopId = user.shopId;
+        token.staffId = user.staffId;
+      }
+      // Sessions minted before staffId existed (M2): heal once from the DB,
+      // or invalidate if the user is gone.
+      const userId = token.userId as string | undefined;
+      if (!token.staffId && userId) {
+        const dbUser = await prismaUnscoped.user.findUnique({
+          where: { id: userId },
+          select: { staffId: true },
+        });
+        if (!dbUser) return null;
+        token.staffId = dbUser.staffId;
       }
       return token;
     },
@@ -56,6 +69,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.id = token.userId as string;
       session.user.role = token.role as UserRole;
       session.user.shopId = token.shopId as string;
+      session.user.staffId = token.staffId as string;
       return session;
     },
   },

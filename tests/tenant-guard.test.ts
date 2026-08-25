@@ -341,6 +341,20 @@ describe("M2 models are scoped (Customer, Vehicle, RepairCase, Photo)", () => {
     ).toBeNull();
   });
 
+  it("findUnique with a narrow select still works (guard injects shopId)", async () => {
+    const own = await forShop(shopA.id).customer.findUnique({
+      where: { id: customerA.id },
+      select: { id: true },
+    });
+    expect(own).toEqual({ id: customerA.id });
+    expect(
+      await forShop(shopA.id).customer.findUnique({
+        where: { id: customerB.id },
+        select: { id: true },
+      }),
+    ).toBeNull();
+  });
+
   it("repair cases: scoped findMany and cross-shop findUniqueOrThrow", async () => {
     const scoped = await forShop(shopA.id).repairCase.findMany({
       where: { reference: { startsWith: run } },
@@ -377,6 +391,21 @@ describe("M2 models are scoped (Customer, Vehicle, RepairCase, Photo)", () => {
         },
       }),
     ).rejects.toThrow(TenantGuardError);
+  });
+
+  it("unique-where mutations work inside an interactive transaction", async () => {
+    // Regression: the old ownership pre-check ran on a separate connection
+    // and deadlocked inside $transaction on single-connection dev servers.
+    await forShop(shopA.id).$transaction(async (tx) => {
+      await tx.customer.update({
+        where: { id: customerA.id },
+        data: { note: "updated-in-tx" },
+      });
+    });
+    const after = await prismaUnscoped.customer.findUnique({
+      where: { id: customerA.id },
+    });
+    expect(after?.note).toBe("updated-in-tx");
   });
 
   it("cross-shop customer update throws and changes nothing", async () => {

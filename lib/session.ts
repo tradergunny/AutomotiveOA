@@ -7,10 +7,11 @@ import { forShop } from "@/lib/tenant";
 export const requireSession = cache(async () => {
   const session = await auth();
   const user = session?.user;
-  if (!user?.id || !user.shopId) redirect("/login");
+  if (!user?.id || !user.shopId || !user.staffId) redirect("/login");
   return {
     userId: user.id,
     shopId: user.shopId,
+    staffId: user.staffId,
     role: user.role,
     name: user.name ?? "",
     email: user.email ?? "",
