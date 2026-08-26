@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { list, put } from "@vercel/blob";
+import { get, put } from "@vercel/blob";
 
 /**
  * Photo storage behind one small seam (M2 brief §5 + founder decision):
@@ -53,31 +53,30 @@ export function createLocalPhotoStore(baseDir: string): PhotoStore {
 }
 
 /**
- * Vercel Blob driver. Blob objects are "public" in Vercel's model, but their
- * pathnames end in newPhotoKey's random UUID, so the URL carries the same
- * entropy as an unguessable token — and the app never hands it out: the
- * server fetches the bytes here and streams them through the authenticated
- * photo route. (Revisit if Vercel ships private blobs; tracked for M8.)
+ * Vercel Blob driver, PRIVATE store: the bytes are unreachable without the
+ * store token, so a leaked pathname reveals nothing. Reads go through the
+ * SDK by pathname (never a public URL) and are streamed on to the caller by
+ * the authenticated, tenant-checked photo route — the same contract the
+ * local driver honors.
  */
 export function createBlobPhotoStore(): PhotoStore {
   return {
     async put(key, data, contentType) {
       assertSafeKey(key);
       await put(key, Buffer.from(data), {
-        access: "public",
+        access: "private",
         contentType,
+        // The key is already unique (newPhotoKey's UUID); a suffix would
+        // change the pathname we store and break the read back.
         addRandomSuffix: false,
         cacheControlMaxAge: 31536000,
       });
     },
     async get(key) {
       assertSafeKey(key);
-      const { blobs } = await list({ prefix: key, limit: 1 });
-      const blob = blobs.find((b) => b.pathname === key);
-      if (!blob) return null;
-      const response = await fetch(blob.url);
-      if (!response.ok) return null;
-      return new Uint8Array(await response.arrayBuffer());
+      const result = await get(key, { access: "private" });
+      if (!result) return null;
+      return new Uint8Array(await new Response(result.stream).arrayBuffer());
     },
   };
 }
