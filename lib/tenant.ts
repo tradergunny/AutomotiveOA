@@ -28,7 +28,8 @@ import { Prisma } from "@/lib/generated/prisma/client";
  * relations are structurally safe: every tenant-owned relation joins on a
  * same-shop composite FK — User→Staff in M1; Vehicle→Customer,
  * RepairCase→{Vehicle, Customer, Staff}, and Photo→{RepairCase, Staff} in
- * M2 — so the database rejects any cross-shop link a nested write could
+ * M2; Finding→{RepairCase, Staff} and Photo→Finding (same shop AND case) in
+ * M3 — so the database rejects any cross-shop link a nested write could
  * attempt.
  */
 
@@ -40,6 +41,7 @@ const TENANT_OWNED = [
   "Vehicle",
   "RepairCase",
   "Photo",
+  "Finding",
 ] as const satisfies readonly Prisma.ModelName[];
 
 /** The tenant itself: readable/updatable only as the shop's own row. */

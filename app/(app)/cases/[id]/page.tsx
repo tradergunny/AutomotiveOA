@@ -1,21 +1,24 @@
-import { ArrowLeft, Car, NotebookPen, User } from "lucide-react";
+import { ArrowLeft, Car, Crosshair, NotebookPen, User } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { CaseStatusBadge } from "@/components/blocks/case-status-badge";
 import { CornerTicks } from "@/components/blocks/corner-ticks";
+import { findingSeverity } from "@/lib/inspection";
 import { formatPhone } from "@/lib/normalize";
 import { tenantDb } from "@/lib/session";
 
-// Minimal Repair Case page (M2 brief §6): the check-in landing. M3 grows the
-// Inspection here; M4+ add Jobs and money. Until then: identity, people,
-// note, and the walkaround photo grid.
+// Repair Case page (M2 brief §6, M3 brief §6): the check-in landing, now with
+// the Inspection summary. M4+ add Jobs and money. Walkaround photos are the
+// case-level ones (findingId null); Finding photos live with their Findings
+// on the inspection screen.
 export default async function CasePage({ params }: PageProps<"/cases/[id]">) {
   const { id } = await params;
-  const [t, tv, tc, format, db] = await Promise.all([
+  const [t, tv, tc, ti, format, db] = await Promise.all([
     getTranslations("cases"),
     getTranslations("vehicles"),
     getTranslations("common"),
+    getTranslations("inspection"),
     getFormatter(),
     tenantDb(),
   ]);
@@ -26,14 +29,28 @@ export default async function CasePage({ params }: PageProps<"/cases/[id]">) {
       vehicle: { include: { primaryCustomer: true } },
       contactCustomer: true,
       openedByStaff: true,
-      photos: { orderBy: { capturedAt: "asc" } },
+      photos: { where: { findingId: null }, orderBy: { capturedAt: "asc" } },
+      findings: {
+        select: {
+          source: true,
+          damageTypes: true,
+          condition: true,
+          recordedAt: true,
+          _count: { select: { photos: true } },
+        },
+        orderBy: { recordedAt: "desc" },
+      },
     },
   });
   if (!repairCase) notFound();
 
-  const { vehicle, contactCustomer, photos } = repairCase;
+  const { vehicle, contactCustomer, photos, findings } = repairCase;
   const contactIsPrimary = contactCustomer.id === vehicle.primaryCustomerId;
   const descriptors = [vehicle.make, vehicle.model, vehicle.color].filter(Boolean).join(" ");
+  const severe = findings.filter((f) => findingSeverity(f) === "SEVERE").length;
+  const checklistCount = findings.filter((f) => f.source === "CHECKLIST").length;
+  const findingPhotoCount = findings.reduce((sum, f) => sum + f._count.photos, 0);
+  const lastRecorded = findings[0]?.recordedAt;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
@@ -140,6 +157,60 @@ export default async function CasePage({ params }: PageProps<"/cases/[id]">) {
           <p className="whitespace-pre-wrap text-sm">{repairCase.note}</p>
         </section>
       )}
+
+      <section className="relative border bg-card p-4">
+        <CornerTicks />
+        <div className="flex flex-wrap items-center gap-3">
+          <h3 className="eyebrow flex items-center gap-1.5">
+            <Crosshair className="size-3.5" aria-hidden />
+            {ti("summaryTitle")}
+          </h3>
+          <Link
+            href={`/cases/${repairCase.id}/inspection`}
+            className="ml-auto border border-primary-dim px-3 py-1 text-xs font-semibold text-primary hover:bg-primary-soft"
+          >
+            {ti("openInspection")} →
+          </Link>
+        </div>
+        {findings.length === 0 ? (
+          <p className="mt-2.5 text-xs text-faint">{ti("notInspected")}</p>
+        ) : (
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
+            <span className="font-medium">
+              {ti("summaryFindings", { count: findings.length })}
+            </span>
+            {severe > 0 && (
+              <span className="hatch-soft border border-bad/45 px-1.5 py-px text-bad">
+                {ti("summarySevere", { count: severe })}
+              </span>
+            )}
+            {findings.length - severe > 0 && (
+              <span className="hatch-soft border border-warn/45 px-1.5 py-px text-warn">
+                {ti("summaryMinor", { count: findings.length - severe })}
+              </span>
+            )}
+            {checklistCount > 0 && (
+              <span className="border border-border-strong px-1.5 py-px text-muted-foreground">
+                {ti("summaryChecklist", { count: checklistCount })}
+              </span>
+            )}
+            <span className="text-muted-foreground">
+              {ti("summaryPhotos", { count: findingPhotoCount })}
+            </span>
+            {lastRecorded && (
+              <span className="num ml-auto text-[11px] text-faint">
+                {ti("lastRecorded")} ·{" "}
+                {format.dateTime(lastRecorded, {
+                  day: "numeric",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            )}
+          </div>
+        )}
+      </section>
 
       <section className="flex flex-col gap-2">
         <h3 className="eyebrow">

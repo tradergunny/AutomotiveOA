@@ -19,7 +19,10 @@ let customerB: { id: string };
 let vehicleA: { id: string };
 let vehicleB: { id: string };
 let caseA: { id: string };
+let caseA2: { id: string };
 let caseB: { id: string };
+let findingA: { id: string };
+let findingB: { id: string };
 
 beforeAll(async () => {
   shopA = await prismaUnscoped.shop.create({ data: { name: `${run} Shop A` } });
@@ -100,11 +103,45 @@ beforeAll(async () => {
       uploadedByStaffId: staffA.id,
     },
   });
+  // M3 domain rows: a second case in shop A (for the same-case photo pin
+  // proof) and one Finding per shop.
+  caseA2 = await prismaUnscoped.repairCase.create({
+    data: {
+      shopId: shopA.id,
+      reference: `${run}-RC-A2`,
+      vehicleId: vehicleA.id,
+      contactCustomerId: customerA.id,
+      openedByStaffId: staffA.id,
+    },
+  });
+  findingA = await prismaUnscoped.finding.create({
+    data: {
+      shopId: shopA.id,
+      caseId: caseA.id,
+      source: "DAMAGE_MAP",
+      zone: "front-bumper",
+      damageTypes: ["DENT", "SCRATCH"],
+      proposedActions: ["REPAIR", "REPAINT"],
+      recordedByStaffId: staffA.id,
+    },
+  });
+  findingB = await prismaUnscoped.finding.create({
+    data: {
+      shopId: shopB.id,
+      caseId: caseB.id,
+      source: "CHECKLIST",
+      checklistItem: "brakes",
+      condition: "NEEDS_WORK",
+      proposedActions: ["REPLACE"],
+      recordedByStaffId: staffB.id,
+    },
+  });
 });
 
 afterAll(async () => {
   const shopIds = [shopA.id, shopB.id];
   await prismaUnscoped.photo.deleteMany({ where: { shopId: { in: shopIds } } });
+  await prismaUnscoped.finding.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.repairCase.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.vehicle.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.customer.deleteMany({ where: { shopId: { in: shopIds } } });
@@ -313,6 +350,62 @@ describe("database-level defense in depth", () => {
       }),
     ).rejects.toThrow();
   });
+
+  it("rejects a Finding on another shop's case or staff", async () => {
+    await expect(
+      prismaUnscoped.finding.create({
+        data: {
+          shopId: shopA.id,
+          caseId: caseB.id, // B's case under A's shop
+          source: "DAMAGE_MAP",
+          zone: "hood",
+          recordedByStaffId: staffA.id,
+        },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      prismaUnscoped.finding.create({
+        data: {
+          shopId: shopA.id,
+          caseId: caseA.id,
+          source: "DAMAGE_MAP",
+          zone: "hood",
+          recordedByStaffId: staffB.id, // B's staff recording in A
+        },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("pins Finding photos to the finding's own case, not just its shop", async () => {
+    // Same shop, wrong case: photo on caseA2 pointing at caseA's finding.
+    // The (shop_id, case_id, finding_id) composite FK must reject it.
+    await expect(
+      prismaUnscoped.photo.create({
+        data: {
+          shopId: shopA.id,
+          caseId: caseA2.id,
+          findingId: findingA.id,
+          storageKey: `${run}/photo-cross-case`,
+          contentType: "image/jpeg",
+          sizeBytes: 1,
+          uploadedByStaffId: staffA.id,
+        },
+      }),
+    ).rejects.toThrow();
+    // The legitimate link works.
+    const ok = await prismaUnscoped.photo.create({
+      data: {
+        shopId: shopA.id,
+        caseId: caseA.id,
+        findingId: findingA.id,
+        storageKey: `${run}/photo-finding-a`,
+        contentType: "image/jpeg",
+        sizeBytes: 1,
+        uploadedByStaffId: staffA.id,
+      },
+    });
+    await prismaUnscoped.photo.delete({ where: { id: ok.id } });
+  });
 });
 
 describe("M2 models are scoped (Customer, Vehicle, RepairCase, Photo)", () => {
@@ -359,7 +452,7 @@ describe("M2 models are scoped (Customer, Vehicle, RepairCase, Photo)", () => {
     const scoped = await forShop(shopA.id).repairCase.findMany({
       where: { reference: { startsWith: run } },
     });
-    expect(scoped.map((c) => c.id)).toEqual([caseA.id]);
+    expect(scoped.map((c) => c.id).sort()).toEqual([caseA.id, caseA2.id].sort());
     await expect(
       forShop(shopA.id).repairCase.findUniqueOrThrow({ where: { id: caseB.id } }),
     ).rejects.toThrow(TenantGuardError);
@@ -419,5 +512,43 @@ describe("M2 models are scoped (Customer, Vehicle, RepairCase, Photo)", () => {
       where: { id: customerB.id },
     });
     expect(untouched?.name).toBe(`${run} Customer B`);
+  });
+});
+
+describe("M3 model is scoped (Finding)", () => {
+  it("findMany stays inside the shop", async () => {
+    const scoped = await forShop(shopA.id).finding.findMany({
+      where: { caseId: { in: [caseA.id, caseB.id] } },
+    });
+    expect(scoped.map((f) => f.id)).toEqual([findingA.id]);
+  });
+
+  it("findUnique on another shop's finding returns null", async () => {
+    expect(
+      await forShop(shopA.id).finding.findUnique({ where: { id: findingB.id } }),
+    ).toBeNull();
+  });
+
+  it("cross-shop finding delete throws and deletes nothing", async () => {
+    await expect(
+      forShop(shopA.id).finding.delete({ where: { id: findingB.id } }),
+    ).rejects.toThrow(TenantGuardError);
+    expect(
+      await prismaUnscoped.finding.findUnique({ where: { id: findingB.id } }),
+    ).not.toBeNull();
+  });
+
+  it("finding create lands in the scoped shop", async () => {
+    const created = await forShop(shopA.id).finding.create({
+      data: {
+        caseId: caseA.id,
+        source: "CHECKLIST",
+        checklistItem: "battery",
+        condition: "DUE_SOON",
+        recordedByStaffId: staffA.id,
+      } as never,
+    });
+    expect(created.shopId).toBe(shopA.id);
+    await prismaUnscoped.finding.delete({ where: { id: created.id } });
   });
 });

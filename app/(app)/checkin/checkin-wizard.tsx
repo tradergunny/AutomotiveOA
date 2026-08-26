@@ -17,7 +17,7 @@ import {
   lookupCheckinVehicle,
   performCheckin,
 } from "./actions";
-import { downscalePhoto } from "./downscale";
+import { downscalePhoto } from "@/lib/downscale";
 
 type ContactState =
   | { mode: "idle" }
