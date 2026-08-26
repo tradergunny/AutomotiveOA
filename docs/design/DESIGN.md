@@ -39,7 +39,7 @@ Rules extracted from the reference:
 - Marked zones show state: count badge + severity tint; hatch fill for marked areas (fits the aesthetic).
 - Small screens/tablet: pinch-zoom, plus tap-to-expand a single view.
 - **Body types in MVP: sedan + pickup.** `Vehicle.bodyType` selects the artwork; zone names stay identical across body types.
-- SVG is authored in-repo (hand-drawn line art, stroke-based, theme-aware) — no external asset dependency.
+- SVG is authored in-repo as a **programmatic React SVG** — typed geometry data (zone id → shape, per body type) plus decor paths; stroke-based, theme-aware, no external asset dependency (D-5).
 
 ## Resolved design decisions
 
@@ -47,3 +47,4 @@ Rules extracted from the reference:
 - **D-2 Case board: attention-grouped list.** Dense table grouped by what needs a human: Awaiting authorization · Waiting (with reason) · In progress · In QC · Ready for pickup · Balance due. No kanban — Repair Case progress is derived, so drag-to-move is meaningless.
 - **D-3 Accent: racing amber-orange.** Starting token: `--primary` ≈ Tailwind orange-500 (`#f97316`), tunable on sight. Corner ticks, CTAs, and active states carry it. Status hues stay conventional: green = done/authorized, amber = waiting/attention, red = declined / QC-fail / overdue balance, blue = in-process (In progress, In QC) — the accent itself is never a status hue. Damage Map severity tint uses the same palette: amber hatch = minor (scratch/dent), red hatch = severe (crack/broken). (Founder may still supply exact UFC-project tokens to override.)
 - **D-4 Name: AutomotiveOA** — spelling fixed from the folder's "Automative". Wordmark set in the technical style until a real logo exists; the OA suffix keeps the LINE Official Account association.
+- **D-5 Damage Map artwork: programmatic React SVG, refined beyond M0** (founder ruling, 2026-08-26). The M0 mockup's five-view geometry is the starting reference, not a port target: M3 improves silhouettes, proportions, panel details, and zone boundaries (real panel cut lines), and refines the tap/hover/keyboard interactions — while staying a typed in-repo data module. No vector-tool exports, no third-party art.
