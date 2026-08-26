@@ -415,8 +415,14 @@
       "note": "Note",
       "add": "Add part",
       "remove": "Remove part",
-      "costShort": "@ {price}",
-      "etaShort": "ETA {date}",
+      "col": {
+        "part": "Part",
+        "qty": "Qty",
+        "unit": "Unit ฿",
+        "supplier": "Supplier",
+        "eta": "ETA",
+        "status": "Status"
+      },
       "status": {
         "NOT_ORDERED": "Not ordered",
         "ORDERED": "Ordered",
