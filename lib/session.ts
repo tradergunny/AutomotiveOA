@@ -7,10 +7,11 @@ import { forShop } from "@/lib/tenant";
 export const requireSession = cache(async () => {
   const session = await auth();
   const user = session?.user;
-  if (!user?.id || !user.shopId) redirect("/login");
+  if (!user?.id || !user.shopId || !user.staffId) redirect("/login");
   return {
     userId: user.id,
     shopId: user.shopId,
+    staffId: user.staffId,
     role: user.role,
     name: user.name ?? "",
     email: user.email ?? "",
@@ -21,4 +22,14 @@ export const requireSession = cache(async () => {
 export async function tenantDb() {
   const session = await requireSession();
   return forShop(session.shopId);
+}
+
+/**
+ * Session + tenant client together — for server actions that also need
+ * session facts (e.g. shopId on creates, which Prisma's input types require;
+ * the guard verifies it matches the scope either way).
+ */
+export async function tenantContext() {
+  const session = await requireSession();
+  return { session, db: forShop(session.shopId) };
 }

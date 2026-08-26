@@ -9,6 +9,8 @@ const TITLE_KEYS: Record<string, string> = {
   "": "board",
   checkin: "checkin",
   customers: "customers",
+  vehicles: "customers", // vehicle forms live inside the Customers & Vehicles area
+  cases: "cases",
   followups: "followups",
   catalog: "catalog",
   settings: "settings",

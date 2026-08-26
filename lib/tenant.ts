@@ -15,18 +15,32 @@ import { Prisma } from "@/lib/generated/prisma/client";
  * - operations the guard can't scope (raw queries) are rejected;
  * - a create that names a foreign shopId throws instead of being rewritten.
  *
- * Unique-where mutations (update/delete/upsert) verify ownership with a scoped
- * pre-check. Rows never change tenant (shopId updates are rejected), so the
- * check cannot be invalidated between read and write.
+ * Unique-where mutations (update/delete/upsert) enforce ownership by merging
+ * the tenant filter into the unique where itself (extended where-unique), so
+ * the check and the mutation are ONE atomic statement on the same
+ * connection — transaction-safe, no read-then-write window. A cross-shop (or
+ * missing) target surfaces as Prisma "record not found" (P2025) and is
+ * rethrown as TenantGuardError; upsert's create branch is forced into the
+ * scoped shop, and a row hiding in another shop then trips the unique
+ * constraint instead of leaking.
  *
- * Nested writes are not intercepted by Prisma query extensions, but the M1
- * relations are structurally safe: User's Staff relation joins on
- * (shop_id, staff_id) with a composite FK, so the database rejects any
- * cross-shop link a nested write could attempt.
+ * Nested writes are not intercepted by Prisma query extensions, but the
+ * relations are structurally safe: every tenant-owned relation joins on a
+ * same-shop composite FK — User→Staff in M1; Vehicle→Customer,
+ * RepairCase→{Vehicle, Customer, Staff}, and Photo→{RepairCase, Staff} in
+ * M2 — so the database rejects any cross-shop link a nested write could
+ * attempt.
  */
 
 /** Models that carry shop_id and belong to exactly one Shop. */
-const TENANT_OWNED = ["Staff", "User"] as const satisfies readonly Prisma.ModelName[];
+const TENANT_OWNED = [
+  "Staff",
+  "User",
+  "Customer",
+  "Vehicle",
+  "RepairCase",
+  "Photo",
+] as const satisfies readonly Prisma.ModelName[];
 
 /** The tenant itself: readable/updatable only as the shop's own row. */
 const SHOP_MODEL = "Shop" as const satisfies Prisma.ModelName;
@@ -47,11 +61,8 @@ export class TenantGuardError extends Error {
 const isTenantOwned = (model: string) =>
   (TENANT_OWNED as readonly string[]).includes(model);
 
-/** Prisma delegate property for a model name ("Staff" -> prisma.staff). */
-const delegate = (model: string) =>
-  (prismaUnscoped as unknown as Record<string, any>)[
-    model.charAt(0).toLowerCase() + model.slice(1)
-  ];
+const isRecordNotFound = (error: unknown) =>
+  error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025";
 
 const SCOPED_WHERE_OPS = new Set([
   "findMany",
@@ -146,38 +157,47 @@ async function tenantModelGuard(
   }
 
   if (UNIQUE_READ_OPS.has(operation)) {
-    const result = await query(args);
+    // The ownership post-check reads result.shopId, so a narrow `select`
+    // must still fetch it (injected here, stripped again before returning).
+    const selected = args?.select;
+    const injectShopId = selected != null && selected.shopId == null;
+    const result = await query(
+      injectShopId ? { ...args, select: { ...selected, shopId: true } } : args,
+    );
     if (result != null && result.shopId !== shopId) {
       if (operation === "findUniqueOrThrow") {
         throw new TenantGuardError(`${model} row not found in shop ${shopId}`);
       }
       return null;
     }
+    if (injectShopId && result != null) delete result.shopId;
     return result;
   }
 
   if (UNIQUE_MUTATION_OPS.has(operation)) {
-    const existing = await delegate(model).findFirst({
-      where: { AND: [args.where, { shopId }] },
-      select: { id: true },
-    });
+    const where = { ...args.where, shopId };
     if (operation === "upsert") {
+      rejectShopIdChange(args.update, shopId);
       // No row in this shop: either it truly doesn't exist (create branch,
       // forced into this shop) or it belongs to another shop (the unique
       // constraint then rejects the create — nothing leaks either way).
-      if (!existing) {
-        return query({ ...args, create: forceShopIdOnCreate(args.create, shopId) });
-      }
-      rejectShopIdChange(args.update, shopId);
-      return query(args);
-    }
-    if (!existing) {
-      throw new TenantGuardError(`${model} row not found in shop ${shopId}`);
+      return query({
+        ...args,
+        where,
+        create: forceShopIdOnCreate(args.create, shopId),
+      });
     }
     if (operation === "update") {
       rejectShopIdChange(args.data, shopId);
     }
-    return query(args);
+    try {
+      return await query({ ...args, where });
+    } catch (error) {
+      if (isRecordNotFound(error)) {
+        throw new TenantGuardError(`${model} row not found in shop ${shopId}`);
+      }
+      throw error;
+    }
   }
 
   if (operation === "create") {

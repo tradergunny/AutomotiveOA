@@ -29,6 +29,9 @@ next-env.d.ts
 *.db
 /prisma/*.db
 
+# Local photo store (lib/storage.ts dev driver)
+/.data/
+
 # Logs
 npm-debug.log*
 yarn-debug.log*

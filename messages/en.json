@@ -1,7 +1,13 @@
 {
   "common": {
     "appName": "AutomotiveOA",
-    "tagline": "Workshop OS"
+    "tagline": "Workshop OS",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "back": "Back",
+    "edit": "Edit",
+    "optional": "optional"
   },
   "nav": {
     "board": "Case Board",
@@ -17,7 +23,8 @@
     "customers": "Customers & Vehicles",
     "followups": "Follow-ups",
     "catalog": "Service Catalog",
-    "settings": "Shop Settings"
+    "settings": "Shop Settings",
+    "cases": "Repair Case"
   },
   "roles": {
     "MANAGER": "Manager",
@@ -38,10 +45,116 @@
     "account": "Account"
   },
   "board": {
-    "empty": "No repair cases yet — check-in arrives in M2"
+    "empty": "No open repair cases — start with a check-in",
+    "newCheckin": "New check-in",
+    "columns": {
+      "case": "Case",
+      "vehicle": "Vehicle",
+      "contact": "Contact",
+      "checkedIn": "Checked in"
+    }
   },
   "stub": {
     "comingIn": "This feature arrives in {milestone}",
     "backToBoard": "Back to board"
+  },
+  "caseStatus": {
+    "CHECKED_IN": "Checked in",
+    "READY": "Ready",
+    "DELIVERED": "Delivered"
+  },
+  "cases": {
+    "checkedInAt": "Checked in",
+    "openedBy": "Received by",
+    "vehicle": "Vehicle",
+    "contact": "Contact",
+    "primaryCustomer": "Primary customer",
+    "note": "Visit note",
+    "odometer": "Odometer",
+    "odometerValue": "{km} km",
+    "photos": "Walkaround photos",
+    "noPhotos": "No photos on this case yet",
+    "photoAlt": "Case photo {n}"
+  },
+  "checkin": {
+    "contactSection": "Who brought the car in?",
+    "lookup": "Look up",
+    "looking": "Looking…",
+    "foundCustomer": "Existing customer",
+    "newCustomerHint": "New customer — enter their details",
+    "change": "Change",
+    "vehicleSection": "Vehicle",
+    "foundVehicle": "Existing vehicle",
+    "newVehicleHint": "New vehicle — enter its details",
+    "ownership": "Ownership",
+    "ownershipContactOnly": "Contact only for this visit — owner unchanged",
+    "ownershipRelink": "Car changed hands — make {name} the primary customer",
+    "detailsSection": "Visit details",
+    "noteLabel": "Customer-reported issues / notes",
+    "odometerLabel": "Odometer (km)",
+    "photosSection": "Walkaround photos",
+    "addPhotos": "Add photos",
+    "removePhoto": "Remove",
+    "submit": "Open repair case",
+    "submitting": "Opening case…",
+    "errors": {
+      "contactRequired": "Look up the contact's phone number first",
+      "nameRequired": "Enter the customer's name",
+      "phoneInvalid": "Phone must be 9–10 digits (Thai number)",
+      "phoneTaken": "This phone already has a customer — use the lookup to pick them",
+      "vehicleRequired": "Look up the license plate first",
+      "plateRequired": "Enter the license plate",
+      "plateTaken": "This plate already exists — use the lookup to pick the vehicle",
+      "bodyTypeRequired": "Choose the body type",
+      "photoInvalid": "A selected file is not a supported image (JPEG/PNG/WebP)",
+      "photoTooLarge": "A photo is too large (max 10MB after processing)",
+      "failed": "Check-in failed — nothing was saved, try again"
+    }
+  },
+  "customers": {
+    "searchPlaceholder": "Search name, phone, company, or plate…",
+    "newCustomer": "New customer",
+    "name": "Name",
+    "phone": "Phone",
+    "company": "Company",
+    "note": "Note",
+    "vehicles": "Vehicles",
+    "cases": "Repair cases",
+    "addVehicle": "Add vehicle",
+    "noVehicles": "No vehicles yet",
+    "noCases": "No repair cases yet",
+    "empty": "No customers yet — create one, or start with a check-in",
+    "noResults": "No customers match \"{q}\"",
+    "createTitle": "New customer",
+    "editTitle": "Edit customer",
+    "companyHint": "for corporate cars, e.g. \"ABC Logistics\"",
+    "errors": {
+      "nameRequired": "Enter the customer's name",
+      "phoneInvalid": "Phone must be 9–10 digits (Thai number)",
+      "phoneTaken": "A customer with this phone already exists"
+    }
+  },
+  "vehicles": {
+    "plate": "License plate",
+    "province": "Province",
+    "vin": "VIN",
+    "bodyType": "Body type",
+    "make": "Make",
+    "model": "Model",
+    "color": "Color",
+    "owner": "Primary customer",
+    "createTitle": "New vehicle",
+    "editTitle": "Edit vehicle",
+    "plateEditNote": "New plate on a returning car? Edit it here — the vehicle and its history stay one record.",
+    "bodyTypes": {
+      "SEDAN": "Sedan",
+      "PICKUP": "Pickup"
+    },
+    "errors": {
+      "plateRequired": "Enter the license plate",
+      "plateTaken": "A vehicle with this plate already exists",
+      "bodyTypeRequired": "Choose the body type",
+      "customerMissing": "Customer not found"
+    }
   }
 }

@@ -1,7 +1,13 @@
 {
   "common": {
     "appName": "AutomotiveOA",
-    "tagline": "Workshop OS"
+    "tagline": "Workshop OS",
+    "save": "บันทึก",
+    "saving": "กำลังบันทึก…",
+    "cancel": "ยกเลิก",
+    "back": "ย้อนกลับ",
+    "edit": "แก้ไข",
+    "optional": "ไม่บังคับ"
   },
   "nav": {
     "board": "แดชบอร์ด",
@@ -17,7 +23,8 @@
     "customers": "ลูกค้าและรถ",
     "followups": "งานติดตาม",
     "catalog": "แคตตาล็อกราคา",
-    "settings": "ตั้งค่าอู่"
+    "settings": "ตั้งค่าอู่",
+    "cases": "เคสซ่อม"
   },
   "roles": {
     "MANAGER": "ผู้จัดการ",
@@ -38,10 +45,116 @@
     "account": "บัญชีผู้ใช้"
   },
   "board": {
-    "empty": "ยังไม่มีเคสซ่อม — การรับรถเข้าอู่จะมาใน M2"
+    "empty": "ยังไม่มีเคสซ่อมที่เปิดอยู่ — เริ่มจากการรับรถเข้าอู่",
+    "newCheckin": "รับรถเข้าอู่",
+    "columns": {
+      "case": "เคส",
+      "vehicle": "รถ",
+      "contact": "ผู้ติดต่อ",
+      "checkedIn": "รับรถเมื่อ"
+    }
   },
   "stub": {
     "comingIn": "ฟีเจอร์นี้จะมาใน {milestone}",
     "backToBoard": "กลับแดชบอร์ด"
+  },
+  "caseStatus": {
+    "CHECKED_IN": "รับรถแล้ว",
+    "READY": "พร้อมส่งมอบ",
+    "DELIVERED": "ส่งมอบแล้ว"
+  },
+  "cases": {
+    "checkedInAt": "รับรถเมื่อ",
+    "openedBy": "ผู้รับรถ",
+    "vehicle": "รถ",
+    "contact": "ผู้ติดต่อ",
+    "primaryCustomer": "ลูกค้าหลัก",
+    "note": "อาการ / หมายเหตุ",
+    "odometer": "เลขไมล์",
+    "odometerValue": "{km} กม.",
+    "photos": "รูปถ่ายรอบคัน",
+    "noPhotos": "ยังไม่มีรูปในเคสนี้",
+    "photoAlt": "รูปเคสที่ {n}"
+  },
+  "checkin": {
+    "contactSection": "ผู้ที่นำรถเข้ามา",
+    "lookup": "ค้นหา",
+    "looking": "กำลังค้นหา…",
+    "foundCustomer": "ลูกค้าเดิม",
+    "newCustomerHint": "ลูกค้าใหม่ — กรอกข้อมูลด้านล่าง",
+    "change": "เปลี่ยน",
+    "vehicleSection": "รถ",
+    "foundVehicle": "รถคันเดิมในระบบ",
+    "newVehicleHint": "รถใหม่ — กรอกข้อมูลด้านล่าง",
+    "ownership": "เจ้าของรถ",
+    "ownershipContactOnly": "เป็นผู้ติดต่อเฉพาะครั้งนี้ — เจ้าของคนเดิม",
+    "ownershipRelink": "รถเปลี่ยนมือ — ตั้ง {name} เป็นลูกค้าหลัก",
+    "detailsSection": "รายละเอียดการรับรถ",
+    "noteLabel": "อาการที่ลูกค้าแจ้ง / หมายเหตุ",
+    "odometerLabel": "เลขไมล์ (กม.)",
+    "photosSection": "รูปถ่ายรอบคัน",
+    "addPhotos": "เพิ่มรูป",
+    "removePhoto": "ลบ",
+    "submit": "เปิดเคสซ่อม",
+    "submitting": "กำลังเปิดเคส…",
+    "errors": {
+      "contactRequired": "กรุณาค้นหาเบอร์โทรผู้ติดต่อก่อน",
+      "nameRequired": "กรุณากรอกชื่อลูกค้า",
+      "phoneInvalid": "เบอร์โทรต้องเป็นเลข 9–10 หลัก",
+      "phoneTaken": "เบอร์นี้มีลูกค้าในระบบแล้ว — กดค้นหาเพื่อใช้ข้อมูลเดิม",
+      "vehicleRequired": "กรุณาค้นหาทะเบียนรถก่อน",
+      "plateRequired": "กรุณากรอกทะเบียนรถ",
+      "plateTaken": "ทะเบียนนี้มีในระบบแล้ว — กดค้นหาเพื่อใช้รถคันเดิม",
+      "bodyTypeRequired": "กรุณาเลือกประเภทตัวถัง",
+      "photoInvalid": "มีไฟล์ที่ไม่ใช่รูปภาพที่รองรับ (JPEG/PNG/WebP)",
+      "photoTooLarge": "มีรูปขนาดใหญ่เกินไป (สูงสุด 10MB)",
+      "failed": "เปิดเคสไม่สำเร็จ — ยังไม่มีการบันทึก กรุณาลองใหม่"
+    }
+  },
+  "customers": {
+    "searchPlaceholder": "ค้นหาชื่อ เบอร์โทร บริษัท หรือทะเบียนรถ…",
+    "newCustomer": "เพิ่มลูกค้าใหม่",
+    "name": "ชื่อลูกค้า",
+    "phone": "เบอร์โทรศัพท์",
+    "company": "บริษัท",
+    "note": "บันทึกเพิ่มเติม",
+    "vehicles": "รถของลูกค้า",
+    "cases": "เคสซ่อม",
+    "addVehicle": "เพิ่มรถ",
+    "noVehicles": "ยังไม่มีรถ",
+    "noCases": "ยังไม่มีเคสซ่อม",
+    "empty": "ยังไม่มีลูกค้า — เพิ่มลูกค้าใหม่ หรือเริ่มจากการรับรถเข้าอู่",
+    "noResults": "ไม่พบลูกค้าที่ตรงกับ \"{q}\"",
+    "createTitle": "เพิ่มลูกค้าใหม่",
+    "editTitle": "แก้ไขข้อมูลลูกค้า",
+    "companyHint": "สำหรับรถบริษัท เช่น \"ABC Logistics\"",
+    "errors": {
+      "nameRequired": "กรุณากรอกชื่อลูกค้า",
+      "phoneInvalid": "เบอร์โทรต้องเป็นเลข 9–10 หลัก",
+      "phoneTaken": "เบอร์นี้มีลูกค้าในระบบอยู่แล้ว"
+    }
+  },
+  "vehicles": {
+    "plate": "ทะเบียนรถ",
+    "province": "จังหวัด",
+    "vin": "เลขตัวถัง (VIN)",
+    "bodyType": "ประเภทตัวถัง",
+    "make": "ยี่ห้อ",
+    "model": "รุ่น",
+    "color": "สี",
+    "owner": "ลูกค้าหลัก (เจ้าของ)",
+    "createTitle": "เพิ่มรถใหม่",
+    "editTitle": "แก้ไขข้อมูลรถ",
+    "plateEditNote": "รถคันเดิมเปลี่ยนทะเบียน? แก้ไขที่นี่ได้เลย — ประวัติรถยังอยู่ครบในคันเดียว",
+    "bodyTypes": {
+      "SEDAN": "รถเก๋ง",
+      "PICKUP": "รถกระบะ"
+    },
+    "errors": {
+      "plateRequired": "กรุณากรอกทะเบียนรถ",
+      "plateTaken": "ทะเบียนนี้มีรถในระบบอยู่แล้ว",
+      "bodyTypeRequired": "กรุณาเลือกประเภทตัวถัง",
+      "customerMissing": "ไม่พบข้อมูลลูกค้า"
+    }
   }
 }
