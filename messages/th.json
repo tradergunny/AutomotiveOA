@@ -7,7 +7,8 @@
     "cancel": "ยกเลิก",
     "back": "ย้อนกลับ",
     "edit": "แก้ไข",
-    "optional": "ไม่บังคับ"
+    "optional": "ไม่บังคับ",
+    "copy": "คัดลอก"
   },
   "nav": {
     "board": "แดชบอร์ด",
@@ -342,7 +343,11 @@
     "quotationIssued": "ออกใบเสนอราคา {label}",
     "caseReady": "รถพร้อมส่งมอบ",
     "caseReadyRevoked": "ยังไม่พร้อมส่งมอบ — มีงานเพิ่ม",
-    "caseDelivered": "ส่งมอบรถแล้ว"
+    "caseDelivered": "ส่งมอบรถแล้ว",
+    "lineUpdateSent": "ส่งอัปเดต LINE ถึง {name} · {count, plural, =0 {ไม่มีรูป} other {# รูป}}",
+    "lineUpdateFailed": "ส่งอัปเดต LINE ถึง {name} ไม่สำเร็จ — ลูกค้าไม่ได้รับ",
+    "lineCustomerLinked": "เชื่อมบัญชี LINE แล้ว — {name}",
+    "lineCustomerUnlinked": "ยกเลิกการเชื่อมบัญชี LINE — {name}"
   },
   "catalog": {
     "title": "รายการบริการมาตรฐานและราคา",
@@ -529,5 +534,120 @@
     "total": "รวมทั้งสิ้น",
     "insurerPays": "เบิกประกัน",
     "issuedBy": "ผู้เสนอราคา"
+  },
+  "lineSettings": {
+    "channelTitle": "บัญชีทางการ LINE",
+    "connected": "เชื่อมต่อแล้ว",
+    "fakeTransport": "โหมดทดสอบ",
+    "keyMissing": "ยังไม่ได้ตั้งค่า LINE_CREDENTIALS_KEY จึงเข้ารหัสข้อมูลรับรองไม่ได้ กรุณาตั้งค่าก่อนเชื่อมต่อบัญชี",
+    "connectIntro": "วาง Channel secret และ Channel access token (แบบไม่หมดอายุ) จาก LINE Developers console ระบบจะตรวจสอบกับ LINE แล้วเก็บแบบเข้ารหัส — และจะไม่แสดงอีก",
+    "connect": "ตรวจสอบและเชื่อมต่อ",
+    "verifying": "กำลังตรวจสอบ…",
+    "reverify": "ตรวจสอบใหม่",
+    "disconnect": "ยกเลิกการเชื่อมต่อ",
+    "disconnectConfirm": "ยืนยัน — ลบข้อมูลรับรอง",
+    "disconnectHint": "รายชื่อผู้ติดต่อและประวัติการส่งจะยังอยู่",
+    "notConnectedReadOnly": "ยังไม่ได้เชื่อมต่อบัญชี LINE ผู้จัดการเป็นผู้เชื่อมต่อได้",
+    "oaName": "ชื่อบัญชี",
+    "oaBasicId": "Basic ID",
+    "channelSecret": "Channel secret",
+    "accessToken": "Channel access token",
+    "verifiedAt": "ตรวจสอบล่าสุด",
+    "connectedBy": "เชื่อมต่อโดย",
+    "webhookTitle": "Webhook URL ของอู่นี้",
+    "copied": "คัดลอกแล้ว",
+    "checklist": {
+      "webhookUrl": "นำ URL นี้ไปวางใน LINE Developers console → Messaging API → Webhook URL",
+      "useWebhook": "เปิด “Use webhook”",
+      "autoReply": "ปิดข้อความตอบกลับอัตโนมัติ เพื่อไม่ให้ลูกค้าได้รับข้อความต้อนรับทุกครั้งที่ทัก"
+    },
+    "contactsTitle": "ผู้ติดต่อ LINE",
+    "contactsIntro": "ผู้ที่เพิ่มบัญชี LINE ของอู่เป็นเพื่อนหรือทักเข้ามา จับคู่กับลูกค้าเพื่อให้ส่งอัปเดตได้",
+    "noUnlinked": "ไม่มีผู้ติดต่อ LINE ที่ยังไม่จับคู่",
+    "linkedTitle": "จับคู่แล้ว",
+    "noName": "(ไม่มีชื่อแสดง)",
+    "unfollowed": "เลิกติดตาม",
+    "link": "จับคู่กับลูกค้า",
+    "unlink": "ยกเลิกการจับคู่",
+    "phonePlaceholder": "เบอร์โทรลูกค้า",
+    "search": "ค้นหา",
+    "searching": "กำลังค้นหา…",
+    "noCustomer": "ไม่พบลูกค้าที่ใช้เบอร์นี้",
+    "confirmLink": "จับคู่",
+    "captureTitle": "เพิ่ม LINE user ID เอง",
+    "capturePlaceholder": "U0123456789abcdef0123456789abcdef",
+    "capture": "เพิ่ม",
+    "captureHint": "สำหรับทดสอบเมื่อมี ID อยู่แล้ว ลูกค้าไม่สามารถดู LINE user ID ของตนเองได้ จึงไม่ใช่วิธีปกติ",
+    "errors": {
+      "forbidden": "เฉพาะผู้จัดการเท่านั้น",
+      "cryptoUnavailable": "ยังไม่ได้ตั้งค่าการเข้ารหัส (LINE_CREDENTIALS_KEY)",
+      "secretRequired": "ต้องกรอก Channel secret",
+      "tokenRequired": "ต้องกรอก Channel access token",
+      "userIdInvalid": "LINE user ID ไม่ถูกต้อง",
+      "userIdTaken": "มี LINE user ID นี้อยู่แล้ว",
+      "notConnected": "ยังไม่ได้เชื่อมต่อบัญชี LINE",
+      "contactMissing": "ไม่พบผู้ติดต่อ LINE รายนี้แล้ว",
+      "customerMissing": "ไม่พบลูกค้ารายนี้แล้ว",
+      "customerTaken": "ลูกค้ารายนี้จับคู่กับผู้ติดต่อ LINE อื่นอยู่แล้ว",
+      "phoneInvalid": "กรอกอย่างน้อย 4 หลัก",
+      "failed": "เกิดข้อผิดพลาด — ลองใหม่อีกครั้ง",
+      "line": {
+        "invalidToken": "LINE ปฏิเสธข้อมูลรับรอง — ตรวจสอบ Channel access token",
+        "quotaExceeded": "บัญชี LINE นี้ส่งข้อความครบโควตาแล้ว",
+        "notFriend": "ผู้ใช้ LINE รายนี้ยังไม่ได้เพิ่มบัญชีนี้เป็นเพื่อน",
+        "rateLimited": "LINE จำกัดอัตราการเรียก — ลองใหม่อีกครั้ง",
+        "invalidRequest": "LINE ปฏิเสธคำขอ",
+        "network": "ติดต่อ LINE ไม่ได้ — ตรวจสอบการเชื่อมต่อ",
+        "serverError": "ระบบ LINE ขัดข้อง — ลองใหม่อีกครั้ง"
+      }
+    }
+  },
+  "customerTimeline": {
+    "title": "ไทม์ไลน์ลูกค้า",
+    "customerVisible": "ส่งถึงลูกค้า",
+    "sentCount": "{count, plural, =0 {ยังไม่ได้ส่ง} other {ส่งแล้ว #}}",
+    "empty": "ยังไม่ได้ส่งอะไรถึงลูกค้ารายนี้",
+    "sent": "ส่งแล้ว",
+    "failed": "ไม่ได้ส่ง",
+    "failedHint": "LINE ปฏิเสธข้อความนี้ ({code}) ลูกค้าไม่ได้รับ",
+    "composeTitle": "เขียนอัปเดต",
+    "recipient": "ถึง {name}",
+    "bodyLabel": "ข้อความถึงลูกค้า",
+    "draftHint": "ร่างเป็นภาษาไทยให้แล้ว แก้ไขได้ตามต้องการ จะยังไม่ส่งจนกว่าจะกดส่ง",
+    "photosTitle": "รูปภาพ ({selected}/{max})",
+    "photosRejected": "มี {count} รูปที่ LINE ไม่รองรับ (รองรับเฉพาะ JPEG และ PNG)",
+    "preview": "ดูตัวอย่าง",
+    "hidePreview": "ซ่อนตัวอย่าง",
+    "previewTitle": "สิ่งที่จะถูกส่งจริง",
+    "send": "ส่งถึงลูกค้า",
+    "sendConfirm": "ยืนยัน — ส่งถึง {name}",
+    "sending": "กำลังส่ง…",
+    "blocked": {
+      "notConnected": "อู่นี้ยังไม่ได้เชื่อมต่อบัญชี LINE — ผู้จัดการเชื่อมต่อได้ที่หน้าตั้งค่า",
+      "noIdentity": "ลูกค้ารายนี้ยังไม่ได้จับคู่กับผู้ติดต่อ LINE ขอให้ลูกค้าเพิ่มบัญชี LINE ของอู่เป็นเพื่อน แล้วจับคู่ที่หน้าตั้งค่า",
+      "unfollowed": "ลูกค้ารายนี้ลบหรือบล็อกบัญชี LINE ของอู่ จึงส่งข้อความไม่ได้"
+    },
+    "errors": {
+      "caseMissing": "ไม่พบใบงาน",
+      "caseDelivered": "ใบงานนี้ส่งมอบแล้ว",
+      "notConnected": "ยังไม่ได้เชื่อมต่อบัญชี LINE",
+      "cryptoUnavailable": "ยังไม่ได้ตั้งค่าการเข้ารหัสข้อมูลรับรอง",
+      "noIdentity": "ลูกค้ารายนี้ยังไม่มีผู้ติดต่อ LINE",
+      "unfollowed": "ลูกค้ารายนี้เลิกติดตามบัญชี LINE ของอู่",
+      "bodyRequired": "กรุณาเขียนข้อความก่อน",
+      "bodyTooLong": "ข้อความยาวเกินกว่าที่ LINE รองรับ",
+      "tooManyPhotos": "แนบได้สูงสุด 4 รูปต่อหนึ่งอัปเดต",
+      "photoInvalid": "มีรูปที่ส่งไม่ได้",
+      "failed": "เกิดข้อผิดพลาด — ลองใหม่อีกครั้ง",
+      "line": {
+        "invalidToken": "LINE ปฏิเสธข้อมูลรับรองของอู่ — ตรวจสอบที่หน้าตั้งค่า",
+        "quotaExceeded": "บัญชี LINE นี้ส่งข้อความครบโควตาแล้ว",
+        "notFriend": "ลูกค้ารายนี้ยังไม่ได้เพิ่มบัญชี LINE ของอู่เป็นเพื่อน",
+        "rateLimited": "LINE จำกัดอัตราการเรียก — ลองใหม่อีกครั้ง",
+        "invalidRequest": "LINE ปฏิเสธข้อความ",
+        "network": "ติดต่อ LINE ไม่ได้ — ยังไม่ได้ส่ง",
+        "serverError": "ระบบ LINE ขัดข้อง — ลองใหม่อีกครั้ง"
+      }
+    }
   }
 }

@@ -12,6 +12,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:new": "prisma migrate dev",
     "db:seed": "prisma db seed",
+    "line:simulate": "npx tsx scripts/line-simulate.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

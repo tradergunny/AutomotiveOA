@@ -21,7 +21,7 @@ const ITEMS = [
   { href: "/customers", key: "customers", icon: Users },
   { href: "/followups", key: "followups", icon: PhoneOutgoing, milestone: "M7" },
   { href: "/catalog", key: "catalog", icon: Tags },
-  { href: "/settings", key: "settings", icon: Settings, milestone: "M6" },
+  { href: "/settings", key: "settings", icon: Settings },
 ] as const;
 
 export function NavList() {

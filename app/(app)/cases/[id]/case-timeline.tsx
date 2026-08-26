@@ -9,11 +9,15 @@ import {
   Flag,
   FlagOff,
   History,
+  Link2,
+  Link2Off,
+  MessageCircle,
   PackageCheck,
   Play,
   Shield,
   ShieldCheck,
   ShieldX,
+  SendHorizontal,
   Trash2,
   Undo2,
   UserCog,
@@ -37,6 +41,7 @@ export const CASE_EVENT_INCLUDE = {
   actorStaff: { select: { name: true } },
   subjectStaff: { select: { name: true } },
   quotation: { select: { number: true, version: true } },
+  lineUpdate: { select: { _count: { select: { photos: true } } } },
 } as const satisfies Prisma.CaseEventInclude;
 
 export type CaseEventRow = Prisma.CaseEventGetPayload<{
@@ -157,6 +162,40 @@ export function CaseTimeline({
         return { ...base, icon: FlagOff, tone: "text-warn", label: t("caseReadyRevoked") };
       case "CASE_DELIVERED":
         return { ...base, icon: PackageCheck, tone: "text-ok", label: t("caseDelivered") };
+      case "LINE_UPDATE_SENT":
+        return {
+          ...base,
+          icon: SendHorizontal,
+          // Deliberately note-less: the message body belongs to the Customer
+          // Timeline, not inlined into the operational feed.
+          note: null,
+          tone: "text-muted-foreground",
+          label: t("lineUpdateSent", {
+            name: event.subjectName ?? "—",
+            count: event.lineUpdate?._count.photos ?? 0,
+          }),
+        };
+      case "LINE_UPDATE_FAILED":
+        return {
+          ...base,
+          icon: MessageCircle,
+          tone: "text-bad",
+          label: t("lineUpdateFailed", { name: event.subjectName ?? "—" }),
+        };
+      case "LINE_CUSTOMER_LINKED":
+        return {
+          ...base,
+          icon: Link2,
+          tone: "text-muted-foreground",
+          label: t("lineCustomerLinked", { name: event.subjectName ?? "—" }),
+        };
+      case "LINE_CUSTOMER_UNLINKED":
+        return {
+          ...base,
+          icon: Link2Off,
+          tone: "text-warn",
+          label: t("lineCustomerUnlinked", { name: event.subjectName ?? "—" }),
+        };
     }
   }
 

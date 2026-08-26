@@ -9,6 +9,8 @@ import { forShop, TenantGuardError } from "@/lib/tenant";
  */
 
 const run = `tg-${Date.now()}`;
+/** One LINE userId, deliberately shared by both shops — see the M6 block. */
+const SHARED_LINE_USER_ID = "U0000000000000000000000000000f00d";
 
 let shopA: { id: string };
 let shopB: { id: string };
@@ -29,6 +31,9 @@ let jobA: { id: string };
 let jobB: { id: string };
 let quotationA: { id: string };
 let caseEventA: { id: string };
+let photoA: { id: string };
+let lineContactA: { id: string };
+let lineUpdateA: { id: string };
 
 beforeAll(async () => {
   shopA = await prismaUnscoped.shop.create({ data: { name: `${run} Shop A` } });
@@ -226,11 +231,68 @@ beforeAll(async () => {
       actorStaffId: staffB.id,
     },
   });
+  // M6 domain rows: a LINE identity and a sent Update per shop. The SAME
+  // lineUserId is deliberately used in both — userIds are per-OA (ADR-005),
+  // so two shops holding one must not collide or leak.
+  photoA = await prismaUnscoped.photo.create({
+    data: {
+      shopId: shopA.id,
+      caseId: caseA.id,
+      storageKey: `${run}/a/line.jpg`,
+      contentType: "image/jpeg",
+      sizeBytes: 10,
+      uploadedByStaffId: staffA.id,
+    },
+  });
+  lineContactA = await prismaUnscoped.lineContact.create({
+    data: {
+      shopId: shopA.id,
+      lineUserId: SHARED_LINE_USER_ID,
+      displayName: `${run} LINE A`,
+      customerId: customerA.id,
+      linkedByStaffId: staffA.id,
+      linkedAt: new Date(),
+    },
+  });
+  await prismaUnscoped.lineContact.create({
+    data: {
+      shopId: shopB.id,
+      lineUserId: SHARED_LINE_USER_ID,
+      displayName: `${run} LINE B`,
+    },
+  });
+  lineUpdateA = await prismaUnscoped.lineUpdate.create({
+    data: {
+      shopId: shopA.id,
+      caseId: caseA.id,
+      customerId: customerA.id,
+      lineUserId: SHARED_LINE_USER_ID,
+      recipientName: `${run} Customer A`,
+      bodyText: "อัปเดตงานซ่อม",
+      deliveryStatus: "SENT",
+      sentByStaffId: staffA.id,
+      photos: {
+        create: [
+          {
+            // shopId is supplied by the parent LineUpdate through the
+            // composite FK — Prisma manages it on nested creates.
+            photoId: photoA.id,
+            sortOrder: 0,
+            publicToken: `${run}-token-a`,
+          },
+        ],
+      },
+    },
+  });
 });
 
 afterAll(async () => {
   const shopIds = [shopA.id, shopB.id];
   await prismaUnscoped.caseEvent.deleteMany({ where: { shopId: { in: shopIds } } });
+  await prismaUnscoped.lineUpdatePhoto.deleteMany({ where: { shopId: { in: shopIds } } });
+  await prismaUnscoped.lineUpdate.deleteMany({ where: { shopId: { in: shopIds } } });
+  await prismaUnscoped.lineContact.deleteMany({ where: { shopId: { in: shopIds } } });
+  await prismaUnscoped.shopLineChannel.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.photo.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.jobAuthorization.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.quotationLine.deleteMany({ where: { shopId: { in: shopIds } } });
@@ -942,5 +1004,124 @@ describe("M5 database-level defense in depth", () => {
     expect(survivor?.jobId).toBeNull();
     expect(survivor?.jobTitle).toBe(tempJob.title);
     await prismaUnscoped.caseEvent.delete({ where: { id: event.id } });
+  });
+});
+
+describe("M6 — LINE integration", () => {
+  it("scopes LINE contacts per shop even when the userId is identical", async () => {
+    const fromA = await forShop(shopA.id).lineContact.findMany({
+      where: { lineUserId: SHARED_LINE_USER_ID },
+    });
+    const fromB = await forShop(shopB.id).lineContact.findMany({
+      where: { lineUserId: SHARED_LINE_USER_ID },
+    });
+    expect(fromA).toHaveLength(1);
+    expect(fromB).toHaveLength(1);
+    expect(fromA[0]!.id).not.toBe(fromB[0]!.id);
+    expect(fromA[0]!.displayName).toContain("LINE A");
+  });
+
+  it("hides another shop's LINE contact, update and published photo", async () => {
+    expect(
+      await forShop(shopB.id).lineContact.findUnique({ where: { id: lineContactA.id } }),
+    ).toBeNull();
+    expect(
+      await forShop(shopB.id).lineUpdate.findUnique({ where: { id: lineUpdateA.id } }),
+    ).toBeNull();
+    expect(
+      await forShop(shopB.id).lineUpdatePhoto.findFirst({
+        where: { publicToken: `${run}-token-a` },
+      }),
+    ).toBeNull();
+  });
+
+  it("refuses to link a LINE contact to another shop's customer", async () => {
+    await expect(
+      prismaUnscoped.lineContact.create({
+        data: {
+          shopId: shopB.id,
+          lineUserId: "U0000000000000000000000000000beef",
+          customerId: customerA.id, // A's customer under B's shop
+        },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("refuses an Update whose case, customer or sender belongs to another shop", async () => {
+    await expect(
+      prismaUnscoped.lineUpdate.create({
+        data: {
+          shopId: shopB.id,
+          caseId: caseA.id, // A's case under B's shop
+          customerId: customerB.id,
+          lineUserId: SHARED_LINE_USER_ID,
+          recipientName: "x",
+          bodyText: "x",
+          deliveryStatus: "SENT",
+          sentByStaffId: staffB.id,
+        },
+      }),
+    ).rejects.toThrow();
+
+    await expect(
+      prismaUnscoped.lineUpdate.create({
+        data: {
+          shopId: shopB.id,
+          caseId: caseB.id,
+          customerId: customerA.id, // A's customer under B's shop
+          lineUserId: SHARED_LINE_USER_ID,
+          recipientName: "x",
+          bodyText: "x",
+          deliveryStatus: "SENT",
+          sentByStaffId: staffB.id,
+        },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("refuses to publish another shop's photo on an Update", async () => {
+    await expect(
+      prismaUnscoped.lineUpdatePhoto.create({
+        data: {
+          shopId: shopB.id,
+          lineUpdateId: lineUpdateA.id,
+          photoId: photoA.id,
+          sortOrder: 0,
+        },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("refuses a channel connected by another shop's staff", async () => {
+    await expect(
+      prismaUnscoped.shopLineChannel.create({
+        data: {
+          shopId: shopB.id,
+          channelSecretEnc: "v1:x:y:z",
+          channelAccessTokenEnc: "v1:x:y:z",
+          connectedByStaffId: staffA.id, // A's staff under B's shop
+        },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("keeps one linked LINE contact per customer", async () => {
+    await expect(
+      prismaUnscoped.lineContact.create({
+        data: {
+          shopId: shopA.id,
+          lineUserId: "U0000000000000000000000000000cafe",
+          customerId: customerA.id, // already linked to lineContactA
+        },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("refuses a create that names a foreign shop, like every other model", async () => {
+    await expect(
+      forShop(shopA.id).lineContact.create({
+        data: { shopId: shopB.id, lineUserId: "U0000000000000000000000000000dead" },
+      }),
+    ).rejects.toThrow(TenantGuardError);
   });
 });

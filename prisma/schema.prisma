@@ -2,7 +2,9 @@
 // M1: Shop, Staff, User. M2: Customer, Vehicle, RepairCase, Photo. M3: Finding.
 // M4: ServiceCatalogItem, Job, JobAuthorization, PartLine, Quotation,
 // QuotationLine. M5: CaseEvent (the internal timeline), Job.waitingReason,
-// and the RepairCase ready/delivered fields.
+// and the RepairCase ready/delivered fields. M6: ShopLineChannel,
+// LineContact, LineUpdate, LineUpdatePhoto (the customer's half of the
+// story, sent by a human through the Shop's own OA — ADR-002/003/004/005).
 // Every tenant-owned row carries shop_id (ADR-001); scoping is
 // enforced by the tenant guard in lib/tenant.ts, never by hand-written WHERE
 // clauses. Cross-model relations join on same-shop composite FKs so the
@@ -32,20 +34,24 @@ model Shop {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  staff          Staff[]
-  users          User[]
-  customers      Customer[]
-  vehicles       Vehicle[]
-  repairCases    RepairCase[]
-  photos         Photo[]
-  findings       Finding[]
-  catalogItems   ServiceCatalogItem[]
-  jobs           Job[]
-  authorizations JobAuthorization[]
-  partLines      PartLine[]
-  quotations     Quotation[]
-  quotationLines QuotationLine[]
-  caseEvents     CaseEvent[]
+  staff            Staff[]
+  users            User[]
+  customers        Customer[]
+  vehicles         Vehicle[]
+  repairCases      RepairCase[]
+  photos           Photo[]
+  findings         Finding[]
+  catalogItems     ServiceCatalogItem[]
+  jobs             Job[]
+  authorizations   JobAuthorization[]
+  partLines        PartLine[]
+  quotations       Quotation[]
+  quotationLines   QuotationLine[]
+  caseEvents       CaseEvent[]
+  lineChannel      ShopLineChannel?
+  lineContacts     LineContact[]
+  lineUpdates      LineUpdate[]
+  lineUpdatePhotos LineUpdatePhoto[]
 
   @@map("shops")
 }
@@ -76,6 +82,9 @@ model Staff {
   deliveredCases         RepairCase[]       @relation("CaseDeliveredBy")
   caseEventsActed        CaseEvent[]        @relation("CaseEventActor")
   caseEventsSubject      CaseEvent[]        @relation("CaseEventSubject")
+  connectedLineChannels  ShopLineChannel[]
+  linkedLineContacts     LineContact[]
+  sentLineUpdates        LineUpdate[]
 
   @@unique([shopId, id]) // target for the same-shop composite FKs (users, cases, photos, findings)
   @@index([shopId])
@@ -132,9 +141,11 @@ model Customer {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  shop            Shop         @relation(fields: [shopId], references: [id])
-  primaryVehicles Vehicle[]    @relation("VehiclePrimaryCustomer")
-  contactCases    RepairCase[] @relation("CaseContactCustomer")
+  shop            Shop          @relation(fields: [shopId], references: [id])
+  primaryVehicles Vehicle[]     @relation("VehiclePrimaryCustomer")
+  contactCases    RepairCase[]  @relation("CaseContactCustomer")
+  lineContacts    LineContact[]
+  lineUpdates     LineUpdate[]
 
   @@unique([shopId, phone])
   @@unique([shopId, id]) // target for the same-shop composite FKs
@@ -192,36 +203,37 @@ enum RepairCaseStatus {
 /// at delivery. Carries its own contact person — usually the Vehicle's primary
 /// Customer, but whoever actually brought the car.
 model RepairCase {
-  id                String           @id @default(cuid())
-  shopId            String           @map("shop_id")
+  id                 String           @id @default(cuid())
+  shopId             String           @map("shop_id")
   /// Human reference like RC-1024 — per-Shop sequence from Shop.caseSeq.
-  reference         String
-  status            RepairCaseStatus @default(CHECKED_IN)
-  vehicleId         String           @map("vehicle_id")
-  contactCustomerId String           @map("contact_customer_id")
+  reference          String
+  status             RepairCaseStatus @default(CHECKED_IN)
+  vehicleId          String           @map("vehicle_id")
+  contactCustomerId  String           @map("contact_customer_id")
   /// Visit reason / customer-reported concerns, free text.
-  note              String?
-  odometerKm        Int?             @map("odometer_km")
-  checkedInAt       DateTime         @default(now()) @map("checked_in_at")
-  openedByStaffId   String           @map("opened_by_staff_id")
+  note               String?
+  odometerKm         Int?             @map("odometer_km")
+  checkedInAt        DateTime         @default(now()) @map("checked_in_at")
+  openedByStaffId    String           @map("opened_by_staff_id")
   /// Set while READY (cleared if new work flips the case back — the history
   /// lives in CaseEvents); deliveredAt/By are set once, at handover.
-  readyAt            DateTime? @map("ready_at")
-  deliveredAt        DateTime? @map("delivered_at")
-  deliveredByStaffId String?   @map("delivered_by_staff_id")
-  createdAt         DateTime         @default(now()) @map("created_at")
-  updatedAt         DateTime         @updatedAt @map("updated_at")
+  readyAt            DateTime?        @map("ready_at")
+  deliveredAt        DateTime?        @map("delivered_at")
+  deliveredByStaffId String?          @map("delivered_by_staff_id")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
 
-  shop            Shop        @relation(fields: [shopId], references: [id])
-  vehicle         Vehicle     @relation(fields: [shopId, vehicleId], references: [shopId, id])
-  contactCustomer Customer    @relation("CaseContactCustomer", fields: [shopId, contactCustomerId], references: [shopId, id])
-  openedByStaff   Staff       @relation(fields: [shopId, openedByStaffId], references: [shopId, id])
-  deliveredBy     Staff?      @relation("CaseDeliveredBy", fields: [shopId, deliveredByStaffId], references: [shopId, id])
+  shop            Shop         @relation(fields: [shopId], references: [id])
+  vehicle         Vehicle      @relation(fields: [shopId, vehicleId], references: [shopId, id])
+  contactCustomer Customer     @relation("CaseContactCustomer", fields: [shopId, contactCustomerId], references: [shopId, id])
+  openedByStaff   Staff        @relation(fields: [shopId, openedByStaffId], references: [shopId, id])
+  deliveredBy     Staff?       @relation("CaseDeliveredBy", fields: [shopId, deliveredByStaffId], references: [shopId, id])
   photos          Photo[]
   findings        Finding[]
   jobs            Job[]
   quotations      Quotation[]
   events          CaseEvent[]
+  lineUpdates     LineUpdate[]
 
   @@unique([shopId, reference])
   @@unique([shopId, id]) // target for the same-shop composite FKs
@@ -271,29 +283,29 @@ enum ProposedAction {
 /// already-scratched bumper is a second Finding, not an edit. One Finding per
 /// checklist item per case (partial unique below; zone rows keep NULL there).
 model Finding {
-  id            String            @id @default(cuid())
-  shopId        String            @map("shop_id")
-  caseId        String            @map("case_id")
-  source        FindingSource
+  id                String            @id @default(cuid())
+  shopId            String            @map("shop_id")
+  caseId            String            @map("case_id")
+  source            FindingSource
   /// Canonical body-zone id (DAMAGE_MAP findings; validated in code).
-  zone          String?
+  zone              String?
   /// Canonical checklist-item id (CHECKLIST findings; validated in code).
-  checklistItem String?           @map("checklist_item")
-  damageTypes   DamageType[]      @map("damage_types")
-  condition     FindingCondition?
-  proposedActions ProposedAction[] @map("proposed_actions")
-  note          String?
+  checklistItem     String?           @map("checklist_item")
+  damageTypes       DamageType[]      @map("damage_types")
+  condition         FindingCondition?
+  proposedActions   ProposedAction[]  @map("proposed_actions")
+  note              String?
   /// The Job fulfilling this Finding (M4). At most one per Finding (founder
   /// ruling): grouping is many Findings → one Job, never a split. NULL =
   /// ungrouped. The composite FK pins the Job to this Finding's own shop AND
   /// case at the database level.
-  jobId         String?           @map("job_id")
+  jobId             String?           @map("job_id")
   /// Who recorded it and when — mid-repair additions stay distinguishable
   /// from the check-in inspection by this timestamp.
-  recordedByStaffId String   @map("recorded_by_staff_id")
-  recordedAt        DateTime @default(now()) @map("recorded_at")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  recordedByStaffId String            @map("recorded_by_staff_id")
+  recordedAt        DateTime          @default(now()) @map("recorded_at")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
 
   shop       Shop       @relation(fields: [shopId], references: [id])
   repairCase RepairCase @relation(fields: [shopId, caseId], references: [shopId, id])
@@ -336,12 +348,14 @@ model Photo {
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
-  shop       Shop       @relation(fields: [shopId], references: [id])
-  repairCase RepairCase @relation(fields: [shopId, caseId], references: [shopId, id])
-  finding    Finding?   @relation(fields: [shopId, caseId, findingId], references: [shopId, caseId, id])
-  job        Job?       @relation(fields: [shopId, caseId, jobId], references: [shopId, caseId, id])
-  uploadedBy Staff      @relation(fields: [shopId, uploadedByStaffId], references: [shopId, id])
+  shop             Shop              @relation(fields: [shopId], references: [id])
+  repairCase       RepairCase        @relation(fields: [shopId, caseId], references: [shopId, id])
+  finding          Finding?          @relation(fields: [shopId, caseId, findingId], references: [shopId, caseId, id])
+  job              Job?              @relation(fields: [shopId, caseId, jobId], references: [shopId, caseId, id])
+  uploadedBy       Staff             @relation(fields: [shopId, uploadedByStaffId], references: [shopId, id])
+  lineUpdatePhotos LineUpdatePhoto[]
 
+  @@unique([shopId, id]) // target for LineUpdatePhoto's same-shop composite FK (M6)
   @@index([shopId, caseId])
   @@index([shopId, findingId])
   @@index([shopId, jobId])
@@ -399,27 +413,27 @@ enum PayerType {
 /// quoted by hand (`catalogItemId` NULL — damage/bodywork). `priceSatang`
 /// NULL = not yet priced; quotation issue and authorization both require one.
 model Job {
-  id            String    @id @default(cuid())
-  shopId        String    @map("shop_id")
-  caseId        String    @map("case_id")
-  title         String
-  status        JobStatus @default(PROPOSED)
+  id                       String         @id @default(cuid())
+  shopId                   String         @map("shop_id")
+  caseId                   String         @map("case_id")
+  title                    String
+  status                   JobStatus      @default(PROPOSED)
   /// Required while status is WAITING, NULL otherwise (app-validated;
   /// lib/case-flow.ts). Reason history lives in CaseEvents.
-  waitingReason WaitingReason? @map("waiting_reason")
-  payerType     PayerType @map("payer_type")
+  waitingReason            WaitingReason? @map("waiting_reason")
+  payerType                PayerType      @map("payer_type")
   /// Free text while payerType is INSURER (Claim FK arrives in M8).
-  insurerName   String?   @map("insurer_name")
-  catalogItemId String?   @map("catalog_item_id")
-  priceSatang   Int?      @map("price_satang")
+  insurerName              String?        @map("insurer_name")
+  catalogItemId            String?        @map("catalog_item_id")
+  priceSatang              Int?           @map("price_satang")
   /// Manager who set a catalog Job's price away from the catalog entry —
   /// NULL means no override (CONTEXT.md: regular staff cannot).
-  priceOverriddenByStaffId String? @map("price_overridden_by_staff_id")
-  assignedStaffId          String? @map("assigned_staff_id")
-  note          String?
-  createdByStaffId String   @map("created_by_staff_id")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  priceOverriddenByStaffId String?        @map("price_overridden_by_staff_id")
+  assignedStaffId          String?        @map("assigned_staff_id")
+  note                     String?
+  createdByStaffId         String         @map("created_by_staff_id")
+  createdAt                DateTime       @default(now()) @map("created_at")
+  updatedAt                DateTime       @updatedAt @map("updated_at")
 
   shop              Shop                @relation(fields: [shopId], references: [id])
   repairCase        RepairCase          @relation(fields: [shopId, caseId], references: [shopId, id])
@@ -460,17 +474,17 @@ enum AuthorizationChannel {
 /// Append-only authorization history for one Job (CONTEXT.md: who recorded
 /// it, when, and through which channel). Corrections append, never edit.
 model JobAuthorization {
-  id       String                @id @default(cuid())
-  shopId   String                @map("shop_id")
-  jobId    String                @map("job_id")
-  decision AuthorizationDecision
+  id                String                @id @default(cuid())
+  shopId            String                @map("shop_id")
+  jobId             String                @map("job_id")
+  decision          AuthorizationDecision
   /// Required for AUTHORIZED/DECLINED (app-validated); NULL on REVERTED.
-  channel  AuthorizationChannel?
+  channel           AuthorizationChannel?
   /// The Quotation version presented to the payer, when staff record one.
-  quotationId       String?  @map("quotation_id")
+  quotationId       String?               @map("quotation_id")
   note              String?
-  recordedByStaffId String   @map("recorded_by_staff_id")
-  recordedAt        DateTime @default(now()) @map("recorded_at")
+  recordedByStaffId String                @map("recorded_by_staff_id")
+  recordedAt        DateTime              @default(now()) @map("recorded_at")
 
   shop       Shop       @relation(fields: [shopId], references: [id])
   job        Job        @relation(fields: [shopId, jobId], references: [shopId, id])
@@ -493,18 +507,18 @@ enum PartOrderStatus {
 /// INTERNAL procurement cost (founder ruling): optional, never summed into
 /// the Job's customer-facing price, never printed on quotations.
 model PartLine {
-  id            String          @id @default(cuid())
-  shopId        String          @map("shop_id")
-  jobId         String          @map("job_id")
-  name          String
-  quantity      Int             @default(1)
-  unitCostSatang Int?           @map("unit_cost_satang")
-  supplier      String?
-  orderStatus   PartOrderStatus @default(NOT_ORDERED) @map("order_status")
-  etaDate       DateTime?       @map("eta_date") @db.Date
-  note          String?
-  createdAt     DateTime        @default(now()) @map("created_at")
-  updatedAt     DateTime        @updatedAt @map("updated_at")
+  id             String          @id @default(cuid())
+  shopId         String          @map("shop_id")
+  jobId          String          @map("job_id")
+  name           String
+  quantity       Int             @default(1)
+  unitCostSatang Int?            @map("unit_cost_satang")
+  supplier       String?
+  orderStatus    PartOrderStatus @default(NOT_ORDERED) @map("order_status")
+  etaDate        DateTime?       @map("eta_date") @db.Date
+  note           String?
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
 
   shop Shop @relation(fields: [shopId], references: [id])
   job  Job  @relation(fields: [shopId, jobId], references: [shopId, id])
@@ -519,12 +533,12 @@ model PartLine {
 /// explicit issue. No update path exists anywhere in the app; rows are
 /// created complete and never touched again — hence no updatedAt.
 model Quotation {
-  id            String   @id @default(cuid())
-  shopId        String   @map("shop_id")
-  caseId        String   @map("case_id")
-  number        String
-  version       Int
-  totalSatang   Int      @map("total_satang")
+  id              String   @id @default(cuid())
+  shopId          String   @map("shop_id")
+  caseId          String   @map("case_id")
+  number          String
+  version         Int
+  totalSatang     Int      @map("total_satang")
   issuedByStaffId String   @map("issued_by_staff_id")
   issuedAt        DateTime @default(now()) @map("issued_at")
 
@@ -594,6 +608,12 @@ enum CaseEventType {
   CASE_READY
   CASE_READY_REVOKED
   CASE_DELIVERED
+  /// M6 (ADR-003-safe direction): a human's LINE Update produces an internal
+  /// event, never the reverse. LINKED/UNLINKED record identity linking.
+  LINE_UPDATE_SENT
+  LINE_UPDATE_FAILED
+  LINE_CUSTOMER_LINKED
+  LINE_CUSTOMER_UNLINKED
 }
 
 /// One internal-timeline entry (CONTEXT.md: the internal timeline records
@@ -603,40 +623,190 @@ enum CaseEventType {
 /// forever: the customer narrative is M6's separately composed LINE Updates,
 /// and nothing here ever auto-publishes (ADR-003).
 model CaseEvent {
-  id     String        @id @default(cuid())
-  shopId String        @map("shop_id")
-  caseId String        @map("case_id")
-  type   CaseEventType
+  id             String         @id @default(cuid())
+  shopId         String         @map("shop_id")
+  caseId         String         @map("case_id")
+  type           CaseEventType
   /// Soft link to the live Job — deliberately the QuotationLine idiom
   /// (single-column FK, ON DELETE SET NULL; a composite FK would null shopId
   /// too). The event's shop stays pinned through its case FK, and the title
   /// snapshot below keeps deleted Jobs renderable.
-  jobId    String? @map("job_id")
+  jobId          String?        @map("job_id")
   /// The Job's title at event time — survives deletion and later renames.
-  jobTitle String? @map("job_title")
-  fromStatus    JobStatus?     @map("from_status")
-  toStatus      JobStatus?     @map("to_status")
-  waitingReason WaitingReason? @map("waiting_reason")
+  jobTitle       String?        @map("job_title")
+  fromStatus     JobStatus?     @map("from_status")
+  toStatus       JobStatus?     @map("to_status")
+  waitingReason  WaitingReason? @map("waiting_reason")
   /// JOB_PRICE_OVERRIDDEN: the price the Manager set, in satang.
-  priceSatang Int? @map("price_satang")
+  priceSatang    Int?           @map("price_satang")
   /// QUOTATION_ISSUED: a real composite FK is safe here — quotations are
   /// immutable and never deleted.
-  quotationId String? @map("quotation_id")
+  quotationId    String?        @map("quotation_id")
   /// JOB_ASSIGNED: the newly assigned technician (NULL = unassigned).
-  subjectStaffId String? @map("subject_staff_id")
+  subjectStaffId String?        @map("subject_staff_id")
+  /// LINE_UPDATE_*: the Update that was sent or failed. A real composite FK
+  /// is safe — LineUpdates are append-only and never deleted (M6).
+  lineUpdateId   String?        @map("line_update_id")
+  /// A person's name AS AT event time, snapshotted so it survives renames:
+  /// the LINE display name on LINE_CUSTOMER_LINKED/UNLINKED, the recipient
+  /// on LINE_UPDATE_* (M6).
+  subjectName    String?        @map("subject_name")
   /// Free text carried by the event (QC-fail reason, cancel reason,
   /// authorization note) — shop-authored data, rendered verbatim.
-  note         String?
-  actorStaffId String   @map("actor_staff_id")
-  at           DateTime @default(now()) @map("occurred_at")
+  note           String?
+  actorStaffId   String         @map("actor_staff_id")
+  at             DateTime       @default(now()) @map("occurred_at")
 
-  shop         Shop       @relation(fields: [shopId], references: [id])
-  repairCase   RepairCase @relation(fields: [shopId, caseId], references: [shopId, id])
-  job          Job?       @relation(fields: [jobId], references: [id], onDelete: SetNull)
-  quotation    Quotation? @relation(fields: [shopId, quotationId], references: [shopId, id])
-  subjectStaff Staff?     @relation("CaseEventSubject", fields: [shopId, subjectStaffId], references: [shopId, id])
-  actorStaff   Staff      @relation("CaseEventActor", fields: [shopId, actorStaffId], references: [shopId, id])
+  shop         Shop        @relation(fields: [shopId], references: [id])
+  repairCase   RepairCase  @relation(fields: [shopId, caseId], references: [shopId, id])
+  job          Job?        @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  quotation    Quotation?  @relation(fields: [shopId, quotationId], references: [shopId, id])
+  subjectStaff Staff?      @relation("CaseEventSubject", fields: [shopId, subjectStaffId], references: [shopId, id])
+  actorStaff   Staff       @relation("CaseEventActor", fields: [shopId, actorStaffId], references: [shopId, id])
+  lineUpdate   LineUpdate? @relation(fields: [lineUpdateId], references: [id])
 
   @@index([shopId, caseId, at])
   @@map("case_events")
+}
+
+/// The Shop's connected LINE Official Account (ADR-002): one per Shop.
+/// Credentials are stored ENCRYPTED (ADR-004) — AES-256-GCM envelopes whose
+/// key lives in the environment, bound to this shop by AAD, so a ciphertext
+/// lifted into another Shop's row cannot be decrypted. Every other layer
+/// treats these two columns as opaque strings; only lib/line-credentials.ts
+/// ever opens them, and never on the way to a client.
+model ShopLineChannel {
+  id                    String    @id @default(cuid())
+  shopId                String    @unique @map("shop_id")
+  /// Verifies inbound webhook signatures (ADR-005). Encrypted.
+  channelSecretEnc      String    @map("channel_secret_enc")
+  /// Sends messages as this OA. Encrypted.
+  channelAccessTokenEnc String    @map("channel_access_token_enc")
+  /// Cached from GET /v2/bot/info at connect/verify time — display only, so
+  /// the settings screen never needs to touch the credentials.
+  botUserId             String?   @map("bot_user_id")
+  botBasicId            String?   @map("bot_basic_id")
+  botDisplayName        String?   @map("bot_display_name")
+  botPictureUrl         String?   @map("bot_picture_url")
+  verifiedAt            DateTime? @map("verified_at")
+  connectedByStaffId    String    @map("connected_by_staff_id")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  shop        Shop  @relation(fields: [shopId], references: [id])
+  connectedBy Staff @relation(fields: [shopId, connectedByStaffId], references: [shopId, id])
+
+  @@unique([shopId, id]) // target for the same-shop composite FKs
+  @@map("shop_line_channels")
+}
+
+/// Whether this identity still has the OA added (ADR-005). UNFOLLOWED means
+/// blocked or removed: a push would fail, so the composer refuses with a
+/// reason instead of burning the Shop's message quota.
+enum LineFollowState {
+  FOLLOWING
+  UNFOLLOWED
+}
+
+/// A LINE identity seen on one Shop's OA (CONTEXT.md: LINE Contact). Created
+/// by the webhook from a follow or message event — the ONLY way a userId can
+/// reach us (ADR-005); message CONTENT is never read or stored. Starts
+/// unlinked; Staff match it to a Customer by hand. userIds are per-OA, so the
+/// same person at two Shops is two rows.
+model LineContact {
+  id              String          @id @default(cuid())
+  shopId          String          @map("shop_id")
+  lineUserId      String          @map("line_user_id")
+  displayName     String?         @map("display_name")
+  pictureUrl      String?         @map("picture_url")
+  followState     LineFollowState @default(FOLLOWING) @map("follow_state")
+  firstSeenAt     DateTime        @default(now()) @map("first_seen_at")
+  lastEventAt     DateTime        @default(now()) @map("last_event_at")
+  /// NULL = not yet matched to a Customer — a normal state, not an error.
+  customerId      String?         @map("customer_id")
+  linkedByStaffId String?         @map("linked_by_staff_id")
+  linkedAt        DateTime?       @map("linked_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  shop     Shop      @relation(fields: [shopId], references: [id])
+  customer Customer? @relation(fields: [shopId, customerId], references: [shopId, id])
+  linkedBy Staff?    @relation(fields: [shopId, linkedByStaffId], references: [shopId, id])
+
+  @@unique([shopId, lineUserId])
+  // At most one linked contact per Customer — relinking replaces. Postgres
+  // treats NULLs as distinct, so unlinked rows coexist freely (the
+  // Finding.checklistItem idiom).
+  @@unique([shopId, customerId])
+  @@unique([shopId, id]) // target for the same-shop composite FKs
+  @@index([shopId, followState])
+  @@map("line_contacts")
+}
+
+/// Whether LINE accepted the push. Set ONCE, at row creation, after the API
+/// call returns — the call cannot be rolled back, so we send first and record
+/// second (M6 brief, decision 4). A retry is a NEW row, never an edit.
+enum LineDeliveryStatus {
+  SENT
+  FAILED
+}
+
+/// One LINE Update as SENT (CONTEXT.md): an immutable snapshot of what the
+/// customer actually saw — body text verbatim, ordered photos, and the
+/// recipient as at that moment — so a later rename, reprice, or relink cannot
+/// rewrite history. Composed and sent by a human, always (ADR-003). Failures
+/// are recorded too, so "did we ever actually tell them?" stays answerable.
+/// Append-only: created complete, never touched again — no updatedAt.
+model LineUpdate {
+  id             String             @id @default(cuid())
+  shopId         String             @map("shop_id")
+  caseId         String             @map("case_id")
+  /// Recipient snapshot: the Customer, the userId actually pushed to, and
+  /// the name as it read at send time.
+  customerId     String             @map("customer_id")
+  lineUserId     String             @map("line_user_id")
+  recipientName  String             @map("recipient_name")
+  /// Shop-authored, Thai-first, rendered verbatim — never i18n copy.
+  bodyText       String             @map("body_text")
+  deliveryStatus LineDeliveryStatus @map("delivery_status")
+  /// LINE's x-line-request-id, for support conversations.
+  lineRequestId  String?            @map("line_request_id")
+  errorCode      String?            @map("error_code")
+  errorDetail    String?            @map("error_detail")
+  sentByStaffId  String             @map("sent_by_staff_id")
+  sentAt         DateTime           @default(now()) @map("sent_at")
+
+  shop       Shop              @relation(fields: [shopId], references: [id])
+  repairCase RepairCase        @relation(fields: [shopId, caseId], references: [shopId, id])
+  customer   Customer          @relation(fields: [shopId, customerId], references: [shopId, id])
+  sentBy     Staff             @relation(fields: [shopId, sentByStaffId], references: [shopId, id])
+  photos     LineUpdatePhoto[]
+  events     CaseEvent[]
+
+  @@unique([shopId, id]) // target for the same-shop composite FKs
+  @@index([shopId, caseId, sentAt])
+  @@map("line_updates")
+}
+
+/// One photo published with an Update. LINE's servers fetch image URLs
+/// themselves, so a published photo needs a link that works WITHOUT a session
+/// — `publicToken` is that link, 128 bits of randomness, minted only when a
+/// human pressed send (M6 brief, decision 3). It is the single deliberate
+/// exception to lib/storage.ts's "bytes only leave through the authenticated
+/// route", and the one mutable field on an otherwise append-only row:
+/// nulling it revokes access while the history stays intact.
+model LineUpdatePhoto {
+  id           String  @id @default(cuid())
+  shopId       String  @map("shop_id")
+  lineUpdateId String  @map("line_update_id")
+  photoId      String  @map("photo_id")
+  sortOrder    Int     @map("sort_order")
+  publicToken  String? @unique @map("public_token")
+
+  shop       Shop       @relation(fields: [shopId], references: [id])
+  lineUpdate LineUpdate @relation(fields: [shopId, lineUpdateId], references: [shopId, id])
+  photo      Photo      @relation(fields: [shopId, photoId], references: [shopId, id])
+
+  @@index([shopId, lineUpdateId])
+  @@map("line_update_photos")
 }
