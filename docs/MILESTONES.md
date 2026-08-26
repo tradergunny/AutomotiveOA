@@ -13,4 +13,4 @@ Work proceeds strictly milestone by milestone; each ends with a founder review g
 | M5 | Case Board & internal timeline | Attention-grouped dashboard; Job status flow incl. Waiting reasons and QC gate; internal event log | The shop's day is visible on one screen |
 | M6 | LINE integration | Shop LINE OA connect; Customer Timeline composer; push updates with photos (ADR-002/003 honored) | A customer's LINE receives a real update |
 | M7 | Payments & CRM | Payment records + balance due on board; Customer/Vehicle history views (history split); Follow-up worklist | Money owed and follow-ups are workable lists |
-| M8 | Hardening & pilot readiness | Bilingual copy pass; Claim records on cases; print styles; second-Shop onboarding dry-run; backups | Pilot shop goes live |
+| M8 | Hardening & pilot readiness | Bilingual copy pass; Claim records on cases; print styles; second-Shop onboarding dry-run; backups; production deploy (Vercel + hosted Postgres per M1 assumption: Blob driver behind the [lib/storage.ts](../lib/storage.ts) seam, pooled `DATABASE_URL`, per-photo check-in uploads for the 4.5 MB serverless body cap) with a written deploy guide | Pilot shop goes live |
