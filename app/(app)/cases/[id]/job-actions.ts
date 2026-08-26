@@ -5,6 +5,7 @@ import type {
   AuthorizationChannel,
   PayerType,
 } from "@/lib/generated/prisma/enums";
+import { applyCaseReadiness } from "@/lib/case-flow";
 import { AUTH_CHANNELS, PAYER_TYPES, PART_ORDER_STATUSES, type JobDto } from "@/lib/jobs";
 import { bahtToSatang } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -16,8 +17,11 @@ import { JOB_INCLUDE, toJobDto } from "./job-dto";
 // Job actions (M4 brief §3–§5). Same shape as the M3 inspection actions:
 // every mutation re-checks case ownership through the tenant guard, refuses
 // DELIVERED cases, and returns the fresh JobDto so the client panel can
-// reconcile its state. M4 only ever writes PROPOSED / AUTHORIZED / DECLINED;
-// the working statuses arrive with the M5 board.
+// reconcile its state. This file writes PROPOSED / AUTHORIZED / DECLINED;
+// the working transitions live in flow-actions.ts (M5). Since M5, mutations
+// that are timeline material also write their CaseEvent in the same
+// transaction (ruling 1), and authorization changes re-derive READY
+// (ruling 4a).
 
 export type JobError =
   | "caseMissing"
@@ -164,10 +168,21 @@ export async function createJobFromFindings(
           data: { jobId: created.id },
         });
       }
+      await tx.caseEvent.create({
+        data: {
+          shopId: session.shopId,
+          caseId,
+          type: "JOB_CREATED",
+          jobId: created.id,
+          jobTitle: title,
+          actorStaffId: session.staffId,
+        },
+      });
       return created;
     });
 
     revalidatePath(`/cases/${caseId}`);
+    revalidatePath("/");
     return { ok: true, value: await freshDto(db, job.id) };
   } catch (error) {
     return fail(error);
@@ -190,19 +205,33 @@ export async function createCatalogJob(
     });
     if (!item?.active) throw new JobInputError("catalogMissing");
 
-    const job = await db.job.create({
-      data: {
-        shopId: session.shopId,
-        caseId,
-        title: item.name,
-        catalogItemId: item.id,
-        priceSatang: item.priceSatang,
-        ...payer,
-        createdByStaffId: session.staffId,
-      },
+    const job = await db.$transaction(async (tx) => {
+      const created = await tx.job.create({
+        data: {
+          shopId: session.shopId,
+          caseId,
+          title: item.name,
+          catalogItemId: item.id,
+          priceSatang: item.priceSatang,
+          ...payer,
+          createdByStaffId: session.staffId,
+        },
+      });
+      await tx.caseEvent.create({
+        data: {
+          shopId: session.shopId,
+          caseId,
+          type: "JOB_CREATED",
+          jobId: created.id,
+          jobTitle: created.title,
+          actorStaffId: session.staffId,
+        },
+      });
+      return created;
     });
 
     revalidatePath(`/cases/${caseId}`);
+    revalidatePath("/");
     return { ok: true, value: await freshDto(db, job.id) };
   } catch (error) {
     return fail(error);
@@ -225,7 +254,7 @@ export async function updateJob(
   },
 ): Promise<JobActionResult<JobDto>> {
   try {
-    const { db } = await tenantContext();
+    const { session, db } = await tenantContext();
     const job = await editableJob(db, jobId);
 
     const data: Record<string, unknown> = {};
@@ -241,6 +270,7 @@ export async function updateJob(
       Object.assign(data, parsePayer(patch.payerType, patch.insurerName));
     }
     if (patch.note !== undefined) data.note = cleanText(patch.note, MAX_NOTE_LENGTH);
+    let assignmentChanged = false;
     if (patch.assignedStaffId !== undefined) {
       if (patch.assignedStaffId === null) {
         data.assignedStaffId = null;
@@ -252,10 +282,27 @@ export async function updateJob(
         if (!staff) throw new JobInputError("invalidInput");
         data.assignedStaffId = staff.id;
       }
+      assignmentChanged = data.assignedStaffId !== job.assignedStaffId;
     }
 
-    await db.job.update({ where: { id: jobId }, data });
+    await db.$transaction(async (tx) => {
+      await tx.job.update({ where: { id: jobId }, data });
+      if (assignmentChanged) {
+        await tx.caseEvent.create({
+          data: {
+            shopId: session.shopId,
+            caseId: job.repairCase.id,
+            type: "JOB_ASSIGNED",
+            jobId,
+            jobTitle: (data.title as string | undefined) ?? job.title,
+            subjectStaffId: data.assignedStaffId as string | null,
+            actorStaffId: session.staffId,
+          },
+        });
+      }
+    });
     revalidatePath(`/cases/${job.repairCase.id}`);
+    revalidatePath("/");
     return { ok: true, value: await freshDto(db, jobId) };
   } catch (error) {
     return fail(error);
@@ -283,12 +330,27 @@ export async function updateJobPrice(
       }
       if (priceSatang == null) throw new JobInputError("priceInvalid");
       const override = priceSatang !== job.catalogItem?.priceSatang;
-      await db.job.update({
-        where: { id: jobId },
-        data: {
-          priceSatang,
-          priceOverriddenByStaffId: override ? session.staffId : null,
-        },
+      await db.$transaction(async (tx) => {
+        await tx.job.update({
+          where: { id: jobId },
+          data: {
+            priceSatang,
+            priceOverriddenByStaffId: override ? session.staffId : null,
+          },
+        });
+        if (override) {
+          await tx.caseEvent.create({
+            data: {
+              shopId: session.shopId,
+              caseId: job.repairCase.id,
+              type: "JOB_PRICE_OVERRIDDEN",
+              jobId,
+              jobTitle: job.title,
+              priceSatang,
+              actorStaffId: session.staffId,
+            },
+          });
+        }
       });
     } else {
       await db.job.update({ where: { id: jobId }, data: { priceSatang } });
@@ -309,7 +371,7 @@ export async function updateJobPrice(
  */
 export async function deleteJob(jobId: string): Promise<JobActionResult<{ id: string }>> {
   try {
-    const { db } = await tenantContext();
+    const { session, db } = await tenantContext();
     const job = await editableJob(db, jobId);
     if (job.status !== "PROPOSED") throw new JobInputError("notProposed");
 
@@ -319,9 +381,21 @@ export async function deleteJob(jobId: string): Promise<JobActionResult<{ id: st
       await tx.jobAuthorization.deleteMany({ where: { jobId } });
       await tx.photo.deleteMany({ where: { jobId } });
       await tx.job.delete({ where: { id: jobId } });
+      // jobId stays NULL on purpose: the row is gone, the snapshot title
+      // keeps the timeline entry renderable (schema comment).
+      await tx.caseEvent.create({
+        data: {
+          shopId: session.shopId,
+          caseId: job.repairCase.id,
+          type: "JOB_DELETED",
+          jobTitle: job.title,
+          actorStaffId: session.staffId,
+        },
+      });
     });
 
     revalidatePath(`/cases/${job.repairCase.id}`);
+    revalidatePath("/");
     return { ok: true, value: { id: jobId } };
   } catch (error) {
     return fail(error);
@@ -369,6 +443,7 @@ export async function recordAuthorization(
       quotationId = quotation.id;
     }
 
+    const note = cleanText(input.note, MAX_NOTE_LENGTH);
     await db.$transaction(async (tx) => {
       await tx.jobAuthorization.create({
         data: {
@@ -377,14 +452,32 @@ export async function recordAuthorization(
           decision: input.decision,
           channel: input.channel as AuthorizationChannel,
           quotationId,
-          note: cleanText(input.note, MAX_NOTE_LENGTH),
+          note,
           recordedByStaffId: session.staffId,
         },
       });
       await tx.job.update({ where: { id: jobId }, data: { status: input.decision } });
+      await tx.caseEvent.create({
+        data: {
+          shopId: session.shopId,
+          caseId: job.repairCase.id,
+          type: "JOB_AUTHORIZATION_RECORDED",
+          jobId,
+          jobTitle: job.title,
+          fromStatus: "PROPOSED",
+          toStatus: input.decision,
+          note,
+          actorStaffId: session.staffId,
+        },
+      });
+      // New authorized work on a READY case revokes it (ruling 4a).
+      if (input.decision === "AUTHORIZED") {
+        await applyCaseReadiness(tx, session.shopId, job.repairCase.id, session.staffId);
+      }
     });
 
     revalidatePath(`/cases/${job.repairCase.id}`);
+    revalidatePath("/");
     return { ok: true, value: await freshDto(db, jobId) };
   } catch (error) {
     return fail(error);
@@ -415,9 +508,26 @@ export async function revertAuthorization(
         },
       });
       await tx.job.update({ where: { id: jobId }, data: { status: "PROPOSED" } });
+      await tx.caseEvent.create({
+        data: {
+          shopId: session.shopId,
+          caseId: job.repairCase.id,
+          type: "JOB_AUTHORIZATION_RECORDED",
+          jobId,
+          jobTitle: job.title,
+          fromStatus: job.status,
+          toStatus: "PROPOSED",
+          actorStaffId: session.staffId,
+        },
+      });
+      // Un-authorizing may leave only completed work → the case turns READY.
+      if (job.status === "AUTHORIZED") {
+        await applyCaseReadiness(tx, session.shopId, job.repairCase.id, session.staffId);
+      }
     });
 
     revalidatePath(`/cases/${job.repairCase.id}`);
+    revalidatePath("/");
     return { ok: true, value: await freshDto(db, jobId) };
   } catch (error) {
     return fail(error);

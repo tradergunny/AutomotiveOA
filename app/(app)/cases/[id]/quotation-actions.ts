@@ -85,6 +85,16 @@ export async function issueQuotation(
           sortOrder: index,
         })),
       });
+      // Timeline material since M5 (ruling 1) — same transaction.
+      await tx.caseEvent.create({
+        data: {
+          shopId: session.shopId,
+          caseId,
+          type: "QUOTATION_ISSUED",
+          quotationId: created.id,
+          actorStaffId: session.staffId,
+        },
+      });
       return created;
     });
 

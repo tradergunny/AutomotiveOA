@@ -47,12 +47,17 @@
   "board": {
     "empty": "ยังไม่มีเคสซ่อมที่เปิดอยู่ — เริ่มจากการรับรถเข้าอู่",
     "newCheckin": "รับรถเข้าอู่",
-    "columns": {
-      "case": "เคส",
-      "vehicle": "รถ",
-      "contact": "ผู้ติดต่อ",
-      "checkedIn": "รับรถเมื่อ"
-    }
+    "openCount": "เคสที่เปิดอยู่ {count} เคส",
+    "groups": {
+      "IN_ASSESSMENT": "กำลังตรวจประเมิน",
+      "AWAITING_AUTH": "รอลูกค้าอนุมัติ",
+      "WAITING": "รอดำเนินการ",
+      "IN_PROGRESS": "กำลังซ่อม",
+      "IN_QC": "ตรวจ QC",
+      "READY": "พร้อมส่งมอบ"
+    },
+    "partsProgress": "อะไหล่ {arrived}/{total}",
+    "partsEta": "ถึง {date}"
   },
   "stub": {
     "comingIn": "ฟีเจอร์นี้จะมาใน {milestone}",
@@ -74,7 +79,23 @@
     "odometerValue": "{km} กม.",
     "photos": "รูปถ่ายรอบคัน",
     "noPhotos": "ยังไม่มีรูปในเคสนี้",
-    "photoAlt": "รูปเคสที่ {n}"
+    "photoAlt": "รูปเคสที่ {n}",
+    "readySince": "พร้อมส่งมอบ — {when}",
+    "deliveredLine": "ส่งมอบแล้ว {when} · {name}",
+    "flow": {
+      "markReady": "ตั้งเป็นพร้อมส่งมอบ",
+      "markReadyConfirm": "ยืนยัน — ไม่มีงานค้างในเคสนี้?",
+      "markDelivered": "บันทึกส่งมอบรถ",
+      "markDeliveredConfirm": "ยืนยันส่งมอบ — เคสจะปิดการแก้ไข",
+      "errors": {
+        "caseMissing": "ไม่พบเคสนี้",
+        "caseDelivered": "เคสนี้ส่งมอบไปแล้ว",
+        "invalidTransition": "สถานะเคสเปลี่ยนไปแล้ว — รีเฟรชหน้า",
+        "activeWork": "ยังมีงานที่กำลังดำเนินการอยู่ในเคสนี้",
+        "notReady": "ส่งมอบได้เฉพาะเคสที่พร้อมส่งมอบ",
+        "failed": "เกิดข้อผิดพลาด — ลองอีกครั้ง"
+      }
+    }
   },
   "checkin": {
     "contactSection": "ผู้ที่นำรถเข้ามา",
@@ -291,6 +312,38 @@
     "DECLINED": "ไม่อนุมัติ",
     "CANCELLED": "ยกเลิก"
   },
+  "waitingReasons": {
+    "PARTS": "อะไหล่",
+    "PAINT_BOOTH": "ห้องพ่นสี",
+    "TECHNICIAN": "ช่าง",
+    "OTHER": "อื่น ๆ"
+  },
+  "timeline": {
+    "title": "ไทม์ไลน์ภายใน",
+    "staffOnly": "เฉพาะพนักงาน",
+    "entryCount": "{count} รายการ",
+    "checkedIn": "รับรถเข้าอู่",
+    "jobCreated": "สร้างงาน — {job}",
+    "jobDeleted": "ลบงาน — {job}",
+    "jobAuthorized": "อนุมัติงาน — {job}",
+    "jobDeclined": "ปฏิเสธงาน — {job}",
+    "authorizationReverted": "ย้อนการอนุมัติกลับเป็นรออนุมัติ — {job}",
+    "workStarted": "เริ่มงาน — {job}",
+    "jobWaiting": "รอดำเนินการ ({reason}) — {job}",
+    "waitingReasonChanged": "เปลี่ยนเหตุผลที่รอเป็น {reason} — {job}",
+    "sentToQc": "ส่งตรวจ QC — {job}",
+    "qcPassed": "ผ่าน QC — {job}",
+    "qcFailed": "ไม่ผ่าน QC — {job}",
+    "jobCancelled": "ยกเลิกงาน — {job}",
+    "jobReverted": "ย้อนสถานะเป็น {status} — {job}",
+    "jobAssigned": "มอบหมายให้ {name} — {job}",
+    "jobUnassigned": "ถอนการมอบหมาย — {job}",
+    "priceOverridden": "แก้ราคาเป็น {price} — {job}",
+    "quotationIssued": "ออกใบเสนอราคา {label}",
+    "caseReady": "รถพร้อมส่งมอบ",
+    "caseReadyRevoked": "ยังไม่พร้อมส่งมอบ — มีงานเพิ่ม",
+    "caseDelivered": "ส่งมอบรถแล้ว"
+  },
   "catalog": {
     "title": "รายการบริการมาตรฐานและราคา",
     "empty": "ยังไม่มีรายการ — เพิ่มบริการมาตรฐานของอู่ด้านล่าง",
@@ -392,6 +445,26 @@
         "OTHER": "อื่น ๆ"
       }
     },
+    "flow": {
+      "title": "สถานะงาน",
+      "startWork": "เริ่มงาน",
+      "resumeWork": "กลับมาทำต่อ",
+      "setWaiting": "ตั้งสถานะรอ…",
+      "changeReason": "เปลี่ยนเหตุผลที่รอ…",
+      "reasonLabel": "เหตุผลที่รอ",
+      "confirm": "ยืนยัน",
+      "sendToQc": "ส่งตรวจ QC",
+      "qcPass": "ผ่าน QC",
+      "qcFail": "ไม่ผ่าน QC…",
+      "qcFailNotePlaceholder": "สาเหตุที่ไม่ผ่านและต้องแก้อะไร (จำเป็น)",
+      "cancel": "ยกเลิกงาน…",
+      "cancelConfirm": "ยกเลิกงาน",
+      "cancelNotePlaceholder": "เหตุผลที่หยุดงานที่อนุมัติแล้ว (จำเป็น)",
+      "qcManagerHint": "ผู้จัดการเป็นผู้ตรวจรับ QC",
+      "qcOwnWorkHint": "ช่างผู้รับผิดชอบงานตรวจรับงานตัวเองไม่ได้",
+      "revertStep": "ย้อนสถานะ",
+      "revertStepConfirm": "ยืนยันย้อนสถานะหนึ่งขั้น?"
+    },
     "createdAt": "สร้างเมื่อ {when}",
     "delete": "ลบงาน",
     "deleteConfirm": "ยืนยันลบ? รายการตรวจจะกลับเป็นยังไม่จัดกลุ่ม",
@@ -400,6 +473,10 @@
       "caseDelivered": "เคสนี้ส่งมอบแล้ว — ไม่สามารถแก้ไขงานได้",
       "jobMissing": "ไม่พบงานนี้",
       "notProposed": "แก้ไขได้เฉพาะงานที่รออนุมัติ",
+      "invalidTransition": "เปลี่ยนสถานะแบบนี้ไม่ได้",
+      "reasonRequired": "กรุณาเลือกเหตุผลที่รอ",
+      "noteRequired": "ต้องกรอกหมายเหตุสำหรับการดำเนินการนี้",
+      "qcOwnWork": "ช่างผู้รับผิดชอบงานตรวจรับงานตัวเองไม่ได้",
       "titleRequired": "กรุณากรอกชื่องาน",
       "priceInvalid": "กรุณากรอกราคาให้ถูกต้อง",
       "priceRequired": "ต้องตีราคางานก่อนจึงจะอนุมัติได้",

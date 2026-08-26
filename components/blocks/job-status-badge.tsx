@@ -4,9 +4,9 @@ import { cn } from "@/lib/utils";
 
 // Status hues per DESIGN.md D-3: amber = waiting/attention (a Proposed Job
 // awaits authorization), green = authorized/done, blue = in-process, red =
-// declined, muted = cancelled. The full map ships now; M4 only ever renders
-// PROPOSED / AUTHORIZED / DECLINED — the rest arrive with the M5 board.
-const TONE: Record<JobStatus, string> = {
+// declined, muted = cancelled. Shared with the board's and case header's
+// rollup chips (job-rollup.tsx).
+export const JOB_STATUS_TONE: Record<JobStatus, string> = {
   PROPOSED: "border-warn/50 text-warn",
   AUTHORIZED: "border-ok/50 text-ok",
   WAITING: "border-warn/50 text-warn",
@@ -23,7 +23,7 @@ export function JobStatusBadge({ status }: { status: JobStatus }) {
     <span
       className={cn(
         "hatch-soft inline-flex items-center border px-1.5 py-px font-mono text-[10px] tracking-[0.08em] whitespace-nowrap",
-        TONE[status],
+        JOB_STATUS_TONE[status],
       )}
     >
       {t(status)}

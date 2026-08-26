@@ -4,18 +4,23 @@ import { notFound } from "next/navigation";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { CaseStatusBadge } from "@/components/blocks/case-status-badge";
 import { CornerTicks } from "@/components/blocks/corner-ticks";
+import { JobRollupChips } from "@/components/blocks/job-rollup";
+import { hasActiveWork } from "@/lib/case-flow";
 import { findingSeverity } from "@/lib/inspection";
 import { formatPhone } from "@/lib/normalize";
 import { can } from "@/lib/permissions";
 import { requireSession, tenantDb } from "@/lib/session";
+import { CaseFlowPanel } from "./case-flow-panel";
+import { CASE_EVENT_INCLUDE, CaseTimeline } from "./case-timeline";
 import { JOB_INCLUDE, QUOTATION_INCLUDE, toJobDto, toQuotationDto } from "./job-dto";
 import { JobsPanel } from "./jobs-panel";
 
-// Repair Case page (M2 brief §6, M3 brief §6, M4 brief §7): the check-in
-// landing with the Inspection summary and now the Jobs & money section —
-// Jobs with pricing and authorization, plus the quotation lineage. Walkaround
-// photos are the case-level ones (findingId AND jobId null); Finding/Job
-// photos live with their Findings and Jobs.
+// Repair Case page (M2 brief §6, M3 brief §6, M4 brief §7, M5 brief §6–§7):
+// the check-in landing with the Inspection summary, the Jobs & money section,
+// and now the real case status — derived rollup in the header, Mark ready /
+// Mark delivered, and the internal timeline. Walkaround photos are the
+// case-level ones (findingId AND jobId null); Finding/Job photos live with
+// their Findings and Jobs.
 export default async function CasePage({
   params,
   searchParams,
@@ -37,6 +42,7 @@ export default async function CasePage({
       vehicle: { include: { primaryCustomer: true } },
       contactCustomer: true,
       openedByStaff: true,
+      deliveredBy: { select: { name: true } },
       photos: { where: { findingId: null, jobId: null }, orderBy: { capturedAt: "asc" } },
       findings: {
         select: {
@@ -56,7 +62,7 @@ export default async function CasePage({
   });
   if (!repairCase) notFound();
 
-  const [jobs, quotations, catalogItems, staffOptions] = await Promise.all([
+  const [jobs, quotations, catalogItems, staffOptions, events] = await Promise.all([
     db.job.findMany({
       where: { caseId: id },
       include: JOB_INCLUDE,
@@ -76,6 +82,11 @@ export default async function CasePage({
       where: { active: true },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
+    }),
+    db.caseEvent.findMany({
+      where: { caseId: id },
+      include: CASE_EVENT_INCLUDE,
+      orderBy: { at: "asc" },
     }),
   ]);
 
@@ -113,6 +124,12 @@ export default async function CasePage({
             {repairCase.reference}
           </span>
           <CaseStatusBadge status={repairCase.status} />
+          <JobRollupChips
+            jobs={jobs.map((job) => ({
+              status: job.status,
+              waitingReason: job.waitingReason,
+            }))}
+          />
           <span className="ml-auto text-right">
             <span className="eyebrow block">{t("checkedInAt")}</span>
             <span className="font-mono text-xs">
@@ -129,6 +146,33 @@ export default async function CasePage({
         <p className="mt-2 text-xs text-muted-foreground">
           {t("openedBy")} · {repairCase.openedByStaff.name}
         </p>
+        {repairCase.status === "READY" && repairCase.readyAt && (
+          <p className="mt-1 text-xs text-ok">
+            {t("readySince", { when: format.relativeTime(repairCase.readyAt) })}
+          </p>
+        )}
+        {repairCase.status === "DELIVERED" && repairCase.deliveredAt && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t("deliveredLine", {
+              when: format.dateTime(repairCase.deliveredAt, {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+              name: repairCase.deliveredBy?.name ?? "—",
+            })}
+          </p>
+        )}
+        <CaseFlowPanel
+          caseId={repairCase.id}
+          canMarkReady={
+            repairCase.status === "CHECKED_IN" &&
+            !hasActiveWork(jobs.map((job) => ({ status: job.status })))
+          }
+          canDeliver={repairCase.status === "READY"}
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -264,8 +308,18 @@ export default async function CasePage({
         catalogItems={catalogItems}
         staffOptions={staffOptions}
         isManager={can(session.role, "catalog.priceOverride")}
+        canSignOffQc={can(session.role, "qc.signOff")}
+        canCancelJob={can(session.role, "job.cancel")}
+        canRevertStep={can(session.role, "job.revertStep")}
+        viewerStaffId={session.staffId}
         readOnly={repairCase.status === "DELIVERED"}
         preselectFindingId={preselectFindingId}
+      />
+
+      <CaseTimeline
+        events={events}
+        checkedInAt={repairCase.checkedInAt}
+        openedByName={repairCase.openedByStaff.name}
       />
 
       <section className="flex flex-col gap-2">

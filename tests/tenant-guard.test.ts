@@ -28,6 +28,7 @@ let catalogItemB: { id: string };
 let jobA: { id: string };
 let jobB: { id: string };
 let quotationA: { id: string };
+let caseEventA: { id: string };
 
 beforeAll(async () => {
   shopA = await prismaUnscoped.shop.create({ data: { name: `${run} Shop A` } });
@@ -204,10 +205,32 @@ beforeAll(async () => {
       recordedByStaffId: staffA.id,
     },
   });
+  // M5 domain rows: one internal-timeline event per shop.
+  caseEventA = await prismaUnscoped.caseEvent.create({
+    data: {
+      shopId: shopA.id,
+      caseId: caseA.id,
+      type: "JOB_CREATED",
+      jobId: jobA.id,
+      jobTitle: `${run} Job A`,
+      actorStaffId: staffA.id,
+    },
+  });
+  await prismaUnscoped.caseEvent.create({
+    data: {
+      shopId: shopB.id,
+      caseId: caseB.id,
+      type: "JOB_CREATED",
+      jobId: jobB.id,
+      jobTitle: `${run} Job B`,
+      actorStaffId: staffB.id,
+    },
+  });
 });
 
 afterAll(async () => {
   const shopIds = [shopA.id, shopB.id];
+  await prismaUnscoped.caseEvent.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.photo.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.jobAuthorization.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.quotationLine.deleteMany({ where: { shopId: { in: shopIds } } });
@@ -819,5 +842,105 @@ describe("M4 database-level defense in depth", () => {
     expect(survivor?.jobId).toBeNull();
     expect(survivor?.priceSatang).toBe(100_000);
     await prismaUnscoped.quotationLine.delete({ where: { id: line.id } });
+  });
+});
+
+describe("M5 model is scoped (CaseEvent)", () => {
+  it("findMany stays inside the shop", async () => {
+    const events = await forShop(shopA.id).caseEvent.findMany({
+      where: { jobTitle: { startsWith: run } },
+    });
+    expect(events.map((e) => e.id)).toEqual([caseEventA.id]);
+  });
+
+  it("findUnique on another shop's event returns null", async () => {
+    expect(
+      await forShop(shopB.id).caseEvent.findUnique({ where: { id: caseEventA.id } }),
+    ).toBeNull();
+  });
+
+  it("event create lands in the scoped shop; the log is append-only-safe across shops", async () => {
+    const created = await forShop(shopA.id).caseEvent.create({
+      data: { shopId: shopA.id, caseId: caseA.id, type: "CASE_READY", actorStaffId: staffA.id },
+    });
+    expect(created.shopId).toBe(shopA.id);
+    // B cannot delete A's history even by id.
+    await expect(
+      forShop(shopB.id).caseEvent.delete({ where: { id: created.id } }),
+    ).rejects.toThrow(TenantGuardError);
+    await prismaUnscoped.caseEvent.delete({ where: { id: created.id } });
+  });
+});
+
+describe("M5 database-level defense in depth", () => {
+  it("rejects an event on another shop's case, actor, or quotation", async () => {
+    await expect(
+      prismaUnscoped.caseEvent.create({
+        data: {
+          shopId: shopA.id,
+          caseId: caseB.id, // B's case under A's shop
+          type: "CASE_READY",
+          actorStaffId: staffA.id,
+        },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      prismaUnscoped.caseEvent.create({
+        data: {
+          shopId: shopA.id,
+          caseId: caseA.id,
+          type: "CASE_READY",
+          actorStaffId: staffB.id, // B's staff as actor
+        },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      prismaUnscoped.caseEvent.create({
+        data: {
+          shopId: shopB.id,
+          caseId: caseB.id,
+          type: "QUOTATION_ISSUED",
+          quotationId: quotationA.id, // A's quotation under B's shop
+          actorStaffId: staffB.id,
+        },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("rejects a delivered-by staff from another shop", async () => {
+    await expect(
+      prismaUnscoped.repairCase.update({
+        where: { id: caseA.id },
+        data: { deliveredByStaffId: staffB.id },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("events survive job deletion via the soft SET NULL link, title snapshot intact", async () => {
+    const tempJob = await prismaUnscoped.job.create({
+      data: {
+        shopId: shopA.id,
+        caseId: caseA.id,
+        title: `${run} temp job M5`,
+        payerType: "CUSTOMER",
+        createdByStaffId: staffA.id,
+      },
+    });
+    const event = await prismaUnscoped.caseEvent.create({
+      data: {
+        shopId: shopA.id,
+        caseId: caseA.id,
+        type: "JOB_CREATED",
+        jobId: tempJob.id,
+        jobTitle: tempJob.title,
+        actorStaffId: staffA.id,
+      },
+    });
+    await prismaUnscoped.job.delete({ where: { id: tempJob.id } });
+    const survivor = await prismaUnscoped.caseEvent.findUnique({ where: { id: event.id } });
+    expect(survivor).not.toBeNull();
+    expect(survivor?.jobId).toBeNull();
+    expect(survivor?.jobTitle).toBe(tempJob.title);
+    await prismaUnscoped.caseEvent.delete({ where: { id: event.id } });
   });
 });

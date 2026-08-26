@@ -33,6 +33,7 @@ export function toJobDto(row: JobWithRelations): JobDto {
     id: row.id,
     title: row.title,
     status: row.status,
+    waitingReason: row.waitingReason,
     payerType: row.payerType,
     insurerName: row.insurerName,
     catalogItemId: row.catalogItemId,
