@@ -1,5 +1,5 @@
-// Client-side photo downscale (M2 brief §5): tablet/phone camera shots are
-// multi-MB; resize before upload so a full walkaround stays well inside the
+// Client-side photo downscale (M2 brief §5, reused by M3 finding photos):
+// camera shots are multi-MB; resize before upload to stay well inside the
 // action body limit. EXIF is dropped, orientation is baked in.
 
 const MAX_EDGE = 1600;
