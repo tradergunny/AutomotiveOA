@@ -4,7 +4,7 @@ Written for the person who owns the garage, not for a developer. It takes about 
 
 You need: a LINE account on your phone, and a computer.
 
-> **The one technical constraint, up front.** LINE's servers have to be able to reach this app over the internet — to deliver messages people send you, and to fetch the photos you attach to an update. `localhost` on your laptop is not reachable from the internet, so **do the steps below against the deployed app** (the Vercel staging URL), not a local dev server. Local development uses a stand-in that never talks to LINE at all — see [README](../README.md#line-in-dev).
+> **The one technical constraint, up front.** LINE's servers have to be able to reach this app over the internet — to deliver messages people send you, and to fetch the photos you attach to an update. `localhost` on your laptop is not reachable from the internet, so **do the steps below against the deployed app** — currently <https://automotive-oa.vercel.app> — not a local dev server. Local development uses a stand-in that never talks to LINE at all — see [README](../README.md#line-in-dev).
 
 ---
 
@@ -57,7 +57,9 @@ You now have the two values the app asks for:
 | **Channel secret** | Basic settings tab | Proves that messages arriving from LINE are genuinely from LINE |
 | **Channel access token** | Messaging API tab | Lets the app send messages as your account |
 
-Treat both like passwords. The app encrypts them before storing them ([ADR-004](adr/ADR-004-line-credential-encryption.md)) and never shows them again — if you lose them you can re-issue a token here at any time.
+Treat both like passwords: type or paste them **only** into the app's Settings page and the LINE console. Never put them in a chat, an email, a ticket, or a commit — anyone holding them can message your whole friends list as you. If one does get exposed, re-issue it in this console (Basic settings → Channel secret → **Issue**; Messaging API tab → **Issue** a new access token), then reconnect in Settings. The old value stops working the moment you re-issue.
+
+The app encrypts both before storing them ([ADR-004](adr/ADR-004-line-credential-encryption.md)) and never shows them again.
 
 > LINE occasionally rearranges these consoles and renames tabs. If a label does not match, look for the *concept* — "channel secret", "channel access token", "webhook URL" — rather than the exact wording.
 
@@ -65,12 +67,12 @@ Treat both like passwords. The app encrypts them before storing them ([ADR-004](
 
 ## Part 4 — Connect it to the app (about 3 minutes)
 
-1. Open the app and sign in as a **Manager** (advisors can see the connection but not change it).
+1. Open the deployed app (<https://automotive-oa.vercel.app>) and sign in as a **Manager** (advisors can see the connection but not change it).
 2. Go to **Settings**.
 3. Paste the **Channel secret** and the **Channel access token**, then press **Verify and connect**.
    - The app calls LINE to check the credentials before saving anything. If they are wrong you get a plain message saying so, and nothing is stored.
    - On success the page shows your OA's real name and Basic ID — a good sanity check that you connected the account you meant to.
-4. The page now shows a **Webhook URL for this shop**. Press **Copy**.
+4. The page now shows a **Webhook URL for this shop**. Press **Copy**. It looks like `https://automotive-oa.vercel.app/api/line/webhook/<a long shop id>` — the id is generated per shop and differs between the deployed app and a developer's laptop, so always copy it from the page rather than typing it out.
 5. Back in the **LINE Developers Console → Messaging API tab → Webhook settings**:
    - Paste the URL into **Webhook URL** and **Update**.
    - Press **Verify**. It should report success.
