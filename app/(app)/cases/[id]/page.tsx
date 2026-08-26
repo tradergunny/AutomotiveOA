@@ -6,20 +6,28 @@ import { CaseStatusBadge } from "@/components/blocks/case-status-badge";
 import { CornerTicks } from "@/components/blocks/corner-ticks";
 import { findingSeverity } from "@/lib/inspection";
 import { formatPhone } from "@/lib/normalize";
-import { tenantDb } from "@/lib/session";
+import { can } from "@/lib/permissions";
+import { requireSession, tenantDb } from "@/lib/session";
+import { JOB_INCLUDE, QUOTATION_INCLUDE, toJobDto, toQuotationDto } from "./job-dto";
+import { JobsPanel } from "./jobs-panel";
 
-// Repair Case page (M2 brief §6, M3 brief §6): the check-in landing, now with
-// the Inspection summary. M4+ add Jobs and money. Walkaround photos are the
-// case-level ones (findingId null); Finding photos live with their Findings
-// on the inspection screen.
-export default async function CasePage({ params }: PageProps<"/cases/[id]">) {
-  const { id } = await params;
-  const [t, tv, tc, ti, format, db] = await Promise.all([
+// Repair Case page (M2 brief §6, M3 brief §6, M4 brief §7): the check-in
+// landing with the Inspection summary and now the Jobs & money section —
+// Jobs with pricing and authorization, plus the quotation lineage. Walkaround
+// photos are the case-level ones (findingId AND jobId null); Finding/Job
+// photos live with their Findings and Jobs.
+export default async function CasePage({
+  params,
+  searchParams,
+}: PageProps<"/cases/[id]">) {
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const [t, tv, tc, ti, format, session, db] = await Promise.all([
     getTranslations("cases"),
     getTranslations("vehicles"),
     getTranslations("common"),
     getTranslations("inspection"),
     getFormatter(),
+    requireSession(),
     tenantDb(),
   ]);
 
@@ -29,10 +37,14 @@ export default async function CasePage({ params }: PageProps<"/cases/[id]">) {
       vehicle: { include: { primaryCustomer: true } },
       contactCustomer: true,
       openedByStaff: true,
-      photos: { where: { findingId: null }, orderBy: { capturedAt: "asc" } },
+      photos: { where: { findingId: null, jobId: null }, orderBy: { capturedAt: "asc" } },
       findings: {
         select: {
+          id: true,
           source: true,
+          zone: true,
+          checklistItem: true,
+          jobId: true,
           damageTypes: true,
           condition: true,
           recordedAt: true,
@@ -43,6 +55,38 @@ export default async function CasePage({ params }: PageProps<"/cases/[id]">) {
     },
   });
   if (!repairCase) notFound();
+
+  const [jobs, quotations, catalogItems, staffOptions] = await Promise.all([
+    db.job.findMany({
+      where: { caseId: id },
+      include: JOB_INCLUDE,
+      orderBy: { createdAt: "asc" },
+    }),
+    db.quotation.findMany({
+      where: { caseId: id },
+      include: QUOTATION_INCLUDE,
+      orderBy: { version: "desc" },
+    }),
+    db.serviceCatalogItem.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, priceSatang: true },
+    }),
+    db.staff.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+  ]);
+
+  const groupFindingParam = query["group-finding"];
+  const preselectFindingId = Array.isArray(groupFindingParam)
+    ? groupFindingParam[0]
+    : groupFindingParam;
+  const ungroupedFindings = repairCase.findings
+    .filter((f) => f.jobId === null)
+    .map((f) => ({ id: f.id, source: f.source, zone: f.zone, checklistItem: f.checklistItem }))
+    .reverse(); // oldest first, matching the inspection screen's order
 
   const { vehicle, contactCustomer, photos, findings } = repairCase;
   const contactIsPrimary = contactCustomer.id === vehicle.primaryCustomerId;
@@ -211,6 +255,18 @@ export default async function CasePage({ params }: PageProps<"/cases/[id]">) {
           </div>
         )}
       </section>
+
+      <JobsPanel
+        caseId={repairCase.id}
+        initialJobs={jobs.map(toJobDto)}
+        initialQuotations={quotations.map(toQuotationDto)}
+        initialUngrouped={ungroupedFindings}
+        catalogItems={catalogItems}
+        staffOptions={staffOptions}
+        isManager={can(session.role, "catalog.priceOverride")}
+        readOnly={repairCase.status === "DELIVERED"}
+        preselectFindingId={preselectFindingId}
+      />
 
       <section className="flex flex-col gap-2">
         <h3 className="eyebrow">

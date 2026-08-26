@@ -263,6 +263,35 @@
   }
 }
 
+/* ---------- Quotation document (M4, DESIGN.md D-1) ----------
+ * The one always-light artifact: on screen it sits as a white card inside
+ * the dark app; in print the chrome vanishes and only the document remains.
+ * "PDF" is the browser's print-to-PDF (founder ruling — no PDF library). */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+  body {
+    background: #fff !important;
+  }
+  body *:not(.q-doc):not(.q-doc *) {
+    visibility: hidden;
+  }
+  .q-doc,
+  .q-doc * {
+    visibility: visible;
+  }
+  .q-doc {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

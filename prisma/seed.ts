@@ -4,9 +4,11 @@ import type { BodyType } from "../lib/generated/prisma/enums";
 
 // Pilot shop seed (M1 brief §8): Somchai Garage + a Manager and an Advisor,
 // so login is testable on a fresh clone. M2 (brief §8) adds sample Customers
-// and Vehicles so phone/plate lookups are testable too — but NO seeded
-// Repair Cases: performing a check-in is the M2 gate. Idempotent — safe to
-// re-run. DEV CREDENTIALS ONLY — real onboarding replaces this in M8.
+// and Vehicles so phone/plate lookups are testable too. M4 (brief §8) adds a
+// small Service Catalog so catalog Jobs are testable — but NO seeded Repair
+// Cases, Jobs, or Quotations: performing the flows is each milestone's gate.
+// Idempotent — safe to re-run. DEV CREDENTIALS ONLY — real onboarding
+// replaces this in M8.
 
 const SHOP_NAME = "Somchai Garage";
 
@@ -87,6 +89,16 @@ const CUSTOMERS: SeedCustomer[] = [
   },
 ];
 
+// Shop-authored catalog content (Thai — the pilot Shop's own language), in
+// integer satang per the M4 money ruling.
+const CATALOG: { name: string; priceSatang: number; note?: string }[] = [
+  { name: "เปลี่ยนผ้าเบรกหน้า", priceSatang: 280_000 },
+  { name: "เปลี่ยนถ่ายน้ำมันเครื่อง + ไส้กรอง", priceSatang: 150_000 },
+  { name: "เปลี่ยนน้ำยาหล่อเย็น", priceSatang: 90_000 },
+  { name: "เปลี่ยนแบตเตอรี่", priceSatang: 320_000, note: "ไม่รวมค่าแบตเตอรี่" },
+  { name: "ตรวจเช็กระยะ", priceSatang: 120_000 },
+];
+
 const USERS = [
   {
     email: "somchai@somchaigarage.dev",
@@ -152,6 +164,18 @@ async function main() {
       });
     }
     console.log(`customer: ${spec.name} (${spec.vehicles.length} vehicles)`);
+  }
+
+  for (const item of CATALOG) {
+    const existing = await prismaUnscoped.serviceCatalogItem.findFirst({
+      where: { shopId: shop.id, name: item.name },
+    });
+    if (!existing) {
+      await prismaUnscoped.serviceCatalogItem.create({
+        data: { shopId: shop.id, ...item },
+      });
+    }
+    console.log(`catalog: ${item.name}`);
   }
 }
 

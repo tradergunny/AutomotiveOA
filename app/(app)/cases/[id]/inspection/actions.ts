@@ -57,6 +57,7 @@ type FindingRow = {
   condition: FindingCondition | null;
   proposedActions: ProposedAction[];
   note: string | null;
+  jobId: string | null;
   recordedAt: Date;
   recordedBy: { name: string };
   photos: { id: string }[];
@@ -72,6 +73,7 @@ function toDto(row: FindingRow): FindingDto {
     condition: row.condition,
     proposedActions: row.proposedActions,
     note: row.note,
+    jobId: row.jobId,
     recordedAt: row.recordedAt.toISOString(),
     recordedByName: row.recordedBy.name,
     photos: row.photos,

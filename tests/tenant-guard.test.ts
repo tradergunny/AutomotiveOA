@@ -23,6 +23,11 @@ let caseA2: { id: string };
 let caseB: { id: string };
 let findingA: { id: string };
 let findingB: { id: string };
+let catalogItemA: { id: string };
+let catalogItemB: { id: string };
+let jobA: { id: string };
+let jobB: { id: string };
+let quotationA: { id: string };
 
 beforeAll(async () => {
   shopA = await prismaUnscoped.shop.create({ data: { name: `${run} Shop A` } });
@@ -136,12 +141,81 @@ beforeAll(async () => {
       recordedByStaffId: staffB.id,
     },
   });
+  // M4 domain rows: one catalog entry, Job, part line, quotation (+ line),
+  // and authorization per shop as needed.
+  catalogItemA = await prismaUnscoped.serviceCatalogItem.create({
+    data: { shopId: shopA.id, name: `${run} pads A`, priceSatang: 280_000 },
+  });
+  catalogItemB = await prismaUnscoped.serviceCatalogItem.create({
+    data: { shopId: shopB.id, name: `${run} pads B`, priceSatang: 300_000 },
+  });
+  jobA = await prismaUnscoped.job.create({
+    data: {
+      shopId: shopA.id,
+      caseId: caseA.id,
+      title: `${run} Job A`,
+      payerType: "CUSTOMER",
+      priceSatang: 500_000,
+      createdByStaffId: staffA.id,
+    },
+  });
+  jobB = await prismaUnscoped.job.create({
+    data: {
+      shopId: shopB.id,
+      caseId: caseB.id,
+      title: `${run} Job B`,
+      payerType: "INSURER",
+      insurerName: "Viriyah",
+      priceSatang: 700_000,
+      createdByStaffId: staffB.id,
+    },
+  });
+  await prismaUnscoped.partLine.create({
+    data: { shopId: shopA.id, jobId: jobA.id, name: `${run} part A` },
+  });
+  quotationA = await prismaUnscoped.quotation.create({
+    data: {
+      shopId: shopA.id,
+      caseId: caseA.id,
+      number: `${run}-Q-A`,
+      version: 1,
+      totalSatang: 500_000,
+      issuedByStaffId: staffA.id,
+    },
+  });
+  await prismaUnscoped.quotationLine.create({
+    data: {
+      shopId: shopA.id,
+      quotationId: quotationA.id,
+      jobId: jobA.id,
+      title: `${run} Job A`,
+      priceSatang: 500_000,
+      payerType: "CUSTOMER",
+      sortOrder: 0,
+    },
+  });
+  await prismaUnscoped.jobAuthorization.create({
+    data: {
+      shopId: shopA.id,
+      jobId: jobA.id,
+      decision: "AUTHORIZED",
+      channel: "PHONE",
+      quotationId: quotationA.id,
+      recordedByStaffId: staffA.id,
+    },
+  });
 });
 
 afterAll(async () => {
   const shopIds = [shopA.id, shopB.id];
   await prismaUnscoped.photo.deleteMany({ where: { shopId: { in: shopIds } } });
+  await prismaUnscoped.jobAuthorization.deleteMany({ where: { shopId: { in: shopIds } } });
+  await prismaUnscoped.quotationLine.deleteMany({ where: { shopId: { in: shopIds } } });
+  await prismaUnscoped.quotation.deleteMany({ where: { shopId: { in: shopIds } } });
+  await prismaUnscoped.partLine.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.finding.deleteMany({ where: { shopId: { in: shopIds } } });
+  await prismaUnscoped.job.deleteMany({ where: { shopId: { in: shopIds } } });
+  await prismaUnscoped.serviceCatalogItem.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.repairCase.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.vehicle.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.customer.deleteMany({ where: { shopId: { in: shopIds } } });
@@ -550,5 +624,200 @@ describe("M3 model is scoped (Finding)", () => {
     });
     expect(created.shopId).toBe(shopA.id);
     await prismaUnscoped.finding.delete({ where: { id: created.id } });
+  });
+});
+
+describe("M4 models are scoped (catalog, Job, authorization, parts, quotations)", () => {
+  it("catalog items: findMany stays inside the shop", async () => {
+    const scoped = await forShop(shopA.id).serviceCatalogItem.findMany({
+      where: { name: { startsWith: run } },
+    });
+    expect(scoped.map((i) => i.id)).toEqual([catalogItemA.id]);
+  });
+
+  it("jobs: findMany stays inside the shop; cross-shop findUnique is null", async () => {
+    const scoped = await forShop(shopA.id).job.findMany({
+      where: { title: { startsWith: run } },
+    });
+    expect(scoped.map((j) => j.id)).toEqual([jobA.id]);
+    expect(await forShop(shopA.id).job.findUnique({ where: { id: jobB.id } })).toBeNull();
+  });
+
+  it("cross-shop job update throws and changes nothing", async () => {
+    await expect(
+      forShop(shopA.id).job.update({
+        where: { id: jobB.id },
+        data: { priceSatang: 1 },
+      }),
+    ).rejects.toThrow(TenantGuardError);
+    const untouched = await prismaUnscoped.job.findUnique({ where: { id: jobB.id } });
+    expect(untouched?.priceSatang).toBe(700_000);
+  });
+
+  it("part lines, authorizations, and quotations are scoped", async () => {
+    expect(
+      await forShop(shopB.id).partLine.findMany({ where: { name: { startsWith: run } } }),
+    ).toEqual([]);
+    expect(
+      await forShop(shopB.id).jobAuthorization.findMany({ where: { jobId: jobA.id } }),
+    ).toEqual([]);
+    expect(
+      await forShop(shopB.id).quotation.findMany({ where: { number: { startsWith: run } } }),
+    ).toEqual([]);
+    const own = await forShop(shopA.id).quotation.findMany({
+      where: { number: { startsWith: run } },
+      include: { lines: true },
+    });
+    expect(own.map((q) => q.id)).toEqual([quotationA.id]);
+    expect(own[0].lines).toHaveLength(1);
+  });
+
+  it("job create naming a foreign shopId throws", async () => {
+    await expect(
+      forShop(shopA.id).job.create({
+        data: {
+          shopId: shopB.id,
+          caseId: caseB.id,
+          title: `${run} smuggled job`,
+          payerType: "CUSTOMER",
+          createdByStaffId: staffB.id,
+        },
+      }),
+    ).rejects.toThrow(TenantGuardError);
+  });
+});
+
+describe("M4 database-level defense in depth", () => {
+  it("rejects a Job on another shop's case or catalog entry", async () => {
+    await expect(
+      prismaUnscoped.job.create({
+        data: {
+          shopId: shopA.id,
+          caseId: caseB.id, // B's case under A's shop
+          title: `${run} evil job`,
+          payerType: "CUSTOMER",
+          createdByStaffId: staffA.id,
+        },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      prismaUnscoped.job.create({
+        data: {
+          shopId: shopA.id,
+          caseId: caseA.id,
+          title: `${run} evil catalog job`,
+          payerType: "CUSTOMER",
+          catalogItemId: catalogItemB.id, // B's price list entry
+          createdByStaffId: staffA.id,
+        },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("pins Finding→Job and Photo→Job to the job's own case, not just its shop", async () => {
+    // Same shop, wrong case: rows on caseA2 pointing at caseA's job.
+    await expect(
+      prismaUnscoped.finding.create({
+        data: {
+          shopId: shopA.id,
+          caseId: caseA2.id,
+          source: "DAMAGE_MAP",
+          zone: "hood",
+          jobId: jobA.id,
+          recordedByStaffId: staffA.id,
+        },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      prismaUnscoped.photo.create({
+        data: {
+          shopId: shopA.id,
+          caseId: caseA2.id,
+          jobId: jobA.id,
+          storageKey: `${run}/photo-cross-case-job`,
+          contentType: "image/jpeg",
+          sizeBytes: 1,
+          uploadedByStaffId: staffA.id,
+        },
+      }),
+    ).rejects.toThrow();
+    // The legitimate links work.
+    const photo = await prismaUnscoped.photo.create({
+      data: {
+        shopId: shopA.id,
+        caseId: caseA.id,
+        jobId: jobA.id,
+        storageKey: `${run}/photo-job-a`,
+        contentType: "image/jpeg",
+        sizeBytes: 1,
+        uploadedByStaffId: staffA.id,
+      },
+    });
+    await prismaUnscoped.photo.delete({ where: { id: photo.id } });
+  });
+
+  it("rejects an authorization or quotation crossing shops", async () => {
+    await expect(
+      prismaUnscoped.jobAuthorization.create({
+        data: {
+          shopId: shopA.id,
+          jobId: jobB.id, // B's job under A's shop
+          decision: "AUTHORIZED",
+          channel: "PHONE",
+          recordedByStaffId: staffA.id,
+        },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      prismaUnscoped.quotation.create({
+        data: {
+          shopId: shopA.id,
+          caseId: caseB.id, // B's case under A's shop
+          number: `${run}-Q-EVIL`,
+          version: 1,
+          totalSatang: 1,
+          issuedByStaffId: staffA.id,
+        },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      prismaUnscoped.partLine.create({
+        data: { shopId: shopA.id, jobId: jobB.id, name: `${run} evil part` },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("quotation lines survive job deletion via the soft SET NULL link", async () => {
+    // The one deliberate single-column FK (see schema comment): deleting a
+    // quoted job must never take the snapshot line with it.
+    const tempJob = await prismaUnscoped.job.create({
+      data: {
+        shopId: shopA.id,
+        caseId: caseA.id,
+        title: `${run} temp job`,
+        payerType: "CUSTOMER",
+        priceSatang: 100_000,
+        createdByStaffId: staffA.id,
+      },
+    });
+    const line = await prismaUnscoped.quotationLine.create({
+      data: {
+        shopId: shopA.id,
+        quotationId: quotationA.id,
+        jobId: tempJob.id,
+        title: tempJob.title,
+        priceSatang: 100_000,
+        payerType: "CUSTOMER",
+        sortOrder: 1,
+      },
+    });
+    await prismaUnscoped.job.delete({ where: { id: tempJob.id } });
+    const survivor = await prismaUnscoped.quotationLine.findUnique({
+      where: { id: line.id },
+    });
+    expect(survivor).not.toBeNull();
+    expect(survivor?.jobId).toBeNull();
+    expect(survivor?.priceSatang).toBe(100_000);
+    await prismaUnscoped.quotationLine.delete({ where: { id: line.id } });
   });
 });

@@ -44,10 +44,18 @@ export default async function InspectionPage({
     condition: f.condition,
     proposedActions: f.proposedActions,
     note: f.note,
+    jobId: f.jobId,
     recordedAt: f.recordedAt.toISOString(),
     recordedByName: f.recordedBy.name,
     photos: f.photos,
   }));
+
+  // M4: findings show which Job fulfils them ("→ left-side repaint").
+  const jobs = await db.job.findMany({
+    where: { caseId: repairCase.id },
+    select: { id: true, title: true },
+  });
+  const jobTitles = Object.fromEntries(jobs.map((job) => [job.id, job.title]));
 
   return (
     <div className="flex flex-col gap-4">
@@ -80,6 +88,7 @@ export default async function InspectionPage({
         caseId={repairCase.id}
         bodyType={vehicle.bodyType}
         initialFindings={findings}
+        jobTitles={jobTitles}
         readOnly={repairCase.status === "DELIVERED"}
       />
     </div>
