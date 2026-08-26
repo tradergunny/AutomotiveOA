@@ -415,8 +415,14 @@
       "note": "หมายเหตุ",
       "add": "เพิ่มอะไหล่",
       "remove": "ลบอะไหล่",
-      "costShort": "@ {price}",
-      "etaShort": "ถึง {date}",
+      "col": {
+        "part": "อะไหล่",
+        "qty": "จำนวน",
+        "unit": "ราคา/หน่วย",
+        "supplier": "ร้าน/แหล่ง",
+        "eta": "กำหนดถึง",
+        "status": "สถานะ"
+      },
       "status": {
         "NOT_ORDERED": "ยังไม่สั่ง",
         "ORDERED": "สั่งแล้ว",
