@@ -10,7 +10,14 @@ try {
 export default defineConfig({
   schema: "prisma/schema.prisma",
   datasource: {
-    url: process.env.DATABASE_URL!,
+    // CLI work (migrate deploy, seed) must bypass a serverless pooler —
+    // PgBouncer breaks DDL. Hosted Postgres (Neon etc.) provides a direct
+    // ("unpooled") URL for exactly this; the runtime client keeps the
+    // pooled DATABASE_URL. Locally the two collapse into one.
+    url:
+      process.env.DIRECT_DATABASE_URL ??
+      process.env.DATABASE_URL_UNPOOLED ??
+      process.env.DATABASE_URL!,
     // Needed only when AUTHORING migrations (db:migrate:new). The local
     // `prisma dev` server is single-store — every database name maps to the
     // same data — so Prisma's default shadow database would collide with the

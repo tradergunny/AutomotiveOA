@@ -6,9 +6,11 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
-      // Check-in submits client-downscaled walkaround photos (~0.3–0.8MB
-      // each) in one multipart action; headroom for a dozen-plus shots.
-      bodySizeLimit: "25mb",
+      // Photos upload ONE per action everywhere (check-in walkarounds and
+      // finding evidence alike) so requests stay inside Vercel's ~4.5 MB
+      // serverless body cap. 12 MB keeps headroom for the 10 MB single-file
+      // server cap plus multipart overhead when self-hosting.
+      bodySizeLimit: "12mb",
     },
   },
 };

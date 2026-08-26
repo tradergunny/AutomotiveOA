@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { allocateCaseReference } from "@/lib/case-reference";
 import { isUniqueViolation } from "@/lib/db-errors";
 import type { BodyType } from "@/lib/generated/prisma/enums";
@@ -13,6 +12,12 @@ import { newPhotoKey, photoStore } from "@/lib/storage";
 // at the desk; vehicle by plate; ownership kept or re-linked; one atomic
 // transaction opens the Repair Case. Lookups return only what the wizard
 // renders — never raw rows.
+//
+// Walkaround photos upload AFTER the case commits, one request each via
+// addCasePhoto (the M3 finding-photo pattern) — a whole walkaround in one
+// multipart body blows Vercel's ~4.5 MB serverless request cap. The case
+// itself stays atomic; photos are best-effort attachments the wizard
+// retries before navigating.
 
 const BODY_TYPES = ["SEDAN", "PICKUP"] as const;
 const PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -77,6 +82,8 @@ export async function lookupCheckinVehicle(
 }
 
 export type CheckinState = {
+  /** Set on success — the wizard uploads photos to it, then navigates. */
+  caseId?: string;
   error?:
     | "contactRequired"
     | "nameRequired"
@@ -133,27 +140,11 @@ export async function performCheckin(
   const odometerRaw = text("odometer").replace(/\D/g, "");
   const odometerKm = /^\d{1,7}$/.test(odometerRaw) ? Number(odometerRaw) : null;
 
-  // Photos: already client-downscaled; decode to bytes before the transaction.
-  const files = formData
-    .getAll("photos")
-    .filter((entry): entry is File => entry instanceof File && entry.size > 0)
-    .slice(0, MAX_PHOTOS);
-  for (const file of files) {
-    if (!PHOTO_TYPES.has(file.type)) return { error: "photoInvalid" };
-    if (file.size > MAX_PHOTO_BYTES) return { error: "photoTooLarge" };
-  }
-  const photoData = await Promise.all(
-    files.map(async (file) => ({
-      bytes: new Uint8Array(await file.arrayBuffer()),
-      contentType: file.type,
-    })),
-  );
-
   let caseId: string;
   try {
-    // All-or-nothing: customer, vehicle, ownership, reference, case, and
-    // photo rows commit together — a failure saves nothing (storage files
-    // written for an aborted attempt are orphaned bytes, never visible).
+    // All-or-nothing: customer, vehicle, ownership, reference, and case
+    // commit together — a failure saves nothing. Photos follow one-by-one
+    // through addCasePhoto once the case exists.
     caseId = await db.$transaction(
       async (tx) => {
         let contactId = contactCustomerId;
@@ -213,21 +204,6 @@ export async function performCheckin(
           select: { id: true },
         });
 
-        for (const photo of photoData) {
-          const storageKey = newPhotoKey(session.shopId, repairCase.id, photo.contentType);
-          await photoStore.put(storageKey, photo.bytes, photo.contentType);
-          await tx.photo.create({
-            data: {
-              shopId: session.shopId,
-              caseId: repairCase.id,
-              storageKey,
-              contentType: photo.contentType,
-              sizeBytes: photo.bytes.byteLength,
-              uploadedByStaffId: session.staffId,
-            },
-          });
-        }
-
         return repairCase.id;
       },
       { timeout: 15_000 },
@@ -243,7 +219,55 @@ export async function performCheckin(
 
   revalidatePath("/");
   revalidatePath("/customers");
-  redirect(`/cases/${caseId}`);
+  return { caseId };
+}
+
+/**
+ * One walkaround photo (client-downscaled) onto an open case — the wizard
+ * calls this once per shot after performCheckin returns the caseId.
+ */
+export async function addCasePhoto(
+  caseId: string,
+  formData: FormData,
+): Promise<{ ok: boolean; error?: "photoInvalid" | "photoTooLarge" | "failed" }> {
+  try {
+    const { session, db } = await tenantContext();
+    const repairCase = await db.repairCase.findUnique({
+      where: { id: caseId },
+      select: {
+        id: true,
+        status: true,
+        _count: { select: { photos: { where: { findingId: null } } } },
+      },
+    });
+    if (!repairCase || repairCase.status === "DELIVERED") return { ok: false, error: "failed" };
+    if (repairCase._count.photos >= MAX_PHOTOS) return { ok: false, error: "failed" };
+
+    const file = formData.get("photo");
+    if (!(file instanceof File) || file.size === 0 || !PHOTO_TYPES.has(file.type)) {
+      return { ok: false, error: "photoInvalid" };
+    }
+    if (file.size > MAX_PHOTO_BYTES) return { ok: false, error: "photoTooLarge" };
+    const bytes = new Uint8Array(await file.arrayBuffer());
+
+    const storageKey = newPhotoKey(session.shopId, caseId, file.type);
+    await photoStore.put(storageKey, bytes, file.type);
+    await db.photo.create({
+      data: {
+        shopId: session.shopId,
+        caseId,
+        storageKey,
+        contentType: file.type,
+        sizeBytes: bytes.byteLength,
+        uploadedByStaffId: session.staffId,
+      },
+    });
+    revalidatePath(`/cases/${caseId}`);
+    return { ok: true };
+  } catch (error) {
+    console.error("[checkin] photo failed:", error);
+    return { ok: false, error: "failed" };
+  }
 }
 
 class CheckinInputError extends Error {

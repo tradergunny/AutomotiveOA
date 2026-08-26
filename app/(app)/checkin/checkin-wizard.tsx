@@ -1,8 +1,9 @@
 "use client";
 
 import { Camera, Car, Phone, Search, Truck, User, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useActionState, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { CornerTicks } from "@/components/blocks/corner-ticks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatPhone } from "@/lib/normalize";
 import {
+  addCasePhoto,
   type CheckinState,
   type LookupCustomer,
   type LookupVehicle,
@@ -63,9 +65,34 @@ export function CheckinWizard() {
   const phoneRef = useRef<HTMLInputElement>(null);
   const plateRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const uploadStarted = useRef(false);
+  const router = useRouter();
+  const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
 
   const [state, dispatch, pending] = useActionState(performCheckin, {});
   const [, startTransition] = useTransition();
+
+  // Case committed → push the walkaround shots one request each (Vercel's
+  // serverless body cap rules out one big multipart), then land on the case.
+  // A shot that fails twice is skipped rather than stranding the check-in —
+  // the case page shows what made it.
+  useEffect(() => {
+    const caseId = state.caseId;
+    if (!caseId || uploadStarted.current) return;
+    uploadStarted.current = true;
+    void (async () => {
+      setUploading({ done: 0, total: photos.length });
+      for (let i = 0; i < photos.length; i++) {
+        const formData = new FormData();
+        formData.append("photo", photos[i].blob, "walkaround.jpg");
+        const first = await addCasePhoto(caseId, formData);
+        if (!first.ok) await addCasePhoto(caseId, formData);
+        setUploading({ done: i + 1, total: photos.length });
+      }
+      router.push(`/cases/${caseId}`);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, on the success transition
+  }, [state.caseId]);
 
   async function lookupPhone() {
     const raw = phoneRef.current?.value.trim() ?? "";
@@ -129,9 +156,6 @@ export function CheckinWizard() {
     }
     setLocalError(undefined);
     const formData = new FormData(event.currentTarget);
-    for (const photo of photos) {
-      formData.append("photos", photo.blob, "walkaround.jpg");
-    }
     startTransition(() => dispatch(formData));
   }
 
@@ -393,10 +417,14 @@ export function CheckinWizard() {
 
       <Button
         type="submit"
-        disabled={pending || processing}
+        disabled={pending || processing || uploading != null}
         className="h-9 self-start px-4 font-semibold"
       >
-        {pending ? t("submitting") : t("submit")}
+        {uploading
+          ? t("uploadingPhotos", uploading)
+          : pending
+            ? t("submitting")
+            : t("submit")}
       </Button>
     </form>
   );
