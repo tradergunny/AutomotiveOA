@@ -1,5 +1,5 @@
 // AutomotiveOA — data foundation (CONTEXT.md language).
-// M1: Shop, Staff, User. M2: Customer, Vehicle, RepairCase, Photo.
+// M1: Shop, Staff, User. M2: Customer, Vehicle, RepairCase, Photo. M3: Finding.
 // Every tenant-owned row carries shop_id (ADR-001); scoping is enforced by the
 // tenant guard in lib/tenant.ts, never by hand-written WHERE clauses. Cross-model
 // relations join on same-shop composite FKs so the database itself rejects
@@ -30,6 +30,7 @@ model Shop {
   vehicles    Vehicle[]
   repairCases RepairCase[]
   photos      Photo[]
+  findings    Finding[]
 
   @@map("shops")
 }
@@ -47,12 +48,13 @@ model Staff {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  shop           Shop         @relation(fields: [shopId], references: [id])
-  user           User?
-  openedCases    RepairCase[]
-  uploadedPhotos Photo[]
+  shop             Shop         @relation(fields: [shopId], references: [id])
+  user             User?
+  openedCases      RepairCase[]
+  uploadedPhotos   Photo[]
+  recordedFindings Finding[]
 
-  @@unique([shopId, id]) // target for the same-shop composite FKs (users, cases, photos)
+  @@unique([shopId, id]) // target for the same-shop composite FKs (users, cases, photos, findings)
   @@index([shopId])
   @@map("staff")
 }
@@ -180,11 +182,12 @@ model RepairCase {
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @updatedAt @map("updated_at")
 
-  shop            Shop     @relation(fields: [shopId], references: [id])
-  vehicle         Vehicle  @relation(fields: [shopId, vehicleId], references: [shopId, id])
-  contactCustomer Customer @relation("CaseContactCustomer", fields: [shopId, contactCustomerId], references: [shopId, id])
-  openedByStaff   Staff    @relation(fields: [shopId, openedByStaffId], references: [shopId, id])
+  shop            Shop      @relation(fields: [shopId], references: [id])
+  vehicle         Vehicle   @relation(fields: [shopId, vehicleId], references: [shopId, id])
+  contactCustomer Customer  @relation("CaseContactCustomer", fields: [shopId, contactCustomerId], references: [shopId, id])
+  openedByStaff   Staff     @relation(fields: [shopId, openedByStaffId], references: [shopId, id])
   photos          Photo[]
+  findings        Finding[]
 
   @@unique([shopId, reference])
   @@unique([shopId, id]) // target for the same-shop composite FKs
@@ -192,14 +195,92 @@ model RepairCase {
   @@map("repair_cases")
 }
 
+/// Where a Finding came from — the Damage Map or the Service Checklist.
+/// Two capture surfaces, one record shape (CONTEXT.md).
+enum FindingSource {
+  DAMAGE_MAP
+  CHECKLIST
+}
+
+/// Visible body damage kinds, multi-select per Finding ("dent + scratch").
+/// Severity is DERIVED, never stored: crack/broken => severe (red hatch),
+/// otherwise minor (amber) — DESIGN.md D-3.
+enum DamageType {
+  SCRATCH
+  DENT
+  CRACK
+  BROKEN
+}
+
+/// Checklist wear states that become Findings. OK deliberately does not
+/// persist (founder ruling in the M3 brief): only flagged items are stored —
+/// they are what the M7 Follow-up worklist reads.
+enum FindingCondition {
+  DUE_SOON
+  NEEDS_WORK
+}
+
+/// Proposed next step(s), multi-select — the mockup's "repair + repaint"
+/// chip is [REPAIR, REPAINT]. Jobs that fulfil Findings arrive in M4.
+enum ProposedAction {
+  REPAIR
+  REPAINT
+  REPLACE
+  SERVICE
+}
+
+/// One thing an inspection turned up (CONTEXT.md). Damage Map flavor carries
+/// `zone` (canonical id from lib/inspection registry — a string, not a DB
+/// enum, so a third body type later is code + copy, not a migration);
+/// Checklist flavor carries `checklistItem` + `condition`. Multiple Findings
+/// per zone are allowed — a hidden crack found mid-repair behind an
+/// already-scratched bumper is a second Finding, not an edit. One Finding per
+/// checklist item per case (partial unique below; zone rows keep NULL there).
+model Finding {
+  id            String            @id @default(cuid())
+  shopId        String            @map("shop_id")
+  caseId        String            @map("case_id")
+  source        FindingSource
+  /// Canonical body-zone id (DAMAGE_MAP findings; validated in code).
+  zone          String?
+  /// Canonical checklist-item id (CHECKLIST findings; validated in code).
+  checklistItem String?           @map("checklist_item")
+  damageTypes   DamageType[]      @map("damage_types")
+  condition     FindingCondition?
+  proposedActions ProposedAction[] @map("proposed_actions")
+  note          String?
+  /// Who recorded it and when — mid-repair additions stay distinguishable
+  /// from the check-in inspection by this timestamp.
+  recordedByStaffId String   @map("recorded_by_staff_id")
+  recordedAt        DateTime @default(now()) @map("recorded_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  shop       Shop       @relation(fields: [shopId], references: [id])
+  repairCase RepairCase @relation(fields: [shopId, caseId], references: [shopId, id])
+  recordedBy Staff      @relation(fields: [shopId, recordedByStaffId], references: [shopId, id])
+  photos     Photo[]
+
+  // One checklist Finding per item per case. Postgres unique indexes treat
+  // NULLs as distinct, so Damage Map findings (checklistItem NULL) coexist.
+  @@unique([shopId, caseId, checklistItem])
+  @@unique([shopId, id]) // target for the same-shop composite FKs
+  @@unique([shopId, caseId, id]) // target for Photo's same-case FK
+  @@index([shopId, caseId])
+  @@map("findings")
+}
+
 /// A photo (CONTEXT.md: attaches at Repair Case / Finding / Job level). Every
-/// Photo belongs to its Repair Case; the finer Finding/Job links arrive with
-/// those models (M3/M4). M2 level: the check-in walkaround, shot by the
-/// advisor straight into the system.
+/// Photo belongs to its Repair Case; `findingId` (M3) marks Finding evidence —
+/// NULL means case-level (the check-in walkaround). Job links arrive in M4.
 model Photo {
   id                String   @id @default(cuid())
   shopId            String   @map("shop_id")
   caseId            String   @map("case_id")
+  /// Finding evidence when set. The composite FK below pins the Finding to
+  /// this photo's own shop AND case — a cross-case link is impossible at the
+  /// database level (M2 defense-in-depth idiom).
+  findingId         String?  @map("finding_id")
   /// Key into the photo store (lib/storage) — files are served only through
   /// the authenticated, tenant-checked photo route, never a public URL.
   storageKey        String   @unique @map("storage_key")
@@ -212,8 +293,10 @@ model Photo {
 
   shop       Shop       @relation(fields: [shopId], references: [id])
   repairCase RepairCase @relation(fields: [shopId, caseId], references: [shopId, id])
+  finding    Finding?   @relation(fields: [shopId, caseId, findingId], references: [shopId, caseId, id])
   uploadedBy Staff      @relation(fields: [shopId, uploadedByStaffId], references: [shopId, id])
 
   @@index([shopId, caseId])
+  @@index([shopId, findingId])
   @@map("photos")
 }
