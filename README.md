@@ -6,9 +6,9 @@ Built first with a pilot shop, sold to other garages (see [ADR-001](docs/adr/ADR
 
 ## Status
 
-M4 (Jobs & money core) builds on M3's Findings: staff group them into priced Jobs — quoted by hand for bodywork, or price-locked from the Manager-maintained Service Catalog (`/catalog`, Manager override tracked) — record each payer's authorization per Job (customer or insurer, with channel and append-only history), track Part Lines, and issue immutable, versioned Quotations (Q-1024 → Q-1024-v2) with an always-light Thai document printable via the browser (print / save as PDF). Money is integer satang, THB implicit. Domain features arrive milestone by milestone — see [docs/MILESTONES.md](docs/MILESTONES.md).
+M6 (LINE integration) gives the customer their half of the story. Each Shop connects its **own** LINE Official Account in `/settings` (ADR-002) — credentials verified against LINE, then stored encrypted (ADR-004) — and the OA's webhook captures the LINE identities staff match to Customers by hand (ADR-005). On a case, the **Customer timeline** sits beside M5's internal one: a Thai draft is pre-filled from the case's real Jobs in customer-safe wording, staff edit it, attach up to four case photos, preview exactly what will go out, and press send. Every send is an immutable record of what the customer actually saw, and appears on the internal timeline as an event. Nothing is ever sent automatically (ADR-003). Setting up an Official Account is walked through step by step in [docs/LINE-SETUP.md](docs/LINE-SETUP.md).
 
-**Staging is live on Vercel** (since 2026-08-26): production branch `main` — every merged PR deploys automatically. Neon Postgres (pooled `DATABASE_URL` at runtime; `vercel.json` runs `prisma migrate deploy` on the unpooled URL at build time) and a **private** Vercel Blob store for photos (`BLOB_READ_WRITE_TOKEN` selects the driver in [lib/storage.ts](lib/storage.ts)). Env vars live in the Vercel dashboard and are baked in at build time — connecting a store or changing a value does nothing until the next deploy. The full deploy guide is an M8 deliverable.
+**Staging is live on Vercel** (since 2026-08-26) at <https://automotive-oa.vercel.app>: production branch `main` — every merged PR deploys automatically. Neon Postgres (pooled `DATABASE_URL` at runtime; `vercel.json` runs `prisma migrate deploy` on the unpooled URL at build time) and a **private** Vercel Blob store for photos (`BLOB_READ_WRITE_TOKEN` selects the driver in [lib/storage.ts](lib/storage.ts)). Env vars live in the Vercel dashboard and are baked in at build time — connecting a store or changing a value does nothing until the next deploy. The full deploy guide is an M8 deliverable.
 
 ## Getting started (dev)
 
@@ -45,6 +45,22 @@ Open http://localhost:3000 and log in with a seeded pilot-shop account:
 
 Tests (`npm test`) need the dev database running.
 
+### LINE in dev
+
+You do **not** need a LINE Official Account to run or test the app. With no `LINE_TRANSPORT` set, development uses a stand-in transport that writes the exact payload it *would* have posted to `.data/line/outbox.jsonl` (gitignored) and charges nothing — everything else runs for real, so the Customer timeline, the internal event, and the photo links are all genuine.
+
+Set `LINE_CREDENTIALS_KEY` in `.env` (`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`), then in `/settings` connect a channel using **any** access token starting with `dev-` (for example `dev-token`) and any channel secret. The stand-in accepts `dev-` tokens and refuses everything else, exactly the way LINE refuses a bad one.
+
+To exercise the inbound half — a customer adding the OA — simulate a signed webhook against your dev server:
+
+```bash
+npm run line:simulate -- follow
+```
+
+`follow`, `message`, and `unfollow` are all supported (`-- follow --user U…` picks a specific id). The script signs the body with the connected Shop's real channel secret, so the encryption and signature paths are exercised too. No tunnel, no account, no fees.
+
+Note that a real OA needs a publicly reachable HTTPS app for both webhooks and photo delivery, so the live pass belongs on the deployed staging URL, not `localhost`.
+
 Check-in and inspection photos are stored in `.data/photos/` (gitignored) by the local storage driver; production swaps in Vercel Blob behind the same seam ([lib/storage.ts](lib/storage.ts)) at deploy time.
 
 ### Authoring new migrations
@@ -63,6 +79,7 @@ npm run db:migrate:new
 | [docs/design/DESIGN.md](docs/design/DESIGN.md) | UI guidelines: stack, dark technical aesthetic, bilingual TH/EN, Damage Map |
 | [docs/design/mockup.html](docs/design/mockup.html) | M0 clickable visual mockup (Case Board + Inspection / Damage Map) |
 | [docs/adr/](docs/adr/) | Architecture Decision Records |
+| [docs/LINE-SETUP.md](docs/LINE-SETUP.md) | Step-by-step: creating a LINE Official Account and connecting it |
 | [docs/LATER.md](docs/LATER.md) | Deliberately deferred scope |
 | [docs/INTERVIEW-QUESTIONS.md](docs/INTERVIEW-QUESTIONS.md) | Garage-interview checklist validating working assumptions |
 

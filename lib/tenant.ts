@@ -33,11 +33,19 @@ import { Prisma } from "@/lib/generated/prisma/client";
  * Photo→Job (same shop AND case), JobAuthorization→{Job, Quotation, Staff},
  * PartLine→Job, Quotation→{RepairCase, Staff}, and QuotationLine→Quotation
  * in M4; CaseEvent→{RepairCase, Quotation, Staff×2} and
- * RepairCase→Staff (deliveredBy) in M5 — so the database rejects any
- * cross-shop link a nested write could attempt. (Two deliberate exceptions,
+ * RepairCase→Staff (deliveredBy) in M5; ShopLineChannel→Staff,
+ * LineContact→{Customer, Staff}, LineUpdate→{RepairCase, Customer, Staff},
+ * LineUpdatePhoto→{LineUpdate, Photo}, and CaseEvent→LineUpdate in M6 — so
+ * the database rejects any cross-shop link a nested write could attempt. (Two deliberate exceptions,
  * same reason: QuotationLine→Job and CaseEvent→Job are single-column soft
  * links so ON DELETE SET NULL works — see the schema comments; each row's
  * shop stays pinned through its Quotation/RepairCase.)
+ *
+ * M6 opens the app's only two UNAUTHENTICATED routes — the LINE webhook and
+ * the published-photo route — which by definition have no session to scope
+ * by. Neither bypasses this guard: each performs exactly ONE unscoped read
+ * to establish which Shop the request belongs to (see lib/line-public.ts),
+ * then does all further work through forShop() like everything else.
  */
 
 /** Models that carry shop_id and belong to exactly one Shop. */
@@ -56,6 +64,10 @@ const TENANT_OWNED = [
   "Quotation",
   "QuotationLine",
   "CaseEvent",
+  "ShopLineChannel",
+  "LineContact",
+  "LineUpdate",
+  "LineUpdatePhoto",
 ] as const satisfies readonly Prisma.ModelName[];
 
 /** The tenant itself: readable/updatable only as the shop's own row. */

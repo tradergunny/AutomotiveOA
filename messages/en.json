@@ -7,7 +7,8 @@
     "cancel": "Cancel",
     "back": "Back",
     "edit": "Edit",
-    "optional": "optional"
+    "optional": "optional",
+    "copy": "Copy"
   },
   "nav": {
     "board": "Case Board",
@@ -342,7 +343,11 @@
     "quotationIssued": "Quotation {label} issued",
     "caseReady": "Ready for pickup",
     "caseReadyRevoked": "No longer ready — work reopened",
-    "caseDelivered": "Delivered"
+    "caseDelivered": "Delivered",
+    "lineUpdateSent": "LINE update sent to {name} · {count, plural, =0 {no photos} one {# photo} other {# photos}}",
+    "lineUpdateFailed": "LINE update to {name} failed — not delivered",
+    "lineCustomerLinked": "LINE account linked — {name}",
+    "lineCustomerUnlinked": "LINE account unlinked — {name}"
   },
   "catalog": {
     "title": "Standard services & prices",
@@ -529,5 +534,120 @@
     "total": "Total",
     "insurerPays": "insurance",
     "issuedBy": "Quoted by"
+  },
+  "lineSettings": {
+    "channelTitle": "LINE Official Account",
+    "connected": "CONNECTED",
+    "fakeTransport": "DEV TRANSPORT",
+    "keyMissing": "LINE_CREDENTIALS_KEY is not set, so credentials cannot be encrypted. Set it in the environment before connecting an account.",
+    "connectIntro": "Paste the Channel secret and a long-lived Channel access token from the LINE Developers console. They are verified against LINE, then stored encrypted — never shown again.",
+    "connect": "Verify and connect",
+    "verifying": "Verifying…",
+    "reverify": "Re-verify",
+    "disconnect": "Disconnect",
+    "disconnectConfirm": "Confirm — remove credentials",
+    "disconnectHint": "Contacts and sent updates are kept.",
+    "notConnectedReadOnly": "No LINE account is connected yet. A Manager can connect one.",
+    "oaName": "Account name",
+    "oaBasicId": "Basic ID",
+    "channelSecret": "Channel secret",
+    "accessToken": "Channel access token",
+    "verifiedAt": "Last verified",
+    "connectedBy": "Connected by",
+    "webhookTitle": "Webhook URL for this shop",
+    "copied": "Copied",
+    "checklist": {
+      "webhookUrl": "Paste this URL into the LINE Developers console → Messaging API → Webhook URL.",
+      "useWebhook": "Turn “Use webhook” ON.",
+      "autoReply": "Turn auto-reply messages OFF, so customers don’t get the default greeting on every message."
+    },
+    "contactsTitle": "LINE contacts",
+    "contactsIntro": "People who added your LINE account or messaged it. Match each one to a customer so updates can be sent to them.",
+    "noUnlinked": "No unmatched LINE contacts.",
+    "linkedTitle": "Matched",
+    "noName": "(no display name)",
+    "unfollowed": "UNFRIENDED",
+    "link": "Match to customer",
+    "unlink": "Unmatch",
+    "phonePlaceholder": "Customer phone",
+    "search": "Find",
+    "searching": "Finding…",
+    "noCustomer": "No customer with that phone number.",
+    "confirmLink": "Match",
+    "captureTitle": "Add a LINE user ID by hand",
+    "capturePlaceholder": "U0123456789abcdef0123456789abcdef",
+    "capture": "Add",
+    "captureHint": "For testing with an ID you already have. Customers cannot see their own LINE user ID, so this is not a normal way to add someone.",
+    "errors": {
+      "forbidden": "Only a Manager can do that",
+      "cryptoUnavailable": "Credential encryption is not configured (LINE_CREDENTIALS_KEY)",
+      "secretRequired": "Channel secret is required",
+      "tokenRequired": "Channel access token is required",
+      "userIdInvalid": "That is not a valid LINE user ID",
+      "userIdTaken": "That LINE user ID is already here",
+      "notConnected": "No LINE account is connected",
+      "contactMissing": "That LINE contact no longer exists",
+      "customerMissing": "That customer no longer exists",
+      "customerTaken": "That customer is already matched to another LINE contact",
+      "phoneInvalid": "Enter at least 4 digits",
+      "failed": "Something went wrong — try again",
+      "line": {
+        "invalidToken": "LINE rejected these credentials — check the channel access token",
+        "quotaExceeded": "This LINE account has reached its message limit",
+        "notFriend": "That LINE user has not added this account",
+        "rateLimited": "LINE is rate-limiting us — try again shortly",
+        "invalidRequest": "LINE rejected the request",
+        "network": "Could not reach LINE — check the connection",
+        "serverError": "LINE is having trouble — try again shortly"
+      }
+    }
+  },
+  "customerTimeline": {
+    "title": "Customer timeline",
+    "customerVisible": "SENT TO CUSTOMER",
+    "sentCount": "{count, plural, =0 {nothing sent} one {# sent} other {# sent}}",
+    "empty": "Nothing has been sent to this customer yet.",
+    "sent": "SENT",
+    "failed": "NOT SENT",
+    "failedHint": "LINE refused this message ({code}). The customer never received it.",
+    "composeTitle": "Compose an update",
+    "recipient": "To {name}",
+    "bodyLabel": "Message to the customer",
+    "draftHint": "Drafted for you in Thai — edit it freely. Nothing is sent until you press send.",
+    "photosTitle": "Photos ({selected}/{max})",
+    "photosRejected": "{count, plural, one {# photo is} other {# photos are}} not a format LINE accepts (JPEG or PNG only).",
+    "preview": "Preview",
+    "hidePreview": "Hide preview",
+    "previewTitle": "Exactly what will be sent",
+    "send": "Send to customer",
+    "sendConfirm": "Confirm — send to {name}",
+    "sending": "Sending…",
+    "blocked": {
+      "notConnected": "No LINE account is connected for this shop yet — a Manager can connect one in Settings.",
+      "noIdentity": "This customer has not been matched to a LINE contact yet. Ask them to add the shop's LINE account, then match them in Settings.",
+      "unfollowed": "This customer has removed or blocked the shop's LINE account, so messages cannot reach them."
+    },
+    "errors": {
+      "caseMissing": "Case not found",
+      "caseDelivered": "This case is already delivered",
+      "notConnected": "No LINE account is connected",
+      "cryptoUnavailable": "Credential encryption is not configured",
+      "noIdentity": "This customer has no LINE contact yet",
+      "unfollowed": "This customer has unfriended the shop's LINE account",
+      "bodyRequired": "Write a message first",
+      "bodyTooLong": "The message is too long for LINE",
+      "tooManyPhotos": "At most 4 photos per update",
+      "photoInvalid": "One of those photos cannot be sent",
+      "failed": "Something went wrong — try again",
+      "line": {
+        "invalidToken": "LINE rejected the shop's credentials — check Settings",
+        "quotaExceeded": "This LINE account has reached its message limit",
+        "notFriend": "That customer has not added the shop's LINE account",
+        "rateLimited": "LINE is rate-limiting us — try again shortly",
+        "invalidRequest": "LINE rejected the message",
+        "network": "Could not reach LINE — nothing was sent",
+        "serverError": "LINE is having trouble — try again shortly"
+      }
+    }
   }
 }

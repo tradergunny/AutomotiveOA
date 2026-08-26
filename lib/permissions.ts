@@ -16,6 +16,7 @@ export const PERMISSIONS = {
   "qc.signOff": ["MANAGER"],
   "job.cancel": ["MANAGER"],
   "job.revertStep": ["MANAGER"],
+  "line.manageChannel": ["MANAGER"],
 } as const satisfies Record<string, readonly UserRole[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

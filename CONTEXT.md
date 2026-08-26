@@ -17,7 +17,7 @@ The staff UI is bilingual (Thai/English) from day one; customer-facing LINE mess
 ### Shop
 A garage business using the platform — the tenant. Owns its customers, vehicles, repair cases, staff accounts, and LINE Official Account integration.
 
-Each Shop creates and owns its **own** LINE OA — its brand, its friends list, its LINE message fees. The platform stores the channel credentials and sends on the Shop's behalf; onboarding includes a "connect your LINE OA" step (ADR-002).
+Each Shop creates and owns its **own** LINE OA — its brand, its friends list, its LINE message fees. The platform stores the channel credentials **encrypted** (ADR-004) and sends on the Shop's behalf; onboarding includes a "connect your LINE OA" step (ADR-002), walked through in [docs/LINE-SETUP.md](docs/LINE-SETUP.md).
 
 ### Customer
 Always a person — the one the Shop talks to (LINE, phone) — optionally tagged with a company ("Somchai — ABC Logistics") for corporate cars. Phone number is the identity key: at check-in the advisor looks up by phone to decide existing-vs-new. Real fleet accounts (company billing, multiple contacts per organization) are deferred to LATER.
@@ -80,9 +80,16 @@ Money actually received against a Repair Case: amount, method (cash / transfer /
 The Shop's own price list of standard services (brake pads, oil change, fluids…) with fixed prices. Maintained per Shop by its Manager. Standard-service Jobs take their price from here; damage/bodywork Jobs are priced by quote.
 
 ### LINE Update
-A message pushed from the Shop's LINE Official Account to a Customer: current status, photos, and a short note — composed and sent by Staff from the system. MVP is push-only: replies land in the LINE OA chat inbox and are handled by Staff there; nothing flows back into the system automatically.
+A message pushed from the Shop's LINE Official Account to a Customer: current status, photos, and a short note — composed and sent by Staff from the system. MVP is push-only: replies land in the LINE OA chat inbox and are handled by Staff there. **No message content ever flows back into the system automatically; identity does** (ADR-005) — the OA's webhook captures LINE identities so a push is possible at all, and reply text is never read, stored, or shown.
+
+A sent Update is an immutable snapshot of what the customer actually saw — body text, photos, recipient — so later renames or repricing can't rewrite history. Failed sends are recorded too. Sending is an operational event and appears on the internal timeline; nothing travels the other way (ADR-003).
 
 Updates cover all Jobs on the visit regardless of Payer — an insurer footing the bill doesn't change who gets kept informed.
+
+### LINE Contact
+A LINE identity seen on one Shop's OA — a `userId`, plus the display name and picture LINE reports. It arrives when the person adds the OA as a friend or messages it, and starts out **unlinked**: Staff match it to a Customer by hand, via the same phone lookup as check-in (ADR-005). A Customer with no linked LINE Contact simply can't be sent Updates yet — a normal state, not an error. userIds are per-OA, so the same person at two Shops is two Contacts.
+
+A published Photo — one a human attached to a sent Update — is reachable by an unguessable link, because LINE's servers fetch images themselves. Photos are never public before that.
 
 ### Internal Timeline vs Customer Timeline
 Two deliberately separate narratives. The internal timeline records every operational event for Staff (QC failed, rework, waiting-reason changes). The Customer Timeline is only what Staff chose to send as LINE Updates — curated and human-worded ("Final quality check", not "QC failed — repaint"). No internal event ever auto-publishes to the customer (ADR-003).

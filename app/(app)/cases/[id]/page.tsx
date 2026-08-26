@@ -6,19 +6,24 @@ import { CaseStatusBadge } from "@/components/blocks/case-status-badge";
 import { CornerTicks } from "@/components/blocks/corner-ticks";
 import { JobRollupChips } from "@/components/blocks/job-rollup";
 import { hasActiveWork } from "@/lib/case-flow";
+import { LINE_MAX_PHOTOS_PER_UPDATE } from "@/lib/line";
+import { buildDraftBody } from "@/lib/line-draft";
 import { findingSeverity } from "@/lib/inspection";
 import { formatPhone } from "@/lib/normalize";
 import { can } from "@/lib/permissions";
 import { requireSession, tenantDb } from "@/lib/session";
 import { CaseFlowPanel } from "./case-flow-panel";
 import { CASE_EVENT_INCLUDE, CaseTimeline } from "./case-timeline";
+import { CustomerTimeline, type SendBlockedReason } from "./customer-timeline";
 import { JOB_INCLUDE, QUOTATION_INCLUDE, toJobDto, toQuotationDto } from "./job-dto";
 import { JobsPanel } from "./jobs-panel";
 
 // Repair Case page (M2 brief §6, M3 brief §6, M4 brief §7, M5 brief §6–§7):
 // the check-in landing with the Inspection summary, the Jobs & money section,
-// and now the real case status — derived rollup in the header, Mark ready /
-// Mark delivered, and the internal timeline. Walkaround photos are the
+// the real case status — derived rollup in the header, Mark ready / Mark
+// delivered — the internal timeline, and (M6 brief §6, §9) the Customer
+// Timeline beside it: the curated half, composed and sent by a human
+// (ADR-003). Walkaround photos are the
 // case-level ones (findingId AND jobId null); Finding/Job photos live with
 // their Findings and Jobs.
 export default async function CasePage({
@@ -62,7 +67,7 @@ export default async function CasePage({
   });
   if (!repairCase) notFound();
 
-  const [jobs, quotations, catalogItems, staffOptions, events] = await Promise.all([
+  const [jobs, quotations, catalogItems, staffOptions, events, lineUpdates, lineChannel, lineContact, casePhotos, shop] = await Promise.all([
     db.job.findMany({
       where: { caseId: id },
       include: JOB_INCLUDE,
@@ -88,6 +93,30 @@ export default async function CasePage({
       include: CASE_EVENT_INCLUDE,
       orderBy: { at: "asc" },
     }),
+    db.lineUpdate.findMany({
+      where: { caseId: id },
+      include: {
+        sentBy: { select: { name: true } },
+        photos: { orderBy: { sortOrder: "asc" }, select: { photoId: true } },
+      },
+      orderBy: { sentAt: "desc" },
+    }),
+    db.shopLineChannel.findUnique({
+      where: { shopId: session.shopId },
+      select: { id: true },
+    }),
+    db.lineContact.findFirst({
+      where: { customer: { contactCases: { some: { id } } } },
+      select: { followState: true },
+    }),
+    // Every photo on the case — walkaround, Finding evidence and Job progress
+    // shots are all attachable to an Update (CONTEXT.md).
+    db.photo.findMany({
+      where: { caseId: id },
+      orderBy: { capturedAt: "asc" },
+      select: { id: true, contentType: true, findingId: true, jobId: true },
+    }),
+    db.shop.findFirst({ select: { name: true } }),
   ]);
 
   const groupFindingParam = query["group-finding"];
@@ -106,6 +135,16 @@ export default async function CasePage({
   const checklistCount = findings.filter((f) => f.source === "CHECKLIST").length;
   const findingPhotoCount = findings.reduce((sum, f) => sum + f._count.photos, 0);
   const lastRecorded = findings[0]?.recordedAt;
+
+  // The Customer Timeline's send gate (M6 brief §6): each blocked reason is a
+  // normal, explained state — never an error, and never a hidden control.
+  const blockedReason: SendBlockedReason = !lineChannel
+    ? "notConnected"
+    : !lineContact
+      ? "noIdentity"
+      : lineContact.followState === "UNFOLLOWED"
+        ? "unfollowed"
+        : null;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
@@ -316,11 +355,47 @@ export default async function CasePage({
         preselectFindingId={preselectFindingId}
       />
 
-      <CaseTimeline
-        events={events}
-        checkedInAt={repairCase.checkedInAt}
-        openedByName={repairCase.openedByStaff.name}
-      />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <CaseTimeline
+          events={events}
+          checkedInAt={repairCase.checkedInAt}
+          openedByName={repairCase.openedByStaff.name}
+        />
+        <CustomerTimeline
+          caseId={repairCase.id}
+          initialUpdates={lineUpdates.map((update) => ({
+            id: update.id,
+            bodyText: update.bodyText,
+            deliveryStatus: update.deliveryStatus,
+            errorCode: update.errorCode,
+            recipientName: update.recipientName,
+            sentByName: update.sentBy.name,
+            sentAt: update.sentAt.toISOString(),
+            photoIds: update.photos.map((photo) => photo.photoId),
+          }))}
+          draftBody={buildDraftBody({
+            shopName: shop?.name ?? "",
+            reference: repairCase.reference,
+            plate: vehicle.plate,
+            customerName: contactCustomer.name,
+            caseStatus: repairCase.status,
+            jobs: jobs.map((job) => ({
+              title: job.title,
+              status: job.status,
+              waitingReason: job.waitingReason,
+            })),
+          })}
+          photos={casePhotos.map((photo) => ({
+            id: photo.id,
+            contentType: photo.contentType,
+            origin: photo.findingId ? "finding" : photo.jobId ? "job" : "case",
+          }))}
+          recipientName={contactCustomer.name}
+          blockedReason={blockedReason}
+          maxPhotos={LINE_MAX_PHOTOS_PER_UPDATE}
+          readOnly={repairCase.status === "DELIVERED"}
+        />
+      </div>
 
       <section className="flex flex-col gap-2">
         <h3 className="eyebrow">
