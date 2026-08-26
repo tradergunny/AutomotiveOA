@@ -109,7 +109,8 @@
       "photoInvalid": "A selected file is not a supported image (JPEG/PNG/WebP)",
       "photoTooLarge": "A photo is too large (max 10MB after processing)",
       "failed": "Check-in failed — nothing was saved, try again"
-    }
+    },
+    "uploadingPhotos": "Uploading photos… {done}/{total}"
   },
   "customers": {
     "searchPlaceholder": "Search name, phone, company, or plate…",
