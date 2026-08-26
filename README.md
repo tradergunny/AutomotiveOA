@@ -8,6 +8,8 @@ Built first with a pilot shop, sold to other garages (see [ADR-001](docs/adr/ADR
 
 M3 (Inspection) builds on M2's check-in: every open Repair Case now has an Inspection screen — a five-view Damage Map (sedan/pickup artwork selected by the vehicle's body type) where staff tap body zones to record damage, beside a Service Checklist for wear items. Both produce photographed Findings that persist as they're captured and can keep arriving mid-repair. Photos ride the same authenticated store as check-in walkarounds. Domain features arrive milestone by milestone — see [docs/MILESTONES.md](docs/MILESTONES.md).
 
+**Staging is live on Vercel** (since 2026-08-26): production branch `main` — every merged PR deploys automatically. Neon Postgres (pooled `DATABASE_URL` at runtime; `vercel.json` runs `prisma migrate deploy` on the unpooled URL at build time) and a **private** Vercel Blob store for photos (`BLOB_READ_WRITE_TOKEN` selects the driver in [lib/storage.ts](lib/storage.ts)). Env vars live in the Vercel dashboard and are baked in at build time — connecting a store or changing a value does nothing until the next deploy. The full deploy guide is an M8 deliverable.
+
 ## Getting started (dev)
 
 Requires Node 22+. No Docker or local Postgres install needed.
