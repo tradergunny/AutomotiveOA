@@ -5,8 +5,10 @@ import type { BodyType } from "../lib/generated/prisma/enums";
 // Pilot shop seed (M1 brief §8): Somchai Garage + a Manager and an Advisor,
 // so login is testable on a fresh clone. M2 (brief §8) adds sample Customers
 // and Vehicles so phone/plate lookups are testable too. M4 (brief §8) adds a
-// small Service Catalog so catalog Jobs are testable — but NO seeded Repair
-// Cases, Jobs, or Quotations: performing the flows is each milestone's gate.
+// small Service Catalog so catalog Jobs are testable. M5 (brief §8) adds two
+// technician Staff records (no logins — CONTEXT.md) so assignment and the
+// QC never-own-work rule are exercisable. NO seeded Repair Cases, Jobs,
+// events, or Quotations: performing the flows is each milestone's gate.
 // Idempotent — safe to re-run. DEV CREDENTIALS ONLY — real onboarding
 // replaces this in M8.
 
@@ -99,6 +101,12 @@ const CATALOG: { name: string; priceSatang: number; note?: string }[] = [
   { name: "ตรวจเช็กระยะ", priceSatang: 120_000 },
 ];
 
+// Technicians exist as assignable Staff, never Users (Phase 2 promotes them).
+const TECHNICIANS = [
+  { name: "สมศักดิ์ ฝีมือดี", position: "ช่างตัวถัง" },
+  { name: "วินัย สีสวย", position: "ช่างสี" },
+];
+
 const USERS = [
   {
     email: "somchai@somchaigarage.dev",
@@ -143,6 +151,16 @@ async function main() {
       },
     });
     console.log(`user created: ${spec.email} (${spec.role})`);
+  }
+
+  for (const spec of TECHNICIANS) {
+    const existing = await prismaUnscoped.staff.findFirst({
+      where: { shopId: shop.id, name: spec.name },
+    });
+    if (!existing) {
+      await prismaUnscoped.staff.create({ data: { shopId: shop.id, ...spec } });
+    }
+    console.log(`staff: ${spec.name} (${spec.position})`);
   }
 
   for (const spec of CUSTOMERS) {

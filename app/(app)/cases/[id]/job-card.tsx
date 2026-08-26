@@ -1,11 +1,30 @@
 "use client";
 
-import { Camera, ChevronDown, ChevronRight, Pencil, X } from "lucide-react";
+import {
+  Ban,
+  Camera,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Pencil,
+  Play,
+  Shield,
+  ShieldCheck,
+  ShieldX,
+  Undo2,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { JobStatusBadge } from "@/components/blocks/job-status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  canFlow,
+  REVERTIBLE_STATUSES,
+  WAITING_REASONS,
+  type JobFlowAction,
+} from "@/lib/case-flow";
 import { downscalePhoto } from "@/lib/downscale";
 import {
   AUTH_CHANNELS,
@@ -16,6 +35,7 @@ import {
 } from "@/lib/jobs";
 import { formatBaht, satangToBahtInput } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { revertJobStep, transitionJob, type FlowError } from "./flow-actions";
 import {
   addJobPhoto,
   addPartLine,
@@ -27,15 +47,14 @@ import {
   updateJob,
   updateJobPrice,
   updatePartLine,
-  type JobActionResult,
   type JobError,
 } from "./job-actions";
 
 /**
- * One Job on the case page (M4 brief §3–§5, §7): collapsed row → expanded
- * editor with pricing, payer, authorization recording, part lines, and
- * relayed progress photos. Mutations reconcile through the returned JobDto,
- * M3-style.
+ * One Job on the case page (M4 brief §3–§5, §7; M5 brief §2–§3): collapsed
+ * row → expanded editor with pricing, payer, authorization recording, part
+ * lines, relayed progress photos, and the working-flow controls along the
+ * fixed edge map. Mutations reconcile through the returned JobDto, M3-style.
  */
 
 type Props = {
@@ -43,10 +62,17 @@ type Props = {
   quotations: QuotationDto[]; // newest first
   staffOptions: { id: string; name: string }[];
   isManager: boolean;
+  canSignOffQc: boolean;
+  canCancelJob: boolean;
+  canRevertStep: boolean;
+  viewerStaffId: string;
   readOnly: boolean;
   onChanged: (dto: JobDto) => void;
   onDeleted: (job: JobDto) => void;
 };
+
+type CardError = JobError | FlowError;
+type CardResult = { ok: true; value: JobDto } | { ok: false; error: CardError };
 
 const selectCls =
   "border border-border-strong bg-transparent px-1.5 py-1 text-xs focus:border-primary focus:outline-none [&>option]:bg-popover";
@@ -106,6 +132,10 @@ export function JobCard({
   quotations,
   staffOptions,
   isManager,
+  canSignOffQc,
+  canCancelJob,
+  canRevertStep,
+  viewerStaffId,
   readOnly,
   onChanged,
   onDeleted,
@@ -113,21 +143,25 @@ export function JobCard({
   const t = useTranslations("jobs");
   const ti = useTranslations("inspection");
   const tc = useTranslations("common");
+  const twr = useTranslations("waitingReasons");
   const format = useFormatter();
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<JobError | null>(null);
-  const [armed, setArmed] = useState<"delete" | "revert" | null>(null);
+  const [error, setError] = useState<CardError | null>(null);
+  const [armed, setArmed] = useState<"delete" | "revert" | "revertStep" | null>(null);
   const [pendingInsurer, setPendingInsurer] = useState(false);
   const [editingPart, setEditingPart] = useState<string | null>(null);
   const [authChannel, setAuthChannel] = useState<(typeof AUTH_CHANNELS)[number]>("PHONE");
   const [authQuotationId, setAuthQuotationId] = useState<string>(quotations[0]?.id ?? "");
   const [authNote, setAuthNote] = useState("");
+  const [flowMode, setFlowMode] = useState<null | "waiting" | "qcfail" | "cancel">(null);
+  const [flowReason, setFlowReason] = useState<string>(job.waitingReason ?? "PARTS");
+  const [flowNote, setFlowNote] = useState("");
 
   const proposed = job.status === "PROPOSED";
   const canEditCore = proposed && !readOnly;
 
-  async function run(action: () => Promise<JobActionResult<JobDto>>) {
+  async function run(action: () => Promise<CardResult>) {
     if (busy) return;
     setBusy(true);
     setError(null);
@@ -143,7 +177,7 @@ export function JobCard({
     }
   }
 
-  function arm(kind: "delete" | "revert", go: () => void) {
+  function arm(kind: "delete" | "revert" | "revertStep", go: () => void) {
     if (armed !== kind) {
       setArmed(kind);
       setTimeout(() => setArmed((cur) => (cur === kind ? null : cur)), 3000);
@@ -151,6 +185,14 @@ export function JobCard({
     }
     setArmed(null);
     go();
+  }
+
+  const mayFlow = (action: JobFlowAction) => canFlow(action, job.status);
+
+  async function flow(input: { action: JobFlowAction; waitingReason?: string; note?: string }) {
+    await run(() => transitionJob(job.id, input));
+    setFlowMode(null);
+    setFlowNote("");
   }
 
   async function handleDelete() {
@@ -219,6 +261,11 @@ export function JobCard({
         )}
         <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{job.title}</span>
         <JobStatusBadge status={job.status} />
+        {job.status === "WAITING" && job.waitingReason && (
+          <span className="border border-warn/45 px-1.5 py-px font-mono text-[10px] text-warn">
+            {twr(job.waitingReason)}
+          </span>
+        )}
         <span className="border border-border-strong px-1.5 py-px text-[10.5px] text-muted-foreground">
           {job.payerType === "CUSTOMER" ? t("payer.CUSTOMER") : (job.insurerName ?? t("payer.INSURER"))}
         </span>
@@ -726,6 +773,197 @@ export function JobCard({
                 </button>
               )}
           </div>
+
+          {/* working flow (M5 brief §2–§3): the fixed edge map, no free status control */}
+          {!readOnly &&
+            (mayFlow("START_WORK") ||
+              mayFlow("SEND_TO_QC") ||
+              job.status === "QC" ||
+              (canRevertStep &&
+                (REVERTIBLE_STATUSES as readonly string[]).includes(job.status))) && (
+              <div className="flex flex-col gap-2 border-t border-dashed pt-2.5">
+                <span className="eyebrow">{t("flow.title")}</span>
+                {flowMode === null ? (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {mayFlow("START_WORK") && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={busy}
+                        className="h-7 font-semibold"
+                        onClick={() => void flow({ action: "START_WORK" })}
+                      >
+                        <Play data-icon="inline-start" />
+                        {job.status === "WAITING" ? t("flow.resumeWork") : t("flow.startWork")}
+                      </Button>
+                    )}
+                    {mayFlow("SET_WAITING") && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        className="h-7 border-warn/50 text-warn hover:bg-warn/10"
+                        onClick={() => setFlowMode("waiting")}
+                      >
+                        <Clock data-icon="inline-start" />
+                        {job.status === "WAITING" ? t("flow.changeReason") : t("flow.setWaiting")}
+                      </Button>
+                    )}
+                    {mayFlow("SEND_TO_QC") && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        className="h-7 border-info/50 text-info hover:bg-info/10"
+                        onClick={() => void flow({ action: "SEND_TO_QC" })}
+                      >
+                        <Shield data-icon="inline-start" />
+                        {t("flow.sendToQc")}
+                      </Button>
+                    )}
+                    {job.status === "QC" && canSignOffQc && viewerStaffId !== job.assignedStaffId && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        className="h-7 border-ok/50 font-semibold text-ok hover:bg-ok/10"
+                        onClick={() => void flow({ action: "QC_PASS" })}
+                      >
+                        <ShieldCheck data-icon="inline-start" />
+                        {t("flow.qcPass")}
+                      </Button>
+                    )}
+                    {job.status === "QC" && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        className="h-7 border-bad/50 text-bad hover:bg-bad/10"
+                        onClick={() => setFlowMode("qcfail")}
+                      >
+                        <ShieldX data-icon="inline-start" />
+                        {t("flow.qcFail")}
+                      </Button>
+                    )}
+                    {job.status === "QC" && !canSignOffQc && (
+                      <span className="text-[10.5px] text-faint">{t("flow.qcManagerHint")}</span>
+                    )}
+                    {job.status === "QC" && canSignOffQc && viewerStaffId === job.assignedStaffId && (
+                      <span className="text-[10.5px] text-faint">{t("flow.qcOwnWorkHint")}</span>
+                    )}
+                    <span className="ml-auto flex items-center gap-1.5">
+                      {canCancelJob && mayFlow("CANCEL") && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setFlowMode("cancel")}
+                          className="flex items-center gap-1 border border-border-strong px-2 py-0.5 text-[10.5px] text-faint hover:border-bad/50 hover:text-bad"
+                        >
+                          <Ban className="size-3" aria-hidden />
+                          {t("flow.cancel")}
+                        </button>
+                      )}
+                      {canRevertStep &&
+                        (REVERTIBLE_STATUSES as readonly string[]).includes(job.status) && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              arm("revertStep", () => void run(() => revertJobStep(job.id)))
+                            }
+                            className={cn(
+                              "flex items-center gap-1 border px-2 py-0.5 text-[10.5px]",
+                              armed === "revertStep"
+                                ? "border-warn/60 bg-warn/15 text-warn"
+                                : "border-border-strong text-faint hover:text-warn",
+                            )}
+                          >
+                            <Undo2 className="size-3" aria-hidden />
+                            {armed === "revertStep"
+                              ? t("flow.revertStepConfirm")
+                              : t("flow.revertStep")}
+                          </button>
+                        )}
+                    </span>
+                  </div>
+                ) : flowMode === "waiting" ? (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <select
+                      className={selectCls}
+                      value={flowReason}
+                      onChange={(e) => setFlowReason(e.currentTarget.value)}
+                      aria-label={t("flow.reasonLabel")}
+                    >
+                      {WAITING_REASONS.map((reason) => (
+                        <option key={reason} value={reason}>
+                          {twr(reason)}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={busy || (job.status === "WAITING" && job.waitingReason === flowReason)}
+                      className="h-7 font-semibold"
+                      onClick={() => void flow({ action: "SET_WAITING", waitingReason: flowReason })}
+                    >
+                      {t("flow.confirm")}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7"
+                      onClick={() => setFlowMode(null)}
+                    >
+                      {tc("cancel")}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Input
+                      value={flowNote}
+                      onChange={(e) => setFlowNote(e.currentTarget.value)}
+                      placeholder={
+                        flowMode === "qcfail"
+                          ? t("flow.qcFailNotePlaceholder")
+                          : t("flow.cancelNotePlaceholder")
+                      }
+                      autoFocus
+                      className="h-8 min-w-52 flex-1 text-xs"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={busy || !flowNote.trim()}
+                      className="h-7 border-bad/50 font-semibold text-bad hover:bg-bad/10"
+                      onClick={() =>
+                        void flow({
+                          action: flowMode === "qcfail" ? "QC_FAIL" : "CANCEL",
+                          note: flowNote,
+                        })
+                      }
+                    >
+                      {flowMode === "qcfail" ? t("flow.qcFail") : t("flow.cancelConfirm")}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7"
+                      onClick={() => setFlowMode(null)}
+                    >
+                      {tc("cancel")}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
 
           {/* footer: created / delete */}
           <div className="flex items-center gap-2">

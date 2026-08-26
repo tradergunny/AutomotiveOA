@@ -1,7 +1,9 @@
 // AutomotiveOA — data foundation (CONTEXT.md language).
 // M1: Shop, Staff, User. M2: Customer, Vehicle, RepairCase, Photo. M3: Finding.
 // M4: ServiceCatalogItem, Job, JobAuthorization, PartLine, Quotation,
-// QuotationLine. Every tenant-owned row carries shop_id (ADR-001); scoping is
+// QuotationLine. M5: CaseEvent (the internal timeline), Job.waitingReason,
+// and the RepairCase ready/delivered fields.
+// Every tenant-owned row carries shop_id (ADR-001); scoping is
 // enforced by the tenant guard in lib/tenant.ts, never by hand-written WHERE
 // clauses. Cross-model relations join on same-shop composite FKs so the
 // database itself rejects cross-shop links (defense in depth, per User→Staff
@@ -43,6 +45,7 @@ model Shop {
   partLines      PartLine[]
   quotations     Quotation[]
   quotationLines QuotationLine[]
+  caseEvents     CaseEvent[]
 
   @@map("shops")
 }
@@ -70,6 +73,9 @@ model Staff {
   priceOverriddenJobs    Job[]              @relation("JobPriceOverriddenBy")
   recordedAuthorizations JobAuthorization[]
   issuedQuotations       Quotation[]
+  deliveredCases         RepairCase[]       @relation("CaseDeliveredBy")
+  caseEventsActed        CaseEvent[]        @relation("CaseEventActor")
+  caseEventsSubject      CaseEvent[]        @relation("CaseEventSubject")
 
   @@unique([shopId, id]) // target for the same-shop composite FKs (users, cases, photos, findings)
   @@index([shopId])
@@ -172,8 +178,10 @@ model Vehicle {
 }
 
 /// Lifecycle (CONTEXT.md): Checked In → Ready → Delivered. Everything in
-/// between is derived from Jobs (M4+) and never set by hand. M2 only ever
-/// writes CHECKED_IN; READY/DELIVERED transitions arrive with the M5 board.
+/// between is derived from Jobs and never set by hand. READY is derived in
+/// both directions (M5 ruling, lib/case-flow.ts): it flips on the last
+/// authorized Job completing and flips back when new work is authorized;
+/// DELIVERED is always an explicit staff action, only from READY.
 enum RepairCaseStatus {
   CHECKED_IN
   READY
@@ -196,6 +204,11 @@ model RepairCase {
   odometerKm        Int?             @map("odometer_km")
   checkedInAt       DateTime         @default(now()) @map("checked_in_at")
   openedByStaffId   String           @map("opened_by_staff_id")
+  /// Set while READY (cleared if new work flips the case back — the history
+  /// lives in CaseEvents); deliveredAt/By are set once, at handover.
+  readyAt            DateTime? @map("ready_at")
+  deliveredAt        DateTime? @map("delivered_at")
+  deliveredByStaffId String?   @map("delivered_by_staff_id")
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @updatedAt @map("updated_at")
 
@@ -203,10 +216,12 @@ model RepairCase {
   vehicle         Vehicle     @relation(fields: [shopId, vehicleId], references: [shopId, id])
   contactCustomer Customer    @relation("CaseContactCustomer", fields: [shopId, contactCustomerId], references: [shopId, id])
   openedByStaff   Staff       @relation(fields: [shopId, openedByStaffId], references: [shopId, id])
+  deliveredBy     Staff?      @relation("CaseDeliveredBy", fields: [shopId, deliveredByStaffId], references: [shopId, id])
   photos          Photo[]
   findings        Finding[]
   jobs            Job[]
   quotations      Quotation[]
+  events          CaseEvent[]
 
   @@unique([shopId, reference])
   @@unique([shopId, id]) // target for the same-shop composite FKs
@@ -389,6 +404,9 @@ model Job {
   caseId        String    @map("case_id")
   title         String
   status        JobStatus @default(PROPOSED)
+  /// Required while status is WAITING, NULL otherwise (app-validated;
+  /// lib/case-flow.ts). Reason history lives in CaseEvents.
+  waitingReason WaitingReason? @map("waiting_reason")
   payerType     PayerType @map("payer_type")
   /// Free text while payerType is INSURER (Claim FK arrives in M8).
   insurerName   String?   @map("insurer_name")
@@ -414,6 +432,7 @@ model Job {
   authorizations    JobAuthorization[]
   partLines         PartLine[]
   quotationLines    QuotationLine[]
+  events            CaseEvent[]
 
   @@unique([shopId, id]) // target for the same-shop composite FKs
   @@unique([shopId, caseId, id]) // target for Finding/Photo same-case FKs
@@ -514,6 +533,7 @@ model Quotation {
   issuedBy       Staff              @relation(fields: [shopId, issuedByStaffId], references: [shopId, id])
   lines          QuotationLine[]
   authorizations JobAuthorization[]
+  events         CaseEvent[]
 
   @@unique([shopId, caseId, version])
   @@unique([shopId, id]) // target for the same-shop composite FKs
@@ -544,4 +564,79 @@ model QuotationLine {
 
   @@index([shopId, quotationId])
   @@map("quotation_lines")
+}
+
+/// Why a Job sits in WAITING — CONTEXT.md's fixed set.
+enum WaitingReason {
+  PARTS
+  PAINT_BOOTH
+  TECHNICIAN
+  OTHER
+}
+
+/// What an internal-timeline entry records (M5 brief, founder ruling: one
+/// append-only table for every operational event). QC pass/fail, cancel, and
+/// revert get their own types — deriving them from from/to status pairs would
+/// make a Manager revert QC→IN_PROGRESS indistinguishable from a QC fail.
+enum CaseEventType {
+  JOB_CREATED
+  JOB_DELETED
+  JOB_AUTHORIZATION_RECORDED
+  JOB_STATUS_CHANGED
+  JOB_WAITING_REASON_CHANGED
+  JOB_QC_PASSED
+  JOB_QC_FAILED
+  JOB_CANCELLED
+  JOB_REVERTED
+  JOB_ASSIGNED
+  JOB_PRICE_OVERRIDDEN
+  QUOTATION_ISSUED
+  CASE_READY
+  CASE_READY_REVOKED
+  CASE_DELIVERED
+}
+
+/// One internal-timeline entry (CONTEXT.md: the internal timeline records
+/// every operational event for Staff). Append-only: rows are written complete
+/// in the SAME transaction as the mutation they record and never touched
+/// again — no update path, no updatedAt (the Quotation idiom). Staff-only
+/// forever: the customer narrative is M6's separately composed LINE Updates,
+/// and nothing here ever auto-publishes (ADR-003).
+model CaseEvent {
+  id     String        @id @default(cuid())
+  shopId String        @map("shop_id")
+  caseId String        @map("case_id")
+  type   CaseEventType
+  /// Soft link to the live Job — deliberately the QuotationLine idiom
+  /// (single-column FK, ON DELETE SET NULL; a composite FK would null shopId
+  /// too). The event's shop stays pinned through its case FK, and the title
+  /// snapshot below keeps deleted Jobs renderable.
+  jobId    String? @map("job_id")
+  /// The Job's title at event time — survives deletion and later renames.
+  jobTitle String? @map("job_title")
+  fromStatus    JobStatus?     @map("from_status")
+  toStatus      JobStatus?     @map("to_status")
+  waitingReason WaitingReason? @map("waiting_reason")
+  /// JOB_PRICE_OVERRIDDEN: the price the Manager set, in satang.
+  priceSatang Int? @map("price_satang")
+  /// QUOTATION_ISSUED: a real composite FK is safe here — quotations are
+  /// immutable and never deleted.
+  quotationId String? @map("quotation_id")
+  /// JOB_ASSIGNED: the newly assigned technician (NULL = unassigned).
+  subjectStaffId String? @map("subject_staff_id")
+  /// Free text carried by the event (QC-fail reason, cancel reason,
+  /// authorization note) — shop-authored data, rendered verbatim.
+  note         String?
+  actorStaffId String   @map("actor_staff_id")
+  at           DateTime @default(now()) @map("occurred_at")
+
+  shop         Shop       @relation(fields: [shopId], references: [id])
+  repairCase   RepairCase @relation(fields: [shopId, caseId], references: [shopId, id])
+  job          Job?       @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  quotation    Quotation? @relation(fields: [shopId, quotationId], references: [shopId, id])
+  subjectStaff Staff?     @relation("CaseEventSubject", fields: [shopId, subjectStaffId], references: [shopId, id])
+  actorStaff   Staff      @relation("CaseEventActor", fields: [shopId, actorStaffId], references: [shopId, id])
+
+  @@index([shopId, caseId, at])
+  @@map("case_events")
 }

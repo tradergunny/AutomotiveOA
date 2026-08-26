@@ -4,6 +4,7 @@ import type {
   JobStatus,
   PartOrderStatus,
   PayerType,
+  WaitingReason,
 } from "@/lib/generated/prisma/enums";
 
 /**
@@ -71,6 +72,8 @@ export type JobDto = {
   id: string;
   title: string;
   status: JobStatus;
+  /** Set while WAITING (lib/case-flow.ts), NULL otherwise. */
+  waitingReason: WaitingReason | null;
   payerType: PayerType;
   insurerName: string | null;
   catalogItemId: string | null;

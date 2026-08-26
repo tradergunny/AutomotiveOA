@@ -32,10 +32,12 @@ import { Prisma } from "@/lib/generated/prisma/client";
  * M3; Job→{RepairCase, ServiceCatalogItem, Staff}, Finding→Job and
  * Photo→Job (same shop AND case), JobAuthorization→{Job, Quotation, Staff},
  * PartLine→Job, Quotation→{RepairCase, Staff}, and QuotationLine→Quotation
- * in M4 — so the database rejects any cross-shop link a nested write could
- * attempt. (One deliberate exception: QuotationLine→Job is a single-column
- * soft link so ON DELETE SET NULL works — see the schema comment; the line's
- * shop stays pinned through its Quotation.)
+ * in M4; CaseEvent→{RepairCase, Quotation, Staff×2} and
+ * RepairCase→Staff (deliveredBy) in M5 — so the database rejects any
+ * cross-shop link a nested write could attempt. (Two deliberate exceptions,
+ * same reason: QuotationLine→Job and CaseEvent→Job are single-column soft
+ * links so ON DELETE SET NULL works — see the schema comments; each row's
+ * shop stays pinned through its Quotation/RepairCase.)
  */
 
 /** Models that carry shop_id and belong to exactly one Shop. */
@@ -53,6 +55,7 @@ const TENANT_OWNED = [
   "PartLine",
   "Quotation",
   "QuotationLine",
+  "CaseEvent",
 ] as const satisfies readonly Prisma.ModelName[];
 
 /** The tenant itself: readable/updatable only as the shop's own row. */

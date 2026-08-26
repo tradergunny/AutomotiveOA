@@ -47,12 +47,17 @@
   "board": {
     "empty": "No open repair cases — start with a check-in",
     "newCheckin": "New check-in",
-    "columns": {
-      "case": "Case",
-      "vehicle": "Vehicle",
-      "contact": "Contact",
-      "checkedIn": "Checked in"
-    }
+    "openCount": "{count, plural, one {# open case} other {# open cases}}",
+    "groups": {
+      "IN_ASSESSMENT": "In assessment",
+      "AWAITING_AUTH": "Awaiting authorization",
+      "WAITING": "Waiting",
+      "IN_PROGRESS": "In progress",
+      "IN_QC": "In QC",
+      "READY": "Ready for pickup"
+    },
+    "partsProgress": "Parts {arrived}/{total}",
+    "partsEta": "ETA {date}"
   },
   "stub": {
     "comingIn": "This feature arrives in {milestone}",
@@ -74,7 +79,23 @@
     "odometerValue": "{km} km",
     "photos": "Walkaround photos",
     "noPhotos": "No photos on this case yet",
-    "photoAlt": "Case photo {n}"
+    "photoAlt": "Case photo {n}",
+    "readySince": "Ready for pickup — {when}",
+    "deliveredLine": "Delivered {when} · {name}",
+    "flow": {
+      "markReady": "Mark ready for pickup",
+      "markReadyConfirm": "Confirm — nothing left to do?",
+      "markDelivered": "Mark delivered",
+      "markDeliveredConfirm": "Confirm handover — closes editing",
+      "errors": {
+        "caseMissing": "Case not found",
+        "caseDelivered": "This case is already delivered",
+        "invalidTransition": "The case status changed — reload the page",
+        "activeWork": "There is still active work on this case",
+        "notReady": "Only a Ready case can be delivered",
+        "failed": "Something went wrong — try again"
+      }
+    }
   },
   "checkin": {
     "contactSection": "Who brought the car in?",
@@ -291,6 +312,38 @@
     "DECLINED": "Declined",
     "CANCELLED": "Cancelled"
   },
+  "waitingReasons": {
+    "PARTS": "Parts",
+    "PAINT_BOOTH": "Paint booth",
+    "TECHNICIAN": "Technician",
+    "OTHER": "Other"
+  },
+  "timeline": {
+    "title": "Internal timeline",
+    "staffOnly": "STAFF ONLY",
+    "entryCount": "{count, plural, one {# entry} other {# entries}}",
+    "checkedIn": "Checked in",
+    "jobCreated": "Job created — {job}",
+    "jobDeleted": "Job deleted — {job}",
+    "jobAuthorized": "Authorized — {job}",
+    "jobDeclined": "Declined — {job}",
+    "authorizationReverted": "Authorization reverted to proposed — {job}",
+    "workStarted": "Work started — {job}",
+    "jobWaiting": "Waiting ({reason}) — {job}",
+    "waitingReasonChanged": "Waiting reason changed to {reason} — {job}",
+    "sentToQc": "Sent to QC — {job}",
+    "qcPassed": "QC passed — {job}",
+    "qcFailed": "QC failed — {job}",
+    "jobCancelled": "Job cancelled — {job}",
+    "jobReverted": "Status reverted to {status} — {job}",
+    "jobAssigned": "Assigned to {name} — {job}",
+    "jobUnassigned": "Assignment removed — {job}",
+    "priceOverridden": "Price overridden to {price} — {job}",
+    "quotationIssued": "Quotation {label} issued",
+    "caseReady": "Ready for pickup",
+    "caseReadyRevoked": "No longer ready — work reopened",
+    "caseDelivered": "Delivered"
+  },
   "catalog": {
     "title": "Standard services & prices",
     "empty": "No catalog entries yet — add the shop's standard services below",
@@ -392,6 +445,26 @@
         "OTHER": "Other"
       }
     },
+    "flow": {
+      "title": "Work status",
+      "startWork": "Start work",
+      "resumeWork": "Resume work",
+      "setWaiting": "Set waiting…",
+      "changeReason": "Change reason…",
+      "reasonLabel": "Waiting reason",
+      "confirm": "Confirm",
+      "sendToQc": "Send to QC",
+      "qcPass": "QC pass",
+      "qcFail": "QC fail…",
+      "qcFailNotePlaceholder": "What failed and what happens next — required",
+      "cancel": "Cancel job…",
+      "cancelConfirm": "Cancel job",
+      "cancelNotePlaceholder": "Why this authorized job is being stopped — required",
+      "qcManagerHint": "QC sign-off is the Manager's",
+      "qcOwnWorkHint": "The assigned technician can't sign off their own work",
+      "revertStep": "Revert step",
+      "revertStepConfirm": "Really revert one step?"
+    },
     "createdAt": "Created {when}",
     "delete": "Delete job",
     "deleteConfirm": "Really delete? Findings return to ungrouped",
@@ -400,6 +473,10 @@
       "caseDelivered": "This case is delivered — jobs are locked",
       "jobMissing": "Job not found",
       "notProposed": "Only proposed jobs can be changed",
+      "invalidTransition": "That status change isn't allowed from here",
+      "reasonRequired": "Choose a waiting reason",
+      "noteRequired": "A note is required for this action",
+      "qcOwnWork": "The assigned technician can't sign off their own work",
       "titleRequired": "Enter a job title",
       "priceInvalid": "Enter a valid price",
       "priceRequired": "Price the job before it can be authorized",

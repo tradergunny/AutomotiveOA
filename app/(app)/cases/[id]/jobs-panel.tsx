@@ -35,6 +35,10 @@ type Props = {
   catalogItems: { id: string; name: string; priceSatang: number }[];
   staffOptions: { id: string; name: string }[];
   isManager: boolean;
+  canSignOffQc: boolean;
+  canCancelJob: boolean;
+  canRevertStep: boolean;
+  viewerStaffId: string;
   readOnly: boolean;
   preselectFindingId?: string;
 };
@@ -47,6 +51,10 @@ export function JobsPanel({
   catalogItems,
   staffOptions,
   isManager,
+  canSignOffQc,
+  canCancelJob,
+  canRevertStep,
+  viewerStaffId,
   readOnly,
   preselectFindingId,
 }: Props) {
@@ -275,6 +283,10 @@ export function JobsPanel({
               quotations={quotations}
               staffOptions={staffOptions}
               isManager={isManager}
+              canSignOffQc={canSignOffQc}
+              canCancelJob={canCancelJob}
+              canRevertStep={canRevertStep}
+              viewerStaffId={viewerStaffId}
               readOnly={readOnly}
               onChanged={jobChanged}
               onDeleted={jobDeleted}
