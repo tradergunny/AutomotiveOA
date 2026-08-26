@@ -38,7 +38,7 @@ Then, still in OA Manager:
 5. Open **Settings → Response settings** (การตอบกลับ).
    - Turn **Auto-response messages OFF**. Otherwise every customer message gets an automatic canned reply, which looks odd next to the real updates your staff write.
    - Turn **Chat ON**, so replies land in your OA inbox where staff can answer them. This app never reads those replies — that is deliberate ([ADR-005](adr/ADR-005-line-identity-via-webhook.md)).
-   - Turn **Webhooks ON**. This is the switch that lets the app learn who has added you.
+   - Leave **Webhooks** alone for now. It is the switch that lets the app learn who has added you, but LINE will not let you turn it on until a webhook URL exists — you get that URL in Part 4, and turn the switch on there.
    - A greeting message when someone first adds you is optional and fine to keep — it is your words, not the app's.
 
 ---
@@ -73,6 +73,7 @@ The app encrypts both before storing them ([ADR-004](adr/ADR-004-line-credential
    - The app calls LINE to check the credentials before saving anything. If they are wrong you get a plain message saying so, and nothing is stored.
    - On success the page shows your OA's real name and Basic ID — a good sanity check that you connected the account you meant to.
 4. The page now shows a **Webhook URL for this shop**. Press **Copy**. It looks like `https://automotive-oa.vercel.app/api/line/webhook/<a long shop id>` — the id is generated per shop and differs between the deployed app and a developer's laptop, so always copy it from the page rather than typing it out.
+   - This URL is on the page from the start, even before you connect. Do not hand it to LINE any earlier than this, though: the endpoint checks every incoming request against the channel secret you stored in step 3, so until that exists it refuses everything and LINE's **Verify** button reports failure. That refusal is the endpoint working, not a fault.
 5. Back in the **LINE Developers Console → Messaging API tab → Webhook settings**:
    - Paste the URL into **Webhook URL** and **Update**.
    - Press **Verify**. It should report success.
@@ -87,6 +88,7 @@ That is the whole connection.
 1. On your phone, open LINE, search for your **Basic ID** (`@abc1234`) and **add the account as a friend**.
 2. In the app, go back to **Settings**. Within a few seconds your own LINE profile appears under **LINE contacts**, unmatched.
    - Nothing appeared? The webhook is the usual culprit: re-check "Use webhook" is ON and the URL is exactly what the app showed. Sending a chat message to the account also triggers it.
+   - It says **(no display name)**? That is fine, and nothing to fix before continuing. The app only asks LINE for a name and picture when someone newly adds the account — and creating an OA usually makes you a friend of it already, so your "add" fires nothing and the contact arrives from a chat message instead. The LINE user ID beside it is the part that matters; once you match the contact to a customer, the app shows the customer's name everywhere anyway.
 3. Press **Match to customer**, type the phone number of a customer record (use your own test customer), press **Find**, then **Match**.
 4. Open any repair case for that customer. In the **Customer timeline** panel you will find a Thai draft already written from the case's actual jobs.
 5. Edit the wording however you like, tick one or two photos, press **Preview** to see exactly what will be sent, then **Send** — and press it a second time to confirm.
@@ -109,6 +111,7 @@ If you got that message, the milestone's goal is met: *a customer's LINE receive
 | What you see | What it usually means |
 |---|---|
 | "LINE rejected these credentials" | The access token was copied incompletely, or it was re-issued in the console (issuing a new one invalidates the old). Issue a fresh one and reconnect. |
+| LINE's **Verify** button fails | Usually the webhook URL was saved before the account was connected in the app's Settings. Connect first, then Verify. |
 | Contacts never appear | "Use webhook" is off, or the Webhook URL does not match the one on the Settings page. Press **Verify** in the LINE console — it tells you what it got. |
 | "That customer has not added the shop's LINE account" | They removed or blocked the account. They must add it again. |
 | "This LINE account has reached its message limit" | The free plan's monthly push allowance is used up. Check the plan section in OA Manager. |
