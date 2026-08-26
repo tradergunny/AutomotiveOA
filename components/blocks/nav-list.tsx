@@ -20,7 +20,7 @@ const ITEMS = [
   { href: "/checkin", key: "checkin", icon: CarFront },
   { href: "/customers", key: "customers", icon: Users },
   { href: "/followups", key: "followups", icon: PhoneOutgoing, milestone: "M7" },
-  { href: "/catalog", key: "catalog", icon: Tags, milestone: "M4" },
+  { href: "/catalog", key: "catalog", icon: Tags },
   { href: "/settings", key: "settings", icon: Settings, milestone: "M6" },
 ] as const;
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { Camera, ClipboardCheck, Crosshair, Plus, X } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { DamageMap, DamageMapCompact } from "@/components/blocks/damage-map/damage-map";
@@ -37,10 +38,18 @@ type Props = {
   caseId: string;
   bodyType: BodyType;
   initialFindings: FindingDto[];
+  /** Job id → title, for the "→ grouped into" chip (M4). */
+  jobTitles: Record<string, string>;
   readOnly: boolean;
 };
 
-export function InspectionScreen({ caseId, bodyType, initialFindings, readOnly }: Props) {
+export function InspectionScreen({
+  caseId,
+  bodyType,
+  initialFindings,
+  jobTitles,
+  readOnly,
+}: Props) {
   const t = useTranslations("inspection");
   const format = useFormatter();
   const [findings, setFindings] = useState(initialFindings);
@@ -335,6 +344,23 @@ export function InspectionScreen({ caseId, bodyType, initialFindings, readOnly }
                         >
                           {t(`conditions.${f.condition}`)}
                         </span>
+                      )}
+                      {f.jobId ? (
+                        <span
+                          className="max-w-40 truncate border border-ok/40 px-1.5 py-px text-[10.5px] text-ok"
+                          title={jobTitles[f.jobId]}
+                        >
+                          {t("inJob", { title: jobTitles[f.jobId] ?? "" })}
+                        </span>
+                      ) : (
+                        !readOnly && (
+                          <Link
+                            href={`/cases/${caseId}?group-finding=${f.id}#jobs`}
+                            className="border border-border-strong px-1.5 py-px text-[10.5px] text-faint hover:border-primary-dim hover:text-primary"
+                          >
+                            {t("groupIntoJob")}
+                          </Link>
+                        )
                       )}
                       {!readOnly && (
                         <button

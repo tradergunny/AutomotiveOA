@@ -126,6 +126,8 @@ export type FindingDto = {
   condition: FindingCondition | null;
   proposedActions: ProposedAction[];
   note: string | null;
+  /** The Job fulfilling this Finding (M4) — null while ungrouped. */
+  jobId: string | null;
   recordedAt: string; // ISO — serializable across the RSC boundary
   recordedByName: string;
   photos: { id: string }[];

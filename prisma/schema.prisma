@@ -1,9 +1,15 @@
 // AutomotiveOA — data foundation (CONTEXT.md language).
 // M1: Shop, Staff, User. M2: Customer, Vehicle, RepairCase, Photo. M3: Finding.
-// Every tenant-owned row carries shop_id (ADR-001); scoping is enforced by the
-// tenant guard in lib/tenant.ts, never by hand-written WHERE clauses. Cross-model
-// relations join on same-shop composite FKs so the database itself rejects
-// cross-shop links (defense in depth, per User→Staff in M1).
+// M4: ServiceCatalogItem, Job, JobAuthorization, PartLine, Quotation,
+// QuotationLine. Every tenant-owned row carries shop_id (ADR-001); scoping is
+// enforced by the tenant guard in lib/tenant.ts, never by hand-written WHERE
+// clauses. Cross-model relations join on same-shop composite FKs so the
+// database itself rejects cross-shop links (defense in depth, per User→Staff
+// in M1).
+//
+// Money (founder ruling, M4 brief): integer satang (THB minor units) in Int
+// columns — exact arithmetic, serializable, no Decimal objects. THB is
+// implicit platform-wide in MVP; no currency column, no VAT math.
 
 generator client {
   provider = "prisma-client"
@@ -24,13 +30,19 @@ model Shop {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  staff       Staff[]
-  users       User[]
-  customers   Customer[]
-  vehicles    Vehicle[]
-  repairCases RepairCase[]
-  photos      Photo[]
-  findings    Finding[]
+  staff          Staff[]
+  users          User[]
+  customers      Customer[]
+  vehicles       Vehicle[]
+  repairCases    RepairCase[]
+  photos         Photo[]
+  findings       Finding[]
+  catalogItems   ServiceCatalogItem[]
+  jobs           Job[]
+  authorizations JobAuthorization[]
+  partLines      PartLine[]
+  quotations     Quotation[]
+  quotationLines QuotationLine[]
 
   @@map("shops")
 }
@@ -48,11 +60,16 @@ model Staff {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  shop             Shop         @relation(fields: [shopId], references: [id])
-  user             User?
-  openedCases      RepairCase[]
-  uploadedPhotos   Photo[]
-  recordedFindings Finding[]
+  shop                   Shop               @relation(fields: [shopId], references: [id])
+  user                   User?
+  openedCases            RepairCase[]
+  uploadedPhotos         Photo[]
+  recordedFindings       Finding[]
+  createdJobs            Job[]              @relation("JobCreatedBy")
+  assignedJobs           Job[]              @relation("JobAssignedStaff")
+  priceOverriddenJobs    Job[]              @relation("JobPriceOverriddenBy")
+  recordedAuthorizations JobAuthorization[]
+  issuedQuotations       Quotation[]
 
   @@unique([shopId, id]) // target for the same-shop composite FKs (users, cases, photos, findings)
   @@index([shopId])
@@ -182,12 +199,14 @@ model RepairCase {
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @updatedAt @map("updated_at")
 
-  shop            Shop      @relation(fields: [shopId], references: [id])
-  vehicle         Vehicle   @relation(fields: [shopId, vehicleId], references: [shopId, id])
-  contactCustomer Customer  @relation("CaseContactCustomer", fields: [shopId, contactCustomerId], references: [shopId, id])
-  openedByStaff   Staff     @relation(fields: [shopId, openedByStaffId], references: [shopId, id])
+  shop            Shop        @relation(fields: [shopId], references: [id])
+  vehicle         Vehicle     @relation(fields: [shopId, vehicleId], references: [shopId, id])
+  contactCustomer Customer    @relation("CaseContactCustomer", fields: [shopId, contactCustomerId], references: [shopId, id])
+  openedByStaff   Staff       @relation(fields: [shopId, openedByStaffId], references: [shopId, id])
   photos          Photo[]
   findings        Finding[]
+  jobs            Job[]
+  quotations      Quotation[]
 
   @@unique([shopId, reference])
   @@unique([shopId, id]) // target for the same-shop composite FKs
@@ -249,6 +268,11 @@ model Finding {
   condition     FindingCondition?
   proposedActions ProposedAction[] @map("proposed_actions")
   note          String?
+  /// The Job fulfilling this Finding (M4). At most one per Finding (founder
+  /// ruling): grouping is many Findings → one Job, never a split. NULL =
+  /// ungrouped. The composite FK pins the Job to this Finding's own shop AND
+  /// case at the database level.
+  jobId         String?           @map("job_id")
   /// Who recorded it and when — mid-repair additions stay distinguishable
   /// from the check-in inspection by this timestamp.
   recordedByStaffId String   @map("recorded_by_staff_id")
@@ -259,6 +283,7 @@ model Finding {
   shop       Shop       @relation(fields: [shopId], references: [id])
   repairCase RepairCase @relation(fields: [shopId, caseId], references: [shopId, id])
   recordedBy Staff      @relation(fields: [shopId, recordedByStaffId], references: [shopId, id])
+  job        Job?       @relation(fields: [shopId, caseId, jobId], references: [shopId, caseId, id])
   photos     Photo[]
 
   // One checklist Finding per item per case. Postgres unique indexes treat
@@ -267,12 +292,15 @@ model Finding {
   @@unique([shopId, id]) // target for the same-shop composite FKs
   @@unique([shopId, caseId, id]) // target for Photo's same-case FK
   @@index([shopId, caseId])
+  @@index([shopId, jobId])
   @@map("findings")
 }
 
 /// A photo (CONTEXT.md: attaches at Repair Case / Finding / Job level). Every
-/// Photo belongs to its Repair Case; `findingId` (M3) marks Finding evidence —
-/// NULL means case-level (the check-in walkaround). Job links arrive in M4.
+/// Photo belongs to its Repair Case; `findingId` (M3) marks Finding evidence,
+/// `jobId` (M4) marks Job progress/after-work shots relayed by office staff —
+/// both NULL means case-level (the check-in walkaround). A photo links a
+/// Finding or a Job, never both (app-level validation).
 model Photo {
   id                String   @id @default(cuid())
   shopId            String   @map("shop_id")
@@ -281,6 +309,8 @@ model Photo {
   /// this photo's own shop AND case — a cross-case link is impossible at the
   /// database level (M2 defense-in-depth idiom).
   findingId         String?  @map("finding_id")
+  /// Job progress shot when set — same shop-and-case composite pin as findingId.
+  jobId             String?  @map("job_id")
   /// Key into the photo store (lib/storage) — files are served only through
   /// the authenticated, tenant-checked photo route, never a public URL.
   storageKey        String   @unique @map("storage_key")
@@ -294,9 +324,224 @@ model Photo {
   shop       Shop       @relation(fields: [shopId], references: [id])
   repairCase RepairCase @relation(fields: [shopId, caseId], references: [shopId, id])
   finding    Finding?   @relation(fields: [shopId, caseId, findingId], references: [shopId, caseId, id])
+  job        Job?       @relation(fields: [shopId, caseId, jobId], references: [shopId, caseId, id])
   uploadedBy Staff      @relation(fields: [shopId, uploadedByStaffId], references: [shopId, id])
 
   @@index([shopId, caseId])
   @@index([shopId, findingId])
+  @@index([shopId, jobId])
   @@map("photos")
+}
+
+/// The Shop's own price list of standard services (CONTEXT.md). Maintained
+/// per Shop by its Manager; names are shop-authored free text in the Shop's
+/// own language — tenant data, never i18n copy. Entries deactivate, never
+/// delete: Jobs reference them.
+model ServiceCatalogItem {
+  id          String   @id @default(cuid())
+  shopId      String   @map("shop_id")
+  name        String
+  /// Integer satang (M4 brief money ruling).
+  priceSatang Int      @map("price_satang")
+  active      Boolean  @default(true)
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  shop Shop  @relation(fields: [shopId], references: [id])
+  jobs Job[]
+
+  @@unique([shopId, id]) // target for Job's same-shop composite FK
+  @@index([shopId, active])
+  @@map("service_catalog_items")
+}
+
+/// Job lifecycle (CONTEXT.md). The enum ships COMPLETE so M5 never alters a
+/// Postgres enum — but M4 code only ever writes PROPOSED / AUTHORIZED /
+/// DECLINED (working transitions, waiting reasons, and QC are M5).
+enum JobStatus {
+  PROPOSED
+  AUTHORIZED
+  WAITING
+  IN_PROGRESS
+  QC
+  COMPLETED
+  DECLINED
+  CANCELLED
+}
+
+/// Who pays for a Job: the Customer (self-pay) or an insurer. The Claim
+/// record arrives in M8 — until then `insurerName` free text is the whole
+/// insurance surface (M4 brief).
+enum PayerType {
+  CUSTOMER
+  INSURER
+}
+
+/// One line of work on a Repair Case (CONTEXT.md): fulfils zero or more
+/// Findings (zero = customer-requested service, founder ruling), priced from
+/// the Service Catalog (`catalogItemId` set, price locked for Advisors) or
+/// quoted by hand (`catalogItemId` NULL — damage/bodywork). `priceSatang`
+/// NULL = not yet priced; quotation issue and authorization both require one.
+model Job {
+  id            String    @id @default(cuid())
+  shopId        String    @map("shop_id")
+  caseId        String    @map("case_id")
+  title         String
+  status        JobStatus @default(PROPOSED)
+  payerType     PayerType @map("payer_type")
+  /// Free text while payerType is INSURER (Claim FK arrives in M8).
+  insurerName   String?   @map("insurer_name")
+  catalogItemId String?   @map("catalog_item_id")
+  priceSatang   Int?      @map("price_satang")
+  /// Manager who set a catalog Job's price away from the catalog entry —
+  /// NULL means no override (CONTEXT.md: regular staff cannot).
+  priceOverriddenByStaffId String? @map("price_overridden_by_staff_id")
+  assignedStaffId          String? @map("assigned_staff_id")
+  note          String?
+  createdByStaffId String   @map("created_by_staff_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  shop              Shop                @relation(fields: [shopId], references: [id])
+  repairCase        RepairCase          @relation(fields: [shopId, caseId], references: [shopId, id])
+  catalogItem       ServiceCatalogItem? @relation(fields: [shopId, catalogItemId], references: [shopId, id])
+  priceOverriddenBy Staff?              @relation("JobPriceOverriddenBy", fields: [shopId, priceOverriddenByStaffId], references: [shopId, id])
+  assignedStaff     Staff?              @relation("JobAssignedStaff", fields: [shopId, assignedStaffId], references: [shopId, id])
+  createdBy         Staff               @relation("JobCreatedBy", fields: [shopId, createdByStaffId], references: [shopId, id])
+  findings          Finding[]
+  photos            Photo[]
+  authorizations    JobAuthorization[]
+  partLines         PartLine[]
+  quotationLines    QuotationLine[]
+
+  @@unique([shopId, id]) // target for the same-shop composite FKs
+  @@unique([shopId, caseId, id]) // target for Finding/Photo same-case FKs
+  @@index([shopId, caseId])
+  @@map("jobs")
+}
+
+/// A recorded payer response, or a Manager revert (M4 brief §4).
+enum AuthorizationDecision {
+  AUTHORIZED
+  DECLINED
+  /// Manager-only correction back to PROPOSED — appended, never edited.
+  REVERTED
+}
+
+/// How the payer's response arrived (CONTEXT.md: LINE chat, phone, in
+/// person; insurer decisions arrive outside the system).
+enum AuthorizationChannel {
+  LINE
+  PHONE
+  IN_PERSON
+  OTHER
+}
+
+/// Append-only authorization history for one Job (CONTEXT.md: who recorded
+/// it, when, and through which channel). Corrections append, never edit.
+model JobAuthorization {
+  id       String                @id @default(cuid())
+  shopId   String                @map("shop_id")
+  jobId    String                @map("job_id")
+  decision AuthorizationDecision
+  /// Required for AUTHORIZED/DECLINED (app-validated); NULL on REVERTED.
+  channel  AuthorizationChannel?
+  /// The Quotation version presented to the payer, when staff record one.
+  quotationId       String?  @map("quotation_id")
+  note              String?
+  recordedByStaffId String   @map("recorded_by_staff_id")
+  recordedAt        DateTime @default(now()) @map("recorded_at")
+
+  shop       Shop       @relation(fields: [shopId], references: [id])
+  job        Job        @relation(fields: [shopId, jobId], references: [shopId, id])
+  quotation  Quotation? @relation(fields: [shopId, quotationId], references: [shopId, id])
+  recordedBy Staff      @relation(fields: [shopId, recordedByStaffId], references: [shopId, id])
+
+  @@index([shopId, jobId])
+  @@map("job_authorizations")
+}
+
+/// Part order progress (CONTEXT.md): what a Waiting(Parts) Job is waiting
+/// for. The M5 dashboard consumes this; inventory/stock stays out of MVP.
+enum PartOrderStatus {
+  NOT_ORDERED
+  ORDERED
+  ARRIVED
+}
+
+/// One required part on a Job (CONTEXT.md). `unitCostSatang` is the shop's
+/// INTERNAL procurement cost (founder ruling): optional, never summed into
+/// the Job's customer-facing price, never printed on quotations.
+model PartLine {
+  id            String          @id @default(cuid())
+  shopId        String          @map("shop_id")
+  jobId         String          @map("job_id")
+  name          String
+  quantity      Int             @default(1)
+  unitCostSatang Int?           @map("unit_cost_satang")
+  supplier      String?
+  orderStatus   PartOrderStatus @default(NOT_ORDERED) @map("order_status")
+  etaDate       DateTime?       @map("eta_date") @db.Date
+  note          String?
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  shop Shop @relation(fields: [shopId], references: [id])
+  job  Job  @relation(fields: [shopId, jobId], references: [shopId, id])
+
+  @@index([shopId, jobId])
+  @@map("part_lines")
+}
+
+/// A numbered, immutable snapshot of proposed Jobs and their prices
+/// (CONTEXT.md). One lineage per case (founder ruling): `number` derives
+/// from the case reference (RC-1024 → Q-1024) and `version` counts up per
+/// explicit issue. No update path exists anywhere in the app; rows are
+/// created complete and never touched again — hence no updatedAt.
+model Quotation {
+  id            String   @id @default(cuid())
+  shopId        String   @map("shop_id")
+  caseId        String   @map("case_id")
+  number        String
+  version       Int
+  totalSatang   Int      @map("total_satang")
+  issuedByStaffId String   @map("issued_by_staff_id")
+  issuedAt        DateTime @default(now()) @map("issued_at")
+
+  shop           Shop               @relation(fields: [shopId], references: [id])
+  repairCase     RepairCase         @relation(fields: [shopId, caseId], references: [shopId, id])
+  issuedBy       Staff              @relation(fields: [shopId, issuedByStaffId], references: [shopId, id])
+  lines          QuotationLine[]
+  authorizations JobAuthorization[]
+
+  @@unique([shopId, caseId, version])
+  @@unique([shopId, id]) // target for the same-shop composite FKs
+  @@index([shopId, caseId])
+  @@map("quotations")
+}
+
+/// One snapshot line: the Job's title, price, and payer AS OFFERED. The
+/// back-link to the live Job is deliberately a single-column FK (not the
+/// same-shop composite idiom): ON DELETE SET NULL on a composite FK would
+/// null shopId too, so the soft link stands alone — the snapshot must
+/// survive anything, including a still-PROPOSED Job being deleted. The
+/// line's shop is pinned through its Quotation FK regardless.
+model QuotationLine {
+  id          String    @id @default(cuid())
+  shopId      String    @map("shop_id")
+  quotationId String    @map("quotation_id")
+  jobId       String?   @map("job_id")
+  title       String
+  priceSatang Int       @map("price_satang")
+  payerType   PayerType @map("payer_type")
+  insurerName String?   @map("insurer_name")
+  sortOrder   Int       @map("sort_order")
+
+  shop      Shop      @relation(fields: [shopId], references: [id])
+  quotation Quotation @relation(fields: [shopId, quotationId], references: [shopId, id])
+  job       Job?      @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([shopId, quotationId])
+  @@map("quotation_lines")
 }
