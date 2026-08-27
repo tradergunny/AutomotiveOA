@@ -36,7 +36,10 @@ The ticket for one vehicle visit. Opened at check-in, closed at delivery. Human 
 
 "Closed at delivery" means the **work record** freezes — Jobs, Findings, Quotations, statuses can no longer change — while **money and messages stay appendable** (M7 ruling): Payments land after handover because insurers pay weeks late, and follow-up LINE Updates are still composed and sent by Staff. Both are append-only records, so appending them rewrites nothing.
 
-Lifecycle: **Checked In → Ready → Delivered**. Everything in between is derived from its Jobs and shown as a rollup ("2 In Progress · 1 Waiting Parts") — never set by hand. Ready flips when every authorized Job is Completed, and it is a managed state, not a moment: cars sit at the shop awaiting pickup, and the dashboard tracks them.
+Lifecycle: **Checked In → Ready → Delivered**. Everything in between is derived from its Jobs — summarized as the case's [[Stage]], with the per-status rollup ("2 In Progress · 1 Waiting Parts") as supporting detail — never set by hand. Ready flips when every authorized Job is Completed, and it is a managed state, not a moment: cars sit at the shop awaiting pickup, and the dashboard tracks them.
+
+### Stage
+The single answer to "what does this Repair Case need from a human right now" — derived from the case and its Jobs, never stored, never set by hand, exactly one per case: **In assessment · Awaiting authorization · Waiting (with reason) · In progress · In QC · Ready · Delivered**, where a Delivered case still owed money reads as **Balance due** until settled. When several could apply, attention wins (a case with one Proposed and one In Progress Job needs a human for the authorization, so it files under Awaiting authorization); In assessment is the catch-all for a case whose work hasn't taken shape yet. The Case Board groups by Stage, the Repair Case page leads with it, and staff speech ("it's in QC", "waiting on parts") is Stage language.
 
 ### Inspection
 The examination that produces Findings. One screen, two capture surfaces: the **Damage Map** — an interactive car diagram rendered as one unfolded five-view sheet (top, front, rear, left, right — insurance-sheet style) where staff tap a body zone (bumper, hood, door, wheel…) to log visible damage — and the **Service Checklist** beside it, a list of mechanical systems and wear items (engine, transmission, brakes, fluids…). Both surfaces produce Findings of the same shape.
@@ -55,7 +58,7 @@ Lifecycle: **Proposed → Authorized → Waiting / In Progress → QC → Comple
 
 Every Job has a **Payer** — the Customer (self-pay) or an insurer via a Claim — and needs **Authorization** before work begins, decided per Job, never all-or-nothing on the visit. For self-pay Jobs the authorization is the Customer's approval; for insurance-paid Jobs, Staff record the insurer/claim authorization. Jobs proceed independently: one can be In Progress while another still awaits authorization.
 
-In MVP every authorization is recorded by Staff after the payer responds (LINE chat, phone, in person; insurer decisions arrive outside the system). The record captures who recorded it, when, and through which channel. Customers do not tap-to-approve inside LINE yet.
+In MVP every authorization is recorded by Staff after the payer responds (LINE chat, phone, in person; insurer decisions arrive outside the system). The record captures who recorded it, when, and through which channel. Customers do not tap-to-approve inside LINE yet. A Quotation is the professional path, not a gate (founder ruling 2026-08-27): walk-ins agree on the spot, and the authorization is recorded with no Quotation ever issued.
 
 A Declined or Cancelled Job stays on the Repair Case permanently — Declined ones are CRM follow-up material ("your windshield is still cracked — want a quote?") — but neither is active work.
 
