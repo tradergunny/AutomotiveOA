@@ -6,6 +6,7 @@ import type { UserRole } from "@/lib/generated/prisma/enums";
  * and authorization revert. Live since M5: QC sign-off (Manager-only per the
  * founder ruling — a QC-authorized-Staff flag is additive later), job cancel
  * (it terminates payer-approved work), and the single-step status revert.
+ * Live since M7: payment void — the money tier of the same governance.
  * Every capability check goes through can() so none can be forgotten at
  * feature time.
  */
@@ -17,6 +18,7 @@ export const PERMISSIONS = {
   "job.cancel": ["MANAGER"],
   "job.revertStep": ["MANAGER"],
   "line.manageChannel": ["MANAGER"],
+  "payment.void": ["MANAGER"],
 } as const satisfies Record<string, readonly UserRole[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

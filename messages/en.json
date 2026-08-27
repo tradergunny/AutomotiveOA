@@ -55,14 +55,13 @@
       "WAITING": "Waiting",
       "IN_PROGRESS": "In progress",
       "IN_QC": "In QC",
-      "READY": "Ready for pickup"
+      "READY": "Ready for pickup",
+      "BALANCE_DUE": "Balance due"
     },
     "partsProgress": "Parts {arrived}/{total}",
-    "partsEta": "ETA {date}"
-  },
-  "stub": {
-    "comingIn": "This feature arrives in {milestone}",
-    "backToBoard": "Back to board"
+    "partsEta": "ETA {date}",
+    "balanceTotal": "{amount} outstanding",
+    "deliveredAgo": "delivered {when}"
   },
   "caseStatus": {
     "CHECKED_IN": "Checked in",
@@ -151,6 +150,18 @@
     "createTitle": "New customer",
     "editTitle": "Edit customer",
     "companyHint": "for corporate cars, e.g. \"ABC Logistics\"",
+    "spending": "Spending",
+    "spendingHint": "their own payments — insurer money never counts",
+    "visits": "Visits",
+    "noVisits": "No visits yet — this person has not brought a car in",
+    "payments": "Payments",
+    "noPayments": "No payments from this customer yet",
+    "voided": "VOIDED",
+    "followups": "Follow-ups",
+    "noFollowups": "Nothing to chase for this customer",
+    "lineLinked": "LINE linked — {name}",
+    "lineNotLinked": "No LINE contact matched yet",
+    "lineUnfollowed": "LINE contact has unfriended the shop",
     "errors": {
       "nameRequired": "Enter the customer's name",
       "phoneInvalid": "Phone must be 9–10 digits (Thai number)",
@@ -169,6 +180,12 @@
     "createTitle": "New vehicle",
     "editTitle": "Edit vehicle",
     "plateEditNote": "New plate on a returning car? Edit it here — the vehicle and its history stay one record.",
+    "historyTitle": "Repair history",
+    "historyHint": "physical record — stays with the car across owners; money lives with the person",
+    "historyEmpty": "No repair cases for this vehicle yet",
+    "historyNoWork": "No jobs on this visit",
+    "partsReplaced": "Parts replaced",
+    "photoCount": "{count, plural, one {# photo} other {# photos}}",
     "bodyTypes": {
       "SEDAN": "Sedan",
       "PICKUP": "Pickup"
@@ -347,7 +364,13 @@
     "lineUpdateSent": "LINE update sent to {name} · {count, plural, =0 {no photos} one {# photo} other {# photos}}",
     "lineUpdateFailed": "LINE update to {name} failed — not delivered",
     "lineCustomerLinked": "LINE account linked — {name}",
-    "lineCustomerUnlinked": "LINE account unlinked — {name}"
+    "lineCustomerUnlinked": "LINE account unlinked — {name}",
+    "paymentRecorded": "Payment received {amount} · {method} · {payer}",
+    "paymentVoided": "Payment voided — {amount}",
+    "followUpContacted": "Follow-up contacted — {source}",
+    "followUpSnoozed": "Follow-up snoozed until {date} — {source}",
+    "followUpDropped": "Follow-up dropped — {source}",
+    "followUpReopened": "Follow-up reopened — {source}"
   },
   "catalog": {
     "title": "Standard services & prices",
@@ -608,6 +631,84 @@
       }
     }
   },
+  "payments": {
+    "sectionTitle": "Payments & balance",
+    "nothingOwed": "No authorized work to pay for yet",
+    "empty": "No payments recorded yet — deposits are simply payments made early",
+    "dueChip": "{payer} due {amount}",
+    "overpaidChip": "{payer} overpaid {amount}",
+    "settledChip": "{payer} settled",
+    "record": "Record payment",
+    "recordConfirm": "Record",
+    "amountPlaceholder": "Amount (฿)",
+    "insurerPlaceholder": "Insurer name",
+    "receivedLabel": "Received",
+    "notePlaceholder": "Note (optional) — e.g. deposit, deductible, transfer reference",
+    "method": {
+      "CASH": "Cash",
+      "TRANSFER": "Transfer",
+      "CARD": "Card"
+    },
+    "payer": {
+      "CUSTOMER": "Customer",
+      "INSURER": "Insurer"
+    },
+    "void": "Void…",
+    "voidConfirm": "Void payment",
+    "voidReasonPlaceholder": "Why this payment is being voided — required",
+    "voided": "VOIDED",
+    "voidedLine": "Voided by {name}",
+    "errors": {
+      "caseMissing": "Case not found",
+      "amountInvalid": "Enter a valid amount",
+      "invalidInput": "Invalid input",
+      "insurerRequired": "Enter the insurer's name",
+      "dateInvalid": "Enter a valid received date",
+      "paymentMissing": "Payment not found",
+      "alreadyVoided": "This payment is already voided",
+      "reasonRequired": "A reason is required to void a payment",
+      "forbidden": "Only the Manager can void payments",
+      "failed": "Something went wrong — try again"
+    }
+  },
+  "followups": {
+    "filters": {
+      "ACTIONABLE": "Actionable",
+      "SNOOZED": "Snoozed",
+      "CONTACTED": "Contacted",
+      "DROPPED": "Dropped",
+      "ALL": "All"
+    },
+    "status": {
+      "OPEN": "OPEN",
+      "SNOOZED": "SNOOZED",
+      "CONTACTED": "CONTACTED",
+      "DROPPED": "DROPPED"
+    },
+    "count": "{count, plural, one {# follow-up} other {# follow-ups}}",
+    "empty": "Nothing to chase yet — declined work and unactioned wear items land here when a case is delivered",
+    "emptyFiltered": "No follow-ups in this view",
+    "quoted": "quoted {amount}",
+    "deliveredOn": "delivered {date}",
+    "snoozedUntil": "snoozed until {date}",
+    "open": "Open & compose",
+    "markContacted": "Mark contacted",
+    "contactNotePlaceholder": "How they were reached (optional) — e.g. called, came by",
+    "snooze": "Snooze…",
+    "snoozeConfirm": "Snooze",
+    "drop": "Drop…",
+    "dropConfirm": "Drop",
+    "dropReasonPlaceholder": "Why this won't be chased — required",
+    "reopen": "Reopen",
+    "lineNone": "no LINE",
+    "lineUnfollowed": "LINE blocked",
+    "errors": {
+      "missing": "Follow-up not found",
+      "dateInvalid": "Pick a valid date",
+      "reasonRequired": "A reason is required to drop a follow-up",
+      "failed": "Something went wrong — try again"
+    }
+  },
   "customerTimeline": {
     "title": "Customer timeline",
     "customerVisible": "SENT TO CUSTOMER",
@@ -618,6 +719,7 @@
     "failedHint": "LINE refused this message ({code}). The customer never received it.",
     "composeTitle": "Compose an update",
     "recipient": "To {name}",
+    "followupContext": "Follow-up — {label}. Sending will mark it contacted.",
     "bodyLabel": "Message to the customer",
     "draftHint": "Drafted for you in Thai — edit it freely. Nothing is sent until you press send.",
     "photosTitle": "Photos ({selected}/{max})",
@@ -635,7 +737,7 @@
     },
     "errors": {
       "caseMissing": "Case not found",
-      "caseDelivered": "This case is already delivered",
+      "followUpMissing": "That follow-up no longer exists — reload the page",
       "notConnected": "No LINE account is connected",
       "cryptoUnavailable": "Credential encryption is not configured",
       "noIdentity": "This customer has no LINE contact yet",

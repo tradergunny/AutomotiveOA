@@ -24,11 +24,18 @@ import { tenantContext } from "@/lib/session";
  * small transaction. If the database fails in that window the customer has a
  * message we did not record — logged loudly, and preferable to a mutable
  * "pending" row that could not close the window either.
+ *
+ * Since M7 (decision 5, superseding M6's read-only line): DELIVERED cases
+ * accept Updates — delivery freezes the WORK record, while money and
+ * messages stay appendable, because follow-ups are mostly about delivered
+ * cases. A send launched from a Follow-up marks it CONTACTED in the same
+ * recording transaction — bookkeeping caused by a human's send, the
+ * ADR-003-safe direction.
  */
 
 export type SendUpdateError =
   | "caseMissing"
-  | "caseDelivered"
+  | "followUpMissing"
   | "notConnected"
   | "cryptoUnavailable"
   | "noIdentity"
@@ -99,7 +106,19 @@ export async function sendLineUpdate(
       },
     });
     if (!repairCase) return { ok: false, error: "caseMissing" };
-    if (repairCase.status === "DELIVERED") return { ok: false, error: "caseDelivered" };
+
+    // A send launched from the Follow-up worklist carries the row's id; a
+    // stale or foreign id is refused rather than silently ignored.
+    const followUpId = String(formData.get("followUpId") ?? "") || null;
+    const followUp = followUpId
+      ? await db.followUp.findUnique({
+          where: { id: followUpId },
+          select: { id: true, caseId: true, jobTitle: true },
+        })
+      : null;
+    if (followUpId && (!followUp || followUp.caseId !== caseId)) {
+      return { ok: false, error: "followUpMissing" };
+    }
 
     if (!lineCryptoAvailable()) return { ok: false, error: "cryptoUnavailable" };
     const channel = await db.shopLineChannel.findUnique({ where: { shopId: session.shopId } });
@@ -189,10 +208,37 @@ export async function sendLineUpdate(
         },
       });
 
+      // The follow-up flips CONTACTED only when the message actually reached
+      // the customer — a FAILED push leaves the worklist row untouched.
+      if (followUp && delivered) {
+        await tx.followUp.update({
+          where: { id: followUp.id },
+          data: {
+            status: "CONTACTED",
+            snoozedUntil: null,
+            lastActionByStaffId: session.staffId,
+            lastActionAt: new Date(),
+            lastActionNote: null,
+          },
+        });
+        await tx.caseEvent.create({
+          data: {
+            shopId: session.shopId,
+            caseId,
+            type: "FOLLOW_UP_CONTACTED",
+            followUpId: followUp.id,
+            jobTitle: followUp.jobTitle,
+            lineUpdateId: row.id,
+            actorStaffId: session.staffId,
+          },
+        });
+      }
+
       return row;
     });
 
     revalidatePath(`/cases/${caseId}`);
+    if (followUp && delivered) revalidatePath("/followups");
 
     if (!push.ok) return { ok: false, error: `line.${push.code}` };
     return {

@@ -11,6 +11,7 @@ import {
   WAITING_REASONS,
   type JobFlowAction,
 } from "@/lib/case-flow";
+import { mintFollowUpsForCase } from "@/lib/followups";
 import type { JobDto } from "@/lib/jobs";
 import { can } from "@/lib/permissions";
 import { tenantContext } from "@/lib/session";
@@ -276,7 +277,12 @@ export async function markCaseReady(caseId: string): Promise<FlowResult<{ status
   }
 }
 
-/** Delivery is always explicit (ruling 4b): only from READY, at handover. */
+/**
+ * Delivery is always explicit (ruling 4b): only from READY, at handover.
+ * Delivery is also the FollowUp mint point (M7 ruling 4): it freezes the
+ * work record, so the candidate set — declined Jobs, never-actioned wear
+ * Findings — is final, and the rows are created in the same transaction.
+ */
 export async function markCaseDelivered(
   caseId: string,
 ): Promise<FlowResult<{ status: string }>> {
@@ -284,7 +290,7 @@ export async function markCaseDelivered(
     const { session, db } = await tenantContext();
     const repairCase = await db.repairCase.findUnique({
       where: { id: caseId },
-      select: { id: true, status: true },
+      select: { id: true, status: true, contactCustomerId: true },
     });
     if (!repairCase) throw new FlowInputError("caseMissing");
     if (repairCase.status === "DELIVERED") throw new FlowInputError("caseDelivered");
@@ -307,9 +313,11 @@ export async function markCaseDelivered(
           actorStaffId: session.staffId,
         },
       });
+      await mintFollowUpsForCase(tx, session.shopId, caseId, repairCase.contactCustomerId);
     });
 
     revalidateCase(caseId);
+    revalidatePath("/followups");
     return { ok: true, value: { status: "DELIVERED" } };
   } catch (error) {
     return fail(error);

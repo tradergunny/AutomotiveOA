@@ -5,6 +5,7 @@ import {
   CircleCheck,
   CircleX,
   Clock,
+  Coins,
   FileText,
   Flag,
   FlagOff,
@@ -13,6 +14,7 @@ import {
   Link2Off,
   MessageCircle,
   PackageCheck,
+  PhoneOutgoing,
   Play,
   Shield,
   ShieldCheck,
@@ -42,6 +44,8 @@ export const CASE_EVENT_INCLUDE = {
   subjectStaff: { select: { name: true } },
   quotation: { select: { number: true, version: true } },
   lineUpdate: { select: { _count: { select: { photos: true } } } },
+  payment: { select: { method: true, payerType: true, insurerName: true } },
+  followUp: { select: { checklistItem: true } },
 } as const satisfies Prisma.CaseEventInclude;
 
 export type CaseEventRow = Prisma.CaseEventGetPayload<{
@@ -69,11 +73,19 @@ export function CaseTimeline({
   const t = useTranslations("timeline");
   const ts = useTranslations("jobStatus");
   const tw = useTranslations("waitingReasons");
+  const tp = useTranslations("payments");
+  const ti = useTranslations("inspection");
   const format = useFormatter();
 
   const reason = (event: CaseEventRow) =>
     event.waitingReason ? tw(event.waitingReason) : tw("OTHER");
   const job = (event: CaseEventRow) => ({ job: event.jobTitle ?? "—" });
+  /** Follow-up source label: the Job snapshot, or the checklist item via i18n. */
+  const followUpSource = (event: CaseEventRow) =>
+    event.jobTitle ??
+    (event.followUp?.checklistItem
+      ? ti(`checklist.${event.followUp.checklistItem}` as never)
+      : "—");
 
   function toEntry(event: CaseEventRow): Entry {
     const base = { note: event.note, actor: event.actorStaff.name, at: event.at };
@@ -195,6 +207,62 @@ export function CaseTimeline({
           icon: Link2Off,
           tone: "text-warn",
           label: t("lineCustomerUnlinked", { name: event.subjectName ?? "—" }),
+        };
+      case "PAYMENT_RECORDED":
+        return {
+          ...base,
+          icon: Coins,
+          tone: "text-ok",
+          label: t("paymentRecorded", {
+            amount: event.priceSatang != null ? formatBaht(event.priceSatang) : "—",
+            method: event.payment ? tp(`method.${event.payment.method}`) : "—",
+            payer: event.payment
+              ? (event.payment.insurerName ?? tp(`payer.${event.payment.payerType}`))
+              : "—",
+          }),
+        };
+      case "PAYMENT_VOIDED":
+        // The void reason rides the note and renders below, verbatim.
+        return {
+          ...base,
+          icon: Coins,
+          tone: "text-bad",
+          label: t("paymentVoided", {
+            amount: event.priceSatang != null ? formatBaht(event.priceSatang) : "—",
+          }),
+        };
+      case "FOLLOW_UP_CONTACTED":
+        return {
+          ...base,
+          icon: PhoneOutgoing,
+          tone: "text-ok",
+          label: t("followUpContacted", { source: followUpSource(event) }),
+        };
+      case "FOLLOW_UP_SNOOZED":
+        return {
+          ...base,
+          icon: Clock,
+          tone: "text-muted-foreground",
+          label: t("followUpSnoozed", {
+            source: followUpSource(event),
+            date: event.snoozedUntil
+              ? format.dateTime(event.snoozedUntil, { day: "numeric", month: "short" })
+              : "—",
+          }),
+        };
+      case "FOLLOW_UP_DROPPED":
+        return {
+          ...base,
+          icon: CircleX,
+          tone: "text-muted-foreground",
+          label: t("followUpDropped", { source: followUpSource(event) }),
+        };
+      case "FOLLOW_UP_REOPENED":
+        return {
+          ...base,
+          icon: Undo2,
+          tone: "text-muted-foreground",
+          label: t("followUpReopened", { source: followUpSource(event) }),
         };
     }
   }

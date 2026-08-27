@@ -5,6 +5,8 @@
 // and the RepairCase ready/delivered fields. M6: ShopLineChannel,
 // LineContact, LineUpdate, LineUpdatePhoto (the customer's half of the
 // story, sent by a human through the Shop's own OA — ADR-002/003/004/005).
+// M7: Payment (append-only + one-way void) and FollowUp (the CRM worklist,
+// minted at delivery), plus the payment/follow-up CaseEvent surface.
 // Every tenant-owned row carries shop_id (ADR-001); scoping is
 // enforced by the tenant guard in lib/tenant.ts, never by hand-written WHERE
 // clauses. Cross-model relations join on same-shop composite FKs so the
@@ -52,6 +54,8 @@ model Shop {
   lineContacts     LineContact[]
   lineUpdates      LineUpdate[]
   lineUpdatePhotos LineUpdatePhoto[]
+  payments         Payment[]
+  followUps        FollowUp[]
 
   @@map("shops")
 }
@@ -85,6 +89,9 @@ model Staff {
   connectedLineChannels  ShopLineChannel[]
   linkedLineContacts     LineContact[]
   sentLineUpdates        LineUpdate[]
+  recordedPayments       Payment[]         @relation("PaymentRecordedBy")
+  voidedPayments         Payment[]         @relation("PaymentVoidedBy")
+  followUpActions        FollowUp[]
 
   @@unique([shopId, id]) // target for the same-shop composite FKs (users, cases, photos, findings)
   @@index([shopId])
@@ -146,6 +153,8 @@ model Customer {
   contactCases    RepairCase[]  @relation("CaseContactCustomer")
   lineContacts    LineContact[]
   lineUpdates     LineUpdate[]
+  payments        Payment[]
+  followUps       FollowUp[]
 
   @@unique([shopId, phone])
   @@unique([shopId, id]) // target for the same-shop composite FKs
@@ -234,6 +243,8 @@ model RepairCase {
   quotations      Quotation[]
   events          CaseEvent[]
   lineUpdates     LineUpdate[]
+  payments        Payment[]
+  followUps       FollowUp[]
 
   @@unique([shopId, reference])
   @@unique([shopId, id]) // target for the same-shop composite FKs
@@ -312,6 +323,7 @@ model Finding {
   recordedBy Staff      @relation(fields: [shopId, recordedByStaffId], references: [shopId, id])
   job        Job?       @relation(fields: [shopId, caseId, jobId], references: [shopId, caseId, id])
   photos     Photo[]
+  followUps  FollowUp[]
 
   // One checklist Finding per item per case. Postgres unique indexes treat
   // NULLs as distinct, so Damage Map findings (checklistItem NULL) coexist.
@@ -447,6 +459,7 @@ model Job {
   partLines         PartLine[]
   quotationLines    QuotationLine[]
   events            CaseEvent[]
+  followUps         FollowUp[]
 
   @@unique([shopId, id]) // target for the same-shop composite FKs
   @@unique([shopId, caseId, id]) // target for Finding/Photo same-case FKs
@@ -614,6 +627,16 @@ enum CaseEventType {
   LINE_UPDATE_FAILED
   LINE_CUSTOMER_LINKED
   LINE_CUSTOMER_UNLINKED
+  /// M7: money against the case (append-only Payments + the one-way void)…
+  PAYMENT_RECORDED
+  PAYMENT_VOIDED
+  /// …and the Follow-up worklist transitions (chasing is operational — the
+  /// M5 one-table ruling covers it). Creation gets no event: the mint is
+  /// part of CASE_DELIVERED and the FollowUp row's createdAt records it.
+  FOLLOW_UP_CONTACTED
+  FOLLOW_UP_SNOOZED
+  FOLLOW_UP_DROPPED
+  FOLLOW_UP_REOPENED
 }
 
 /// One internal-timeline entry (CONTEXT.md: the internal timeline records
@@ -637,7 +660,8 @@ model CaseEvent {
   fromStatus     JobStatus?     @map("from_status")
   toStatus       JobStatus?     @map("to_status")
   waitingReason  WaitingReason? @map("waiting_reason")
-  /// JOB_PRICE_OVERRIDDEN: the price the Manager set, in satang.
+  /// The money amount the event carries, in satang: the overridden price on
+  /// JOB_PRICE_OVERRIDDEN, the payment amount on PAYMENT_RECORDED/VOIDED.
   priceSatang    Int?           @map("price_satang")
   /// QUOTATION_ISSUED: a real composite FK is safe here — quotations are
   /// immutable and never deleted.
@@ -647,6 +671,14 @@ model CaseEvent {
   /// LINE_UPDATE_*: the Update that was sent or failed. A real composite FK
   /// is safe — LineUpdates are append-only and never deleted (M6).
   lineUpdateId   String?        @map("line_update_id")
+  /// PAYMENT_*: the Payment the event records. A real composite FK is safe —
+  /// Payments are append-only and never deleted, only voided (M7).
+  paymentId      String?        @map("payment_id")
+  /// FOLLOW_UP_*: the worklist row the transition happened on. A real
+  /// composite FK is safe — FollowUps are dropped, never deleted (M7).
+  followUpId     String?        @map("follow_up_id")
+  /// FOLLOW_UP_SNOOZED: the date the snooze runs to.
+  snoozedUntil   DateTime?      @map("snoozed_until") @db.Date
   /// A person's name AS AT event time, snapshotted so it survives renames:
   /// the LINE display name on LINE_CUSTOMER_LINKED/UNLINKED, the recipient
   /// on LINE_UPDATE_* (M6).
@@ -664,9 +696,129 @@ model CaseEvent {
   subjectStaff Staff?      @relation("CaseEventSubject", fields: [shopId, subjectStaffId], references: [shopId, id])
   actorStaff   Staff       @relation("CaseEventActor", fields: [shopId, actorStaffId], references: [shopId, id])
   lineUpdate   LineUpdate? @relation(fields: [lineUpdateId], references: [id])
+  payment      Payment?    @relation(fields: [shopId, paymentId], references: [shopId, id])
+  followUp     FollowUp?   @relation(fields: [shopId, followUpId], references: [shopId, id])
 
   @@index([shopId, caseId, at])
   @@map("case_events")
+}
+
+/// How money arrived — CONTEXT.md's fixed set (PromptPay is a transfer).
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+}
+
+/// Money actually received against a Repair Case (CONTEXT.md). Joins the
+/// append-only family: no update path exists for amount, method, payer, date,
+/// or note — a mistyped payment is corrected by void + re-entry, never by
+/// edit (M7 brief, decision 3). The ONE mutable surface is the one-way void
+/// (the LineUpdatePhoto.publicToken idiom): voidedAt/By/Reason are set once,
+/// Manager-only, never cleared; balances and customer spending sum only
+/// non-voided rows. Recordable on DELIVERED cases — insurers pay weeks late,
+/// so delivery freezes the WORK record while money stays appendable
+/// (decision 5). Deposits are simply Payments made early.
+model Payment {
+  id                String        @id @default(cuid())
+  shopId            String        @map("shop_id")
+  caseId            String        @map("case_id")
+  /// Which side of the split balance this lands on (decision 2): a Payment
+  /// lands in its payer's bucket on the case — no per-Job allocation.
+  payerType         PayerType     @map("payer_type")
+  /// CUSTOMER rows: the person credited with the spending (decision 6) —
+  /// the case's contact Customer at recording time.
+  customerId        String?       @map("customer_id")
+  /// INSURER rows: free text, mirroring Job.insurerName (Claim FK is M8).
+  insurerName       String?       @map("insurer_name")
+  /// Integer satang, positive (the M4 money ruling).
+  amountSatang      Int           @map("amount_satang")
+  method            PaymentMethod
+  /// The date the money arrived — entry often lags receipt.
+  receivedAt        DateTime      @default(now()) @map("received_at") @db.Date
+  note              String?
+  recordedByStaffId String        @map("recorded_by_staff_id")
+  recordedAt        DateTime      @default(now()) @map("recorded_at")
+  voidedAt          DateTime?     @map("voided_at")
+  voidedByStaffId   String?       @map("voided_by_staff_id")
+  voidReason        String?       @map("void_reason")
+
+  shop       Shop       @relation(fields: [shopId], references: [id])
+  repairCase RepairCase @relation(fields: [shopId, caseId], references: [shopId, id])
+  customer   Customer?  @relation(fields: [shopId, customerId], references: [shopId, id])
+  recordedBy Staff      @relation("PaymentRecordedBy", fields: [shopId, recordedByStaffId], references: [shopId, id])
+  voidedBy   Staff?     @relation("PaymentVoidedBy", fields: [shopId, voidedByStaffId], references: [shopId, id])
+  events     CaseEvent[]
+
+  @@unique([shopId, id]) // target for CaseEvent's same-shop composite FK
+  @@index([shopId, caseId])
+  @@index([shopId, customerId])
+  @@map("payments")
+}
+
+/// Where a FollowUp stands on the worklist. SNOOZED rows read as actionable
+/// again once snoozedUntil passes — derived on read, nothing wakes up or
+/// pings on its own (ADR-003).
+enum FollowUpStatus {
+  OPEN
+  SNOOZED
+  CONTACTED
+  DROPPED
+}
+
+/// One chaseable item on the CRM worklist (CONTEXT.md: Follow-up), minted
+/// inside the Mark-delivered transaction (M7 brief, decision 4): delivery
+/// freezes the work record, so the candidate set is final at the only moment
+/// that matters and rows can never drift from their sources. One row per
+/// DECLINED Job and per wear Finding that never became authorized work; a
+/// Finding on a declined Job is covered by that Job's row, never
+/// double-minted. Deliberately MUTABLE worklist state — not a history
+/// record: every transition writes its typed CaseEvent instead (the M5
+/// one-table ruling).
+model FollowUp {
+  id                  String            @id @default(cuid())
+  shopId              String            @map("shop_id")
+  caseId              String            @map("case_id")
+  /// The person to chase — relationship data (CONTEXT.md): the case's
+  /// contact Customer at delivery.
+  customerId          String            @map("customer_id")
+  /// Source: exactly one of jobId/findingId set (app-validated). Real
+  /// same-case composite FKs — delivered cases never delete either.
+  jobId               String?           @map("job_id")
+  findingId           String?           @map("finding_id")
+  /// Job-sourced: the declined Job's title and quoted price at delivery —
+  /// "quoted ฿18,000 in March" is what the chase leans on.
+  jobTitle            String?           @map("job_title")
+  quotedPriceSatang   Int?              @map("quoted_price_satang")
+  /// Finding-sourced: canonical checklist id + condition, rendered through
+  /// i18n at display time — never stored prose (the M5 event-label rule).
+  checklistItem       String?           @map("checklist_item")
+  condition           FindingCondition?
+  status              FollowUpStatus    @default(OPEN)
+  snoozedUntil        DateTime?         @map("snoozed_until") @db.Date
+  lastActionByStaffId String?           @map("last_action_by_staff_id")
+  lastActionAt        DateTime?         @map("last_action_at")
+  lastActionNote      String?           @map("last_action_note")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  shop         Shop       @relation(fields: [shopId], references: [id])
+  repairCase   RepairCase @relation(fields: [shopId, caseId], references: [shopId, id])
+  customer     Customer   @relation(fields: [shopId, customerId], references: [shopId, id])
+  job          Job?       @relation(fields: [shopId, caseId, jobId], references: [shopId, caseId, id])
+  finding      Finding?   @relation(fields: [shopId, caseId, findingId], references: [shopId, caseId, id])
+  lastActionBy Staff?     @relation(fields: [shopId, lastActionByStaffId], references: [shopId, id])
+  events       CaseEvent[]
+
+  // One FollowUp per source, so the delivery mint and the backfill are
+  // idempotent. Postgres treats NULLs as distinct, so the two source kinds
+  // coexist freely (the Finding.checklistItem idiom).
+  @@unique([shopId, jobId])
+  @@unique([shopId, findingId])
+  @@unique([shopId, id]) // target for CaseEvent's same-shop composite FK
+  @@index([shopId, status])
+  @@index([shopId, customerId])
+  @@map("follow_ups")
 }
 
 /// The Shop's connected LINE Official Account (ADR-002): one per Shop.

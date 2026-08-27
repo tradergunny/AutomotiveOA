@@ -34,6 +34,8 @@ let caseEventA: { id: string };
 let photoA: { id: string };
 let lineContactA: { id: string };
 let lineUpdateA: { id: string };
+let paymentA: { id: string };
+let followUpA: { id: string };
 
 beforeAll(async () => {
   shopA = await prismaUnscoped.shop.create({ data: { name: `${run} Shop A` } });
@@ -284,11 +286,35 @@ beforeAll(async () => {
       },
     },
   });
+  // M7 domain rows: one Payment and one FollowUp in shop A.
+  paymentA = await prismaUnscoped.payment.create({
+    data: {
+      shopId: shopA.id,
+      caseId: caseA.id,
+      payerType: "CUSTOMER",
+      customerId: customerA.id,
+      amountSatang: 300_000,
+      method: "TRANSFER",
+      recordedByStaffId: staffA.id,
+    },
+  });
+  followUpA = await prismaUnscoped.followUp.create({
+    data: {
+      shopId: shopA.id,
+      caseId: caseA.id,
+      customerId: customerA.id,
+      jobId: jobA.id,
+      jobTitle: `${run} Job A`,
+      quotedPriceSatang: 500_000,
+    },
+  });
 });
 
 afterAll(async () => {
   const shopIds = [shopA.id, shopB.id];
   await prismaUnscoped.caseEvent.deleteMany({ where: { shopId: { in: shopIds } } });
+  await prismaUnscoped.followUp.deleteMany({ where: { shopId: { in: shopIds } } });
+  await prismaUnscoped.payment.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.lineUpdatePhoto.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.lineUpdate.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.lineContact.deleteMany({ where: { shopId: { in: shopIds } } });
@@ -1123,5 +1149,129 @@ describe("M6 — LINE integration", () => {
         data: { shopId: shopB.id, lineUserId: "U0000000000000000000000000000dead" },
       }),
     ).rejects.toThrow(TenantGuardError);
+  });
+});
+
+describe("M7 models are scoped (Payment, FollowUp)", () => {
+  it("payments: findMany stays inside the shop; cross-shop findUnique is null", async () => {
+    const scoped = await forShop(shopA.id).payment.findMany({ where: { caseId: caseA.id } });
+    expect(scoped.map((p) => p.id)).toEqual([paymentA.id]);
+    expect(await forShop(shopB.id).payment.findMany({})).toEqual([]);
+    expect(
+      await forShop(shopB.id).payment.findUnique({ where: { id: paymentA.id } }),
+    ).toBeNull();
+  });
+
+  it("follow-ups: findMany stays inside the shop; cross-shop update throws", async () => {
+    const scoped = await forShop(shopA.id).followUp.findMany({});
+    expect(scoped.map((f) => f.id)).toEqual([followUpA.id]);
+    await expect(
+      forShop(shopB.id).followUp.update({
+        where: { id: followUpA.id },
+        data: { status: "DROPPED" },
+      }),
+    ).rejects.toThrow(TenantGuardError);
+    const untouched = await prismaUnscoped.followUp.findUnique({ where: { id: followUpA.id } });
+    expect(untouched?.status).toBe("OPEN");
+  });
+
+  it("refuses creates naming a foreign shop, like every other model", async () => {
+    await expect(
+      forShop(shopA.id).payment.create({
+        data: {
+          shopId: shopB.id,
+          caseId: caseB.id,
+          payerType: "CUSTOMER",
+          amountSatang: 1,
+          method: "CASH",
+          recordedByStaffId: staffB.id,
+        },
+      }),
+    ).rejects.toThrow(TenantGuardError);
+  });
+});
+
+describe("M7 database-level defense in depth", () => {
+  it("rejects a payment on another shop's case, customer, or staff", async () => {
+    await expect(
+      prismaUnscoped.payment.create({
+        data: {
+          shopId: shopA.id,
+          caseId: caseB.id, // B's case under A's shop
+          payerType: "CUSTOMER",
+          amountSatang: 1,
+          method: "CASH",
+          recordedByStaffId: staffA.id,
+        },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      prismaUnscoped.payment.create({
+        data: {
+          shopId: shopA.id,
+          caseId: caseA.id,
+          payerType: "CUSTOMER",
+          customerId: customerB.id, // crediting B's customer
+          amountSatang: 1,
+          method: "CASH",
+          recordedByStaffId: staffA.id,
+        },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("pins FollowUp sources to their own case, not just their shop", async () => {
+    // Same shop, wrong case: a follow-up on caseA2 pointing at caseA's job.
+    // The (shop_id, case_id, job_id) composite FK must reject it.
+    await expect(
+      prismaUnscoped.followUp.create({
+        data: {
+          shopId: shopA.id,
+          caseId: caseA2.id,
+          customerId: customerA.id,
+          jobId: jobA.id,
+          jobTitle: "cross-case",
+        },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("keeps one FollowUp per source job (the idempotent-mint unique)", async () => {
+    await expect(
+      prismaUnscoped.followUp.create({
+        data: {
+          shopId: shopA.id,
+          caseId: caseA.id,
+          customerId: customerA.id,
+          jobId: jobA.id, // already covered by followUpA
+          jobTitle: "duplicate",
+        },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("rejects a CaseEvent naming another shop's payment or follow-up", async () => {
+    await expect(
+      prismaUnscoped.caseEvent.create({
+        data: {
+          shopId: shopB.id,
+          caseId: caseB.id,
+          type: "PAYMENT_RECORDED",
+          paymentId: paymentA.id, // A's payment under B's shop
+          actorStaffId: staffB.id,
+        },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      prismaUnscoped.caseEvent.create({
+        data: {
+          shopId: shopB.id,
+          caseId: caseB.id,
+          type: "FOLLOW_UP_CONTACTED",
+          followUpId: followUpA.id, // A's follow-up under B's shop
+          actorStaffId: staffB.id,
+        },
+      }),
+    ).rejects.toThrow();
   });
 });

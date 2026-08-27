@@ -81,7 +81,12 @@ export const REVERTIBLE_STATUSES = ["WAITING", "IN_PROGRESS", "QC", "COMPLETED",
 /* Board grouping (ruling 4c): one group per case, D-2 order.          */
 /* ------------------------------------------------------------------ */
 
-/** Display order — IN_ASSESSMENT leads (the catch-all); BALANCE_DUE is M7. */
+/**
+ * Display order — IN_ASSESSMENT leads (the catch-all); BALANCE_DUE trails
+ * (M7 ruling 1): delivered cases still owed money, the ONE exception to
+ * open-cases-only — a delivered case leaves the board once nothing is owed,
+ * and returns if a void resurrects the debt.
+ */
 export const BOARD_GROUPS = [
   "IN_ASSESSMENT",
   "AWAITING_AUTH",
@@ -89,14 +94,16 @@ export const BOARD_GROUPS = [
   "IN_PROGRESS",
   "IN_QC",
   "READY",
+  "BALANCE_DUE",
 ] as const;
 
 export type BoardGroup = (typeof BOARD_GROUPS)[number];
 
 /**
  * First match in D-2's order (founder ruling): attention first, then READY,
- * else the leading catch-all. DELIVERED cases are off the board entirely —
- * callers exclude them before grouping.
+ * else the leading catch-all. OPEN cases only — a DELIVERED case never files
+ * here; the board itself places delivered-with-balance rows under
+ * BALANCE_DUE (M7 ruling 1), rendered for money, not work.
  */
 export function boardGroupFor(
   caseStatus: RepairCaseStatus,
