@@ -7,19 +7,24 @@ import { cn } from "@/lib/utils";
 import { markCaseDelivered, markCaseReady, type FlowError, type FlowResult } from "./flow-actions";
 
 /**
- * The case's explicit flow actions (M5 brief §4): Mark ready (the
- * customer-collects-anyway path — auto-READY handles completed work) and
- * Mark delivered (always explicit, ruling 4b). Two-tap confirm, M4's arm
- * idiom; the server re-render after revalidatePath updates everything else.
+ * The case's explicit flow actions (M5 brief §4), folded into the header's
+ * next-action strip (M7.5, D-6): Mark ready (the customer-collects-anyway
+ * path — auto-READY handles completed work) and Mark delivered (always
+ * explicit, ruling 4b). Two-tap confirm, M4's arm idiom; the server
+ * re-render after revalidatePath updates everything else. Renders bare
+ * inline buttons — the strip owns the layout.
  */
 export function CaseFlowPanel({
   caseId,
   canMarkReady,
   canDeliver,
+  deliverPrimary,
 }: {
   caseId: string;
   canMarkReady: boolean;
   canDeliver: boolean;
+  /** True when Mark delivered is the stage's suggested move (READY, settled). */
+  deliverPrimary: boolean;
 }) {
   const t = useTranslations("cases.flow");
   const [busy, setBusy] = useState(false);
@@ -51,16 +56,34 @@ export function CaseFlowPanel({
   }
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-dashed pt-3">
+    <>
+      {canDeliver && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => arm("deliver", () => void run(() => markCaseDelivered(caseId)))}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold",
+            armed === "deliver"
+              ? "border border-primary bg-primary-soft text-primary"
+              : deliverPrimary
+                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                : "border border-primary-dim text-primary hover:bg-primary-soft",
+          )}
+        >
+          <PackageCheck className="size-3.5" aria-hidden />
+          {armed === "deliver" ? t("markDeliveredConfirm") : t("markDelivered")}
+        </button>
+      )}
       {canMarkReady && (
         <button
           type="button"
           disabled={busy}
           onClick={() => arm("ready", () => void run(() => markCaseReady(caseId)))}
           className={cn(
-            "flex items-center gap-1.5 border px-2.5 py-1 text-xs font-semibold",
+            "flex items-center gap-1.5 border px-2.5 py-1.5 text-xs",
             armed === "ready"
-              ? "border-ok/60 bg-ok/15 text-ok"
+              ? "border-ok/60 bg-ok/15 font-semibold text-ok"
               : "border-border-strong text-muted-foreground hover:border-ok/50 hover:text-ok",
           )}
         >
@@ -68,27 +91,11 @@ export function CaseFlowPanel({
           {armed === "ready" ? t("markReadyConfirm") : t("markReady")}
         </button>
       )}
-      {canDeliver && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => arm("deliver", () => void run(() => markCaseDelivered(caseId)))}
-          className={cn(
-            "flex items-center gap-1.5 border px-2.5 py-1 text-xs font-semibold",
-            armed === "deliver"
-              ? "border-primary bg-primary-soft text-primary"
-              : "border-primary-dim text-primary hover:bg-primary-soft",
-          )}
-        >
-          <PackageCheck className="size-3.5" aria-hidden />
-          {armed === "deliver" ? t("markDeliveredConfirm") : t("markDelivered")}
-        </button>
-      )}
       {error && (
         <span role="alert" className="border border-bad/45 px-2 py-0.5 text-[11px] text-bad">
           {t(`errors.${error}`)}
         </span>
       )}
-    </div>
+    </>
   );
 }

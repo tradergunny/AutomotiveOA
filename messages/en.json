@@ -69,19 +69,49 @@
     "DELIVERED": "Delivered"
   },
   "cases": {
-    "checkedInAt": "Checked in",
-    "openedBy": "Received by",
-    "vehicle": "Vehicle",
-    "contact": "Contact",
-    "primaryCustomer": "Primary customer",
-    "note": "Visit note",
-    "odometer": "Odometer",
+    "checkedInLine": "Checked in {date}",
     "odometerValue": "{km} km",
-    "photos": "Walkaround photos",
-    "noPhotos": "No photos on this case yet",
+    "carPhotoAlt": "Photo of {plate}",
+    "note": "Reported",
     "photoAlt": "Case photo {n}",
-    "readySince": "Ready for pickup — {when}",
-    "deliveredLine": "Delivered {when} · {name}",
+    "noPhotos": "No walkaround photos yet",
+    "spine": {
+      "ASSESSMENT": "Assessment",
+      "AUTHORIZATION": "Authorization",
+      "WORK": "Work",
+      "READY": "Ready",
+      "DELIVERED": "Delivered"
+    },
+    "sub": {
+      "awaitingAuth": "{count, plural, one {# job proposed} other {# jobs proposed}}",
+      "waiting": "waiting — {reasons}",
+      "inProgress": "{count, plural, one {# job} other {# jobs}} in progress",
+      "inQc": "{count, plural, one {# job} other {# jobs}} in QC",
+      "ready": "since {when}",
+      "balanceDue": "{amount} outstanding",
+      "delivered": "{date} · {name}"
+    },
+    "money": {
+      "proposed": "{amount} proposed",
+      "authorized": "{amount} authorized",
+      "authorizedPaid": "{amount} authorized · {paid} paid",
+      "collect": "{amount} to collect",
+      "settled": "Paid in full"
+    },
+    "blocker": {
+      "parts": "{count, plural, one {# part} other {# parts}} outstanding",
+      "partsEta": "{count, plural, one {# part} other {# parts}} due {date}",
+      "partsArrived": "All parts arrived"
+    },
+    "action": {
+      "openInspection": "Open inspection",
+      "groupFindings": "Group into jobs",
+      "setPrices": "Set prices",
+      "recordAuthorization": "Record authorization",
+      "issueQuotation": "Issue quotation",
+      "recordQc": "Record QC result",
+      "recordPayment": "Record payment"
+    },
     "flow": {
       "markReady": "Mark ready for pickup",
       "markReadyConfirm": "Confirm — nothing left to do?",
@@ -235,7 +265,7 @@
     "summaryChecklist": "{count} checklist",
     "summaryPhotos": "{count, plural, one {# photo} other {# photos}}",
     "lastRecorded": "Last recorded",
-    "notInspected": "Not inspected yet — open the inspection to start.",
+    "notInspected": "Not inspected yet",
     "expandView": "Expand view",
     "closeView": "Close",
     "views": {
@@ -394,11 +424,11 @@
     }
   },
   "jobs": {
-    "sectionTitle": "Jobs & money",
-    "totalProposed": "Proposed {amount}",
-    "totalAuthorized": "Authorized {amount}",
+    "sectionTitle": "Jobs",
+    "totalProposed": "{amount} proposed",
+    "totalAuthorized": "{amount} authorized",
     "countUnpriced": "{count, plural, one {# unpriced} other {# unpriced}}",
-    "empty": "No jobs yet — group findings into a job, or add a standard service",
+    "empty": "No jobs yet",
     "emptyReadOnly": "No jobs on this case",
     "createFromFindings": "Job from findings",
     "createFromCatalog": "Standard service",
@@ -413,11 +443,9 @@
       "INSURER": "Insurance"
     },
     "insurerPlaceholder": "Insurer name",
-    "partsRollup": "parts {arrived}/{total}",
+    "partsRollup": "parts {arrived}/{total} arrived",
     "unpriced": "Not priced",
-    "titleLabel": "Job",
-    "payerLabel": "Payer",
-    "priceLabel": "Price",
+    "titleLabel": "Job title",
     "pricePlaceholder": "Price (฿)",
     "fromCatalog": "CATALOG",
     "priceLockedHint": "Catalog price — only the Manager can change it",
@@ -427,9 +455,12 @@
     "unassigned": "Unassigned",
     "findingsLabel": "Fulfils",
     "notePlaceholder": "Job note (optional)",
+    "editDone": "Done",
+    "byTechnician": "by {name}",
+    "partsSummary": "{count, plural, one {# part} other {# parts}}",
+    "cancelledLine": "Cancelled {when} · {name}",
+    "declinedLine": "Declined {when} · {name}",
     "parts": {
-      "title": "Parts",
-      "empty": "No part lines — add what this repair needs",
       "name": "Part name",
       "quantity": "Qty",
       "unitCost": "Unit cost (฿)",
@@ -452,25 +483,23 @@
         "ARRIVED": "Arrived"
       }
     },
-    "photosLabel": "Progress photos",
     "photoAlt": "Job photo {n}",
     "addPhoto": "Add photo",
     "removePhoto": "Remove photo",
     "auth": {
-      "title": "Authorization",
       "channelLabel": "Channel",
       "quotationLabel": "Quotation presented",
       "noQuotation": "No quotation",
       "notePlaceholder": "Note (optional)",
       "recordAuthorized": "Record authorized",
       "recordDeclined": "Record declined",
-      "needsPrice": "Price the job before recording an authorization",
-      "revert": "Revert to proposed (Manager)",
+      "needsPrice": "Price the job to record an authorization",
+      "revert": "Revert to proposed",
       "revertConfirm": "Really revert? The history entry stays",
       "decision": {
-        "AUTHORIZED": "AUTHORIZED",
-        "DECLINED": "DECLINED",
-        "REVERTED": "REVERTED"
+        "AUTHORIZED": "Authorized",
+        "DECLINED": "Declined",
+        "REVERTED": "Reverted"
       },
       "channel": {
         "LINE": "LINE",
@@ -480,7 +509,6 @@
       }
     },
     "flow": {
-      "title": "Work status",
       "startWork": "Start work",
       "resumeWork": "Resume work",
       "setWaiting": "Set waiting…",
@@ -499,7 +527,6 @@
       "revertStep": "Revert step",
       "revertStepConfirm": "Really revert one step?"
     },
-    "createdAt": "Created {when}",
     "delete": "Delete job",
     "deleteConfirm": "Really delete? Findings return to ungrouped",
     "errors": {
@@ -529,7 +556,7 @@
   },
   "quotations": {
     "sectionTitle": "Quotations",
-    "stale": "Prices or jobs changed since the last version — issue a new one?",
+    "stale": "Prices or jobs changed since the last version",
     "staleShort": "outdated",
     "issue": "Issue quotation",
     "issueHint": "Choose the jobs this quotation covers — it snapshots today's titles and prices, immutably.",
@@ -632,9 +659,9 @@
     }
   },
   "payments": {
-    "sectionTitle": "Payments & balance",
-    "nothingOwed": "No authorized work to pay for yet",
-    "empty": "No payments recorded yet — deposits are simply payments made early",
+    "sectionTitle": "Money",
+    "nothingOwed": "Nothing owed yet",
+    "empty": "No payments yet — a deposit is simply a payment made early",
     "dueChip": "{payer} due {amount}",
     "overpaidChip": "{payer} overpaid {amount}",
     "settledChip": "{payer} settled",

@@ -1,5 +1,6 @@
 import type {
   JobStatus,
+  PartOrderStatus,
   RepairCaseStatus,
   WaitingReason,
 } from "@/lib/generated/prisma/enums";
@@ -7,9 +8,10 @@ import type { TenantDb } from "@/lib/tenant";
 
 /**
  * Case & Job flow (M5 brief, founder rulings): the server-side transition
- * edge map, the derived READY rule (both directions), and the board's
- * single-group placement. Pure logic lives here so it is unit-testable;
- * server actions call into it inside their own transactions.
+ * edge map, the derived READY rule (both directions), and the shared Stage
+ * derivation (M7.5, CONTEXT.md) the board and case page both speak. Pure
+ * logic lives here so it is unit-testable; server actions call into it
+ * inside their own transactions.
  */
 
 export const WAITING_REASONS = ["PARTS", "PAINT_BOOTH", "TECHNICIAN", "OTHER"] as const satisfies
@@ -100,21 +102,192 @@ export const BOARD_GROUPS = [
 export type BoardGroup = (typeof BOARD_GROUPS)[number];
 
 /**
- * First match in D-2's order (founder ruling): attention first, then READY,
- * else the leading catch-all. OPEN cases only — a DELIVERED case never files
- * here; the board itself places delivered-with-balance rows under
- * BALANCE_DUE (M7 ruling 1), rendered for money, not work.
+ * D-2 precedence for a case still open: attention first (an undecided
+ * proposal needs a human before anything else), then the work states, then
+ * READY, else the leading catch-all. One derivation, two views — stageFor
+ * and boardGroupFor both read it, so board and case page can never disagree
+ * (M7.5 brief §1).
  */
-export function boardGroupFor(
+function openCaseStage(
   caseStatus: RepairCaseStatus,
   jobs: { status: JobStatus }[],
-): BoardGroup {
+): Exclude<BoardGroup, "BALANCE_DUE"> {
   if (jobs.some((job) => job.status === "PROPOSED")) return "AWAITING_AUTH";
   if (jobs.some((job) => job.status === "WAITING")) return "WAITING";
   if (jobs.some((job) => job.status === "IN_PROGRESS")) return "IN_PROGRESS";
   if (jobs.some((job) => job.status === "QC")) return "IN_QC";
   if (caseStatus === "READY") return "READY";
   return "IN_ASSESSMENT";
+}
+
+/**
+ * First match in D-2's order (founder ruling). OPEN cases only — a DELIVERED
+ * case never files here; the board itself places delivered-with-balance rows
+ * under BALANCE_DUE (M7 ruling 1), rendered for money, not work.
+ */
+export function boardGroupFor(
+  caseStatus: RepairCaseStatus,
+  jobs: { status: JobStatus }[],
+): BoardGroup {
+  return openCaseStage(caseStatus, jobs);
+}
+
+/* ------------------------------------------------------------------ */
+/* Stage (M7.5, CONTEXT.md): the single answer to "what does this      */
+/* Repair Case need from a human right now".                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The seven board groups plus the settled-Delivered flavor: a DELIVERED case
+ * still owed money reads BALANCE_DUE until its balance clears, then plain
+ * DELIVERED. Derived, never stored, exactly one per case.
+ */
+export type Stage = BoardGroup | "DELIVERED";
+
+/**
+ * The case's Stage. Delivered wins outright — the work record froze, so job
+ * statuses stop mattering and only money can still need a human; open cases
+ * take the shared attention-first precedence.
+ */
+export function stageFor(
+  caseStatus: RepairCaseStatus,
+  jobs: { status: JobStatus }[],
+  totalDueSatang: number,
+): Stage {
+  if (caseStatus === "DELIVERED") {
+    return totalDueSatang > 0 ? "BALANCE_DUE" : "DELIVERED";
+  }
+  return openCaseStage(caseStatus, jobs);
+}
+
+/**
+ * The D-6 stage spine: the five header steps a case walks left to right.
+ * Waiting / In progress / In QC all light WORK, with the specific state
+ * written beneath; Balance due lights DELIVERED with the owed amount beside.
+ */
+export const SPINE_STEPS = [
+  "ASSESSMENT",
+  "AUTHORIZATION",
+  "WORK",
+  "READY",
+  "DELIVERED",
+] as const;
+
+export type SpineStep = (typeof SPINE_STEPS)[number];
+
+const STAGE_SPINE_STEP: Record<Stage, SpineStep> = {
+  IN_ASSESSMENT: "ASSESSMENT",
+  AWAITING_AUTH: "AUTHORIZATION",
+  WAITING: "WORK",
+  IN_PROGRESS: "WORK",
+  IN_QC: "WORK",
+  READY: "READY",
+  BALANCE_DUE: "DELIVERED",
+  DELIVERED: "DELIVERED",
+};
+
+export function spineStepFor(stage: Stage): SpineStep {
+  return STAGE_SPINE_STEP[stage];
+}
+
+/* ------------------------------------------------------------------ */
+/* Next action (D-6): at most one primary and one secondary — a        */
+/* suggestion, never a wizard. Every action stays reachable where it   */
+/* lives today.                                                        */
+/* ------------------------------------------------------------------ */
+
+export type StageAction =
+  | "OPEN_INSPECTION"
+  | "GROUP_FINDINGS"
+  | "SET_PRICES"
+  | "RECORD_AUTHORIZATION"
+  | "ISSUE_QUOTATION"
+  | "RECORD_QC"
+  | "RECORD_PAYMENT"
+  | "MARK_DELIVERED";
+
+export type NextActionFacts = {
+  findingsCount: number;
+  ungroupedFindingsCount: number;
+  /** PROPOSED Jobs with no price — an authorization needs one (M4). */
+  unpricedProposedCount: number;
+  /** A priced PROPOSED Job no Quotation covers (lib/jobs.ts). */
+  hasUnquotedProposed: boolean;
+  /** Blended due across both payer sides — what READY leads with. */
+  totalDueSatang: number;
+};
+
+export type NextMove = {
+  primary: StageAction | null;
+  secondary: StageAction | null;
+};
+
+/**
+ * The assessment cascade runs no Findings → ungrouped Findings → unpriced
+ * Jobs; the pricing tail lives under AWAITING_AUTH because a Job's existence
+ * already files the case there (D-2 precedence). Issue quotation is only
+ * ever the suggested path — a walk-in's authorization is recorded with no
+ * Quotation at all (founder ruling 2026-08-27). WAITING returns no action:
+ * the header renders the blocker itself instead of a button.
+ */
+export function nextActionFor(stage: Stage, facts: NextActionFacts): NextMove {
+  switch (stage) {
+    case "IN_ASSESSMENT":
+      if (facts.findingsCount === 0) return { primary: "OPEN_INSPECTION", secondary: null };
+      if (facts.ungroupedFindingsCount > 0) return { primary: "GROUP_FINDINGS", secondary: null };
+      return { primary: null, secondary: null };
+    case "AWAITING_AUTH":
+      if (facts.unpricedProposedCount > 0) return { primary: "SET_PRICES", secondary: null };
+      return {
+        primary: "RECORD_AUTHORIZATION",
+        secondary: facts.hasUnquotedProposed ? "ISSUE_QUOTATION" : null,
+      };
+    case "WAITING":
+    case "IN_PROGRESS":
+    case "DELIVERED":
+      return { primary: null, secondary: null };
+    case "IN_QC":
+      return { primary: "RECORD_QC", secondary: null };
+    case "READY":
+      return facts.totalDueSatang > 0
+        ? { primary: "RECORD_PAYMENT", secondary: "MARK_DELIVERED" }
+        : { primary: "MARK_DELIVERED", secondary: null };
+    case "BALANCE_DUE":
+      return { primary: "RECORD_PAYMENT", secondary: null };
+  }
+}
+
+/** What a WAITING case is blocked on — the header line D-6 asks for. */
+export type WaitingBlocker = {
+  /** Distinct reasons across WAITING Jobs, in WAITING_REASONS order. */
+  reasons: WaitingReason[];
+  /** Part lines not yet ARRIVED across the Waiting(Parts) Jobs. */
+  pendingParts: number;
+  /** Nearest ETA among those pending lines. */
+  nextEta: Date | null;
+};
+
+export function waitingBlockerFor(
+  jobs: {
+    status: JobStatus;
+    waitingReason: WaitingReason | null;
+    partLines: { orderStatus: PartOrderStatus; etaDate: Date | null }[];
+  }[],
+): WaitingBlocker {
+  const waiting = jobs.filter((job) => job.status === "WAITING");
+  const reasons = WAITING_REASONS.filter((reason) =>
+    waiting.some((job) => (job.waitingReason ?? "OTHER") === reason),
+  );
+  const pendingLines = waiting
+    .filter((job) => job.waitingReason === "PARTS")
+    .flatMap((job) => job.partLines)
+    .filter((line) => line.orderStatus !== "ARRIVED");
+  const nextEta =
+    pendingLines
+      .map((line) => line.etaDate)
+      .filter((eta): eta is Date => eta != null)
+      .sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
+  return { reasons, pendingParts: pendingLines.length, nextEta };
 }
 
 /* ------------------------------------------------------------------ */

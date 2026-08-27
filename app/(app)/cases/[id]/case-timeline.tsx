@@ -1,7 +1,11 @@
+"use client";
+
 import {
   Ban,
   Banknote,
   CarFront,
+  ChevronDown,
+  ChevronRight,
   CircleCheck,
   CircleX,
   Clock,
@@ -9,7 +13,6 @@ import {
   FileText,
   Flag,
   FlagOff,
-  History,
   Link2,
   Link2Off,
   MessageCircle,
@@ -26,31 +29,20 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
+import { useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
-import type { Prisma } from "@/lib/generated/prisma/client";
 import { quotationLabel } from "@/lib/jobs";
 import { formatBaht } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import type { CaseEventRow } from "./case-events";
 
 /**
  * The internal timeline (M5 brief §6): the case's operational story, staff
  * only, chronological. Labels render from typed event data through i18n keys
  * — free-text notes are shop-authored data and render verbatim. Nothing here
  * is ever customer-visible; the Customer Timeline is M6's composer (ADR-003).
+ * Since M7.5 (D-10) it opens as the last event only, expanding on demand.
  */
-
-export const CASE_EVENT_INCLUDE = {
-  actorStaff: { select: { name: true } },
-  subjectStaff: { select: { name: true } },
-  quotation: { select: { number: true, version: true } },
-  lineUpdate: { select: { _count: { select: { photos: true } } } },
-  payment: { select: { method: true, payerType: true, insurerName: true } },
-  followUp: { select: { checklistItem: true } },
-} as const satisfies Prisma.CaseEventInclude;
-
-export type CaseEventRow = Prisma.CaseEventGetPayload<{
-  include: typeof CASE_EVENT_INCLUDE;
-}>;
 
 type Entry = {
   icon: LucideIcon;
@@ -76,6 +68,7 @@ export function CaseTimeline({
   const tp = useTranslations("payments");
   const ti = useTranslations("inspection");
   const format = useFormatter();
+  const [open, setOpen] = useState(false);
 
   const reason = (event: CaseEventRow) =>
     event.waitingReason ? tw(event.waitingReason) : tw("OTHER");
@@ -279,11 +272,25 @@ export function CaseTimeline({
     ...events.map(toEntry),
   ];
 
+  // Collapsed shows only the newest event (D-10) — the list is ascending.
+  const visible = open ? entries : entries.slice(-1);
+
   return (
-    <section className="relative border bg-card">
-      <header className="flex items-center gap-2 border-b border-dashed px-3.5 py-2.5">
-        <History className="size-4 text-muted-foreground" aria-hidden />
-        <h3 className="text-[12.5px] font-semibold tracking-wide">{t("title")}</h3>
+    <section className="border bg-card">
+      <header className="flex items-center gap-2.5 px-4 py-2.5 sm:px-5">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex cursor-pointer items-center gap-1.5 text-[13px] font-semibold hover:text-primary"
+        >
+          {open ? (
+            <ChevronDown className="size-3.5 text-faint" aria-hidden />
+          ) : (
+            <ChevronRight className="size-3.5 text-faint" aria-hidden />
+          )}
+          {t("title")}
+        </button>
         <span className="border border-dashed border-border-strong px-1.5 py-px font-mono text-[9px] tracking-wider text-faint">
           {t("staffOnly")}
         </span>
@@ -291,13 +298,13 @@ export function CaseTimeline({
           {t("entryCount", { count: entries.length })}
         </span>
       </header>
-      <ol>
-        {entries.map((entry, index) => {
+      <ol className="border-t border-dashed">
+        {visible.map((entry, index) => {
           const Icon = entry.icon;
           return (
             <li
               key={index}
-              className="flex items-start gap-2.5 border-b border-dashed px-3.5 py-2 text-xs last:border-0"
+              className="flex items-start gap-2.5 border-b border-dashed px-4 py-2 text-xs last:border-0 sm:px-5"
             >
               <Icon className={cn("mt-px size-3.5 flex-none", entry.tone)} aria-hidden />
               <span className="min-w-0 flex-1">

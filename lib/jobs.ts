@@ -83,11 +83,14 @@ export type JobDto = {
   priceSatang: number | null;
   priceOverriddenByName: string | null;
   assignedStaffId: string | null;
+  assignedStaffName: string | null;
   note: string | null;
   findings: JobFindingRef[];
   partLines: PartLineDto[];
   photos: { id: string }[];
   authorizations: AuthorizationDto[];
+  /** The JOB_CANCELLED event, when one exists — D-7's one-line rendering. */
+  cancelled: { note: string | null; at: string; byName: string } | null;
   createdAt: string;
 };
 
@@ -116,6 +119,28 @@ export type QuotationDto = {
  * re-priced, or a priced, still-quotable Job exists that the quotation
  * doesn't cover. Issuing stays a human act; this only nudges.
  */
+/**
+ * True while a priced PROPOSED Job is covered by no Quotation line at its
+ * current price — the D-6 trigger for suggesting Issue quotation on an
+ * Awaiting-authorization case. A suggestion only: a Quotation is the
+ * professional path, never a gate (founder ruling 2026-08-27).
+ */
+export function hasUnquotedProposed(
+  jobs: Pick<JobDto, "id" | "status" | "priceSatang">[],
+  quotations: { lines: Pick<QuotationLineDto, "jobId" | "priceSatang">[] }[],
+): boolean {
+  return jobs.some(
+    (job) =>
+      job.status === "PROPOSED" &&
+      job.priceSatang != null &&
+      !quotations.some((quotation) =>
+        quotation.lines.some(
+          (line) => line.jobId === job.id && line.priceSatang === job.priceSatang,
+        ),
+      ),
+  );
+}
+
 export function isQuotationStale(
   quotation: Pick<QuotationDto, "lines">,
   jobs: Pick<JobDto, "id" | "status" | "priceSatang">[],
