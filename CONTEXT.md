@@ -34,6 +34,8 @@ Vehicle history is physical truth and stays with the car across owners: past rep
 ### Repair Case
 The ticket for one vehicle visit. Opened at check-in, closed at delivery. Human reference like RC-1024. Contains one or more Jobs. Carries its own contact person — usually the Vehicle's primary Customer, but whoever actually brought the car.
 
+"Closed at delivery" means the **work record** freezes — Jobs, Findings, Quotations, statuses can no longer change — while **money and messages stay appendable** (M7 ruling): Payments land after handover because insurers pay weeks late, and follow-up LINE Updates are still composed and sent by Staff. Both are append-only records, so appending them rewrites nothing.
+
 Lifecycle: **Checked In → Ready → Delivered**. Everything in between is derived from its Jobs and shown as a rollup ("2 In Progress · 1 Waiting Parts") — never set by hand. Ready flips when every authorized Job is Completed, and it is a managed state, not a moment: cars sit at the shop awaiting pickup, and the dashboard tracks them.
 
 ### Inspection
@@ -74,7 +76,7 @@ A lightweight record of an insurance claim, attached to a Repair Case: insurer, 
 The system never talks to insurers in MVP — coordination happens outside; Staff record the outcomes. The workflow as described is a working assumption pending garage interviews.
 
 ### Payment
-Money actually received against a Repair Case: amount, method (cash / transfer / card), date, who paid (Customer or Insurer), note. Deposits and partial payments are simply Payments made early. A Repair Case therefore carries a balance due (authorized work minus Payments) — and Delivered does **not** require zero balance: insurers pay weeks late, so the dashboard lists cases with money outstanding instead. "Customer spending" in the CRM is the sum of that person's real Payments, never an estimate from prices. Formal tax-invoice documents (ใบกำกับภาษี) are out of MVP.
+Money actually received against a Repair Case: amount, method (cash / transfer / card), date, who paid (Customer or Insurer), note. Deposits and partial payments are simply Payments made early. A Repair Case therefore carries a balance due (authorized work minus Payments) — **derived per payer side** (M7 ruling): Customer-owed and Insurer-owed are separate numbers that settle weeks apart, and a Payment lands in its payer's bucket on the case, never allocated per Job. Delivered does **not** require zero balance: insurers pay weeks late, so the dashboard lists cases with money outstanding instead. Payments are append-only — a mistyped one is **voided** (Manager-only, reason required, one-way) and re-entered, never edited; voided rows stay visible and count toward nothing. "Customer spending" in the CRM is the sum of that person's own real Payments — never an estimate from prices, and never insurer money. Formal tax-invoice documents (ใบกำกับภาษี) are out of MVP.
 
 ### Service Catalog
 The Shop's own price list of standard services (brake pads, oil change, fluids…) with fixed prices. Maintained per Shop by its Manager. Standard-service Jobs take their price from here; damage/bodywork Jobs are priced by quote.
@@ -95,7 +97,7 @@ A published Photo — one a human attached to a sent Update — is reachable by 
 Two deliberately separate narratives. The internal timeline records every operational event for Staff (QC failed, rework, waiting-reason changes). The Customer Timeline is only what Staff chose to send as LINE Updates — curated and human-worded ("Final quality check", not "QC failed — repaint"). No internal event ever auto-publishes to the customer (ADR-003).
 
 ### Follow-up
-The CRM worklist. Sources: Declined Jobs worth chasing ("windshield still cracked — quoted 18,000฿ in March") and wear/near-expiration Findings that never became authorized work. Staff work the list by hand — open, compose a LINE Update, mark contacted. Nothing here ever auto-sends (ADR-003).
+The CRM worklist. Sources: Declined Jobs worth chasing ("windshield still cracked — quoted 18,000฿ in March") and wear/near-expiration Findings that never became authorized work. Follow-ups are stored rows **minted at delivery** — the moment the work record freezes, so the candidate set is final (M7 ruling). Staff work the list by hand — open, compose a LINE Update on the source case, mark contacted — through states open / snoozed / contacted / dropped; a snoozed item resurfaces when its date passes, derived on read. Nothing here ever auto-sends or pings (ADR-003).
 
 ### Staff
 Everyone who works at the Shop — expected cast: owner/manager, service advisor / front desk, body technicians, painter, mechanic, possibly parts/admin. Each exists as a Staff record so Jobs can carry an assignee and history stays attributable. A Staff record does **not** imply a login. The cast as listed is a working assumption pending pilot interviews.

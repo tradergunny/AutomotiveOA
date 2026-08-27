@@ -55,14 +55,13 @@
       "WAITING": "รอดำเนินการ",
       "IN_PROGRESS": "กำลังซ่อม",
       "IN_QC": "ตรวจ QC",
-      "READY": "พร้อมส่งมอบ"
+      "READY": "พร้อมส่งมอบ",
+      "BALANCE_DUE": "ค้างชำระ"
     },
     "partsProgress": "อะไหล่ {arrived}/{total}",
-    "partsEta": "ถึง {date}"
-  },
-  "stub": {
-    "comingIn": "ฟีเจอร์นี้จะมาใน {milestone}",
-    "backToBoard": "กลับแดชบอร์ด"
+    "partsEta": "ถึง {date}",
+    "balanceTotal": "ค้างรวม {amount}",
+    "deliveredAgo": "ส่งมอบ{when}"
   },
   "caseStatus": {
     "CHECKED_IN": "รับรถแล้ว",
@@ -151,6 +150,18 @@
     "createTitle": "เพิ่มลูกค้าใหม่",
     "editTitle": "แก้ไขข้อมูลลูกค้า",
     "companyHint": "สำหรับรถบริษัท เช่น \"ABC Logistics\"",
+    "spending": "ยอดใช้จ่ายสะสม",
+    "spendingHint": "เฉพาะเงินที่ลูกค้าจ่ายเอง — ไม่รวมเงินประกัน",
+    "visits": "ประวัติการเข้าอู่",
+    "noVisits": "ยังไม่เคยนำรถเข้าอู่",
+    "payments": "การชำระเงิน",
+    "noPayments": "ยังไม่มีการชำระเงินจากลูกค้ารายนี้",
+    "voided": "ยกเลิกแล้ว",
+    "followups": "งานติดตาม",
+    "noFollowups": "ไม่มีงานติดตามของลูกค้ารายนี้",
+    "lineLinked": "เชื่อม LINE แล้ว — {name}",
+    "lineNotLinked": "ยังไม่ได้จับคู่ผู้ติดต่อ LINE",
+    "lineUnfollowed": "ลูกค้าเลิกติดตามบัญชี LINE ของอู่",
     "errors": {
       "nameRequired": "กรุณากรอกชื่อลูกค้า",
       "phoneInvalid": "เบอร์โทรต้องเป็นเลข 9–10 หลัก",
@@ -169,6 +180,12 @@
     "createTitle": "เพิ่มรถใหม่",
     "editTitle": "แก้ไขข้อมูลรถ",
     "plateEditNote": "รถคันเดิมเปลี่ยนทะเบียน? แก้ไขที่นี่ได้เลย — ประวัติรถยังอยู่ครบในคันเดียว",
+    "historyTitle": "ประวัติการซ่อม",
+    "historyHint": "ประวัติของตัวรถ — ติดตามรถไปทุกเจ้าของ ส่วนเรื่องเงินอยู่กับตัวลูกค้า",
+    "historyEmpty": "รถคันนี้ยังไม่มีเคสซ่อม",
+    "historyNoWork": "ครั้งนี้ไม่มีงานซ่อม",
+    "partsReplaced": "อะไหล่ที่เปลี่ยน",
+    "photoCount": "รูปถ่าย {count} รูป",
     "bodyTypes": {
       "SEDAN": "รถเก๋ง",
       "PICKUP": "รถกระบะ"
@@ -347,7 +364,13 @@
     "lineUpdateSent": "ส่งอัปเดต LINE ถึง {name} · {count, plural, =0 {ไม่มีรูป} other {# รูป}}",
     "lineUpdateFailed": "ส่งอัปเดต LINE ถึง {name} ไม่สำเร็จ — ลูกค้าไม่ได้รับ",
     "lineCustomerLinked": "เชื่อมบัญชี LINE แล้ว — {name}",
-    "lineCustomerUnlinked": "ยกเลิกการเชื่อมบัญชี LINE — {name}"
+    "lineCustomerUnlinked": "ยกเลิกการเชื่อมบัญชี LINE — {name}",
+    "paymentRecorded": "รับชำระเงิน {amount} · {method} · {payer}",
+    "paymentVoided": "ยกเลิกรายการรับเงิน — {amount}",
+    "followUpContacted": "ติดต่อลูกค้าแล้ว — {source}",
+    "followUpSnoozed": "เลื่อนติดตามไปวันที่ {date} — {source}",
+    "followUpDropped": "ยุติการติดตาม — {source}",
+    "followUpReopened": "เปิดการติดตามใหม่ — {source}"
   },
   "catalog": {
     "title": "รายการบริการมาตรฐานและราคา",
@@ -608,6 +631,84 @@
       }
     }
   },
+  "payments": {
+    "sectionTitle": "การชำระเงินและยอดค้าง",
+    "nothingOwed": "ยังไม่มีงานที่อนุมัติให้ต้องชำระ",
+    "empty": "ยังไม่มีการบันทึกรับเงิน — เงินมัดจำคือการชำระล่วงหน้าตามปกติ",
+    "dueChip": "{payer}ค้าง {amount}",
+    "overpaidChip": "{payer}ชำระเกิน {amount}",
+    "settledChip": "{payer}ครบแล้ว",
+    "record": "บันทึกรับเงิน",
+    "recordConfirm": "บันทึก",
+    "amountPlaceholder": "จำนวนเงิน (บาท)",
+    "insurerPlaceholder": "ชื่อบริษัทประกัน",
+    "receivedLabel": "วันที่รับเงิน",
+    "notePlaceholder": "หมายเหตุ (ไม่บังคับ) — เช่น มัดจำ ค่าเสียหายส่วนแรก เลขอ้างอิงโอน",
+    "method": {
+      "CASH": "เงินสด",
+      "TRANSFER": "โอน",
+      "CARD": "บัตร"
+    },
+    "payer": {
+      "CUSTOMER": "ลูกค้า",
+      "INSURER": "ประกัน"
+    },
+    "void": "ยกเลิกรายการ…",
+    "voidConfirm": "ยกเลิกรายการรับเงิน",
+    "voidReasonPlaceholder": "เหตุผลที่ยกเลิกรายการนี้ (จำเป็น)",
+    "voided": "ยกเลิกแล้ว",
+    "voidedLine": "ยกเลิกโดย {name}",
+    "errors": {
+      "caseMissing": "ไม่พบเคสนี้",
+      "amountInvalid": "กรุณากรอกจำนวนเงินให้ถูกต้อง",
+      "invalidInput": "ข้อมูลไม่ถูกต้อง",
+      "insurerRequired": "กรุณากรอกชื่อบริษัทประกัน",
+      "dateInvalid": "กรุณาเลือกวันที่รับเงินให้ถูกต้อง",
+      "paymentMissing": "ไม่พบรายการรับเงินนี้",
+      "alreadyVoided": "รายการนี้ถูกยกเลิกไปแล้ว",
+      "reasonRequired": "ต้องกรอกเหตุผลในการยกเลิกรายการ",
+      "forbidden": "เฉพาะผู้จัดการเท่านั้นที่ยกเลิกรายการรับเงินได้",
+      "failed": "เกิดข้อผิดพลาด — ลองอีกครั้ง"
+    }
+  },
+  "followups": {
+    "filters": {
+      "ACTIONABLE": "ต้องติดตาม",
+      "SNOOZED": "เลื่อนไว้",
+      "CONTACTED": "ติดต่อแล้ว",
+      "DROPPED": "ยุติแล้ว",
+      "ALL": "ทั้งหมด"
+    },
+    "status": {
+      "OPEN": "รอติดตาม",
+      "SNOOZED": "เลื่อนไว้",
+      "CONTACTED": "ติดต่อแล้ว",
+      "DROPPED": "ยุติแล้ว"
+    },
+    "count": "งานติดตาม {count} รายการ",
+    "empty": "ยังไม่มีงานติดตาม — งานที่ลูกค้าไม่อนุมัติและรายการสึกหรอที่ยังไม่ได้ซ่อมจะมาอยู่ที่นี่เมื่อส่งมอบรถ",
+    "emptyFiltered": "ไม่มีงานติดตามในมุมมองนี้",
+    "quoted": "เคยเสนอราคา {amount}",
+    "deliveredOn": "ส่งมอบ {date}",
+    "snoozedUntil": "เลื่อนถึง {date}",
+    "open": "เปิดและเขียนข้อความ",
+    "markContacted": "บันทึกว่าติดต่อแล้ว",
+    "contactNotePlaceholder": "ติดต่อทางไหน (ไม่บังคับ) — เช่น โทรแล้ว ลูกค้าแวะมา",
+    "snooze": "เลื่อนติดตาม…",
+    "snoozeConfirm": "เลื่อน",
+    "drop": "ยุติ…",
+    "dropConfirm": "ยุติการติดตาม",
+    "dropReasonPlaceholder": "เหตุผลที่จะไม่ติดตามต่อ (จำเป็น)",
+    "reopen": "เปิดติดตามใหม่",
+    "lineNone": "ไม่มี LINE",
+    "lineUnfollowed": "LINE ถูกบล็อก",
+    "errors": {
+      "missing": "ไม่พบงานติดตามนี้",
+      "dateInvalid": "กรุณาเลือกวันที่ให้ถูกต้อง",
+      "reasonRequired": "ต้องกรอกเหตุผลในการยุติการติดตาม",
+      "failed": "เกิดข้อผิดพลาด — ลองอีกครั้ง"
+    }
+  },
   "customerTimeline": {
     "title": "ไทม์ไลน์ลูกค้า",
     "customerVisible": "ส่งถึงลูกค้า",
@@ -618,6 +719,7 @@
     "failedHint": "LINE ปฏิเสธข้อความนี้ ({code}) ลูกค้าไม่ได้รับ",
     "composeTitle": "เขียนอัปเดต",
     "recipient": "ถึง {name}",
+    "followupContext": "งานติดตาม — {label} · เมื่อส่งแล้วจะบันทึกว่าติดต่อแล้วให้อัตโนมัติ",
     "bodyLabel": "ข้อความถึงลูกค้า",
     "draftHint": "ร่างเป็นภาษาไทยให้แล้ว แก้ไขได้ตามต้องการ จะยังไม่ส่งจนกว่าจะกดส่ง",
     "photosTitle": "รูปภาพ ({selected}/{max})",
@@ -635,7 +737,7 @@
     },
     "errors": {
       "caseMissing": "ไม่พบใบงาน",
-      "caseDelivered": "ใบงานนี้ส่งมอบแล้ว",
+      "followUpMissing": "ไม่พบงานติดตามนี้แล้ว — รีเฟรชหน้า",
       "notConnected": "ยังไม่ได้เชื่อมต่อบัญชี LINE",
       "cryptoUnavailable": "ยังไม่ได้ตั้งค่าการเข้ารหัสข้อมูลรับรอง",
       "noIdentity": "ลูกค้ารายนี้ยังไม่มีผู้ติดต่อ LINE",

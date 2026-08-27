@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, ImageOff, MessageCircle, Send, TriangleAlert } from "lucide-react";
+import { Eye, ImageOff, MessageCircle, PhoneOutgoing, Send, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,11 @@ import { sendLineUpdate, type SendUpdateError, type SentUpdateDto } from "./line
  * nothing leaves until a person reads it and presses send twice. The body is
  * Thai-first data (DESIGN.md) — it stays Thai whatever locale the staff
  * member is using — while every label around it is bilingual.
+ *
+ * Since M7 (decision 5) the composer works on DELIVERED cases too — most
+ * follow-up-worthy cases are delivered — and a Follow-up deep link arrives
+ * with a pre-filled chase draft; its successful send flips the worklist row
+ * to CONTACTED server-side.
  */
 
 export type ComposerPhoto = {
@@ -26,6 +31,9 @@ export type ComposerPhoto = {
 
 export type SendBlockedReason = "notConnected" | "noIdentity" | "unfollowed" | null;
 
+/** Set when the composer was opened from the Follow-up worklist (M7 §6). */
+export type ComposerFollowUp = { id: string; label: string };
+
 export function CustomerTimeline({
   caseId,
   initialUpdates,
@@ -34,7 +42,7 @@ export function CustomerTimeline({
   recipientName,
   blockedReason,
   maxPhotos,
-  readOnly,
+  followUp,
 }: {
   caseId: string;
   initialUpdates: SentUpdateDto[];
@@ -43,7 +51,7 @@ export function CustomerTimeline({
   recipientName: string;
   blockedReason: SendBlockedReason;
   maxPhotos: number;
-  readOnly: boolean;
+  followUp: ComposerFollowUp | null;
 }) {
   const t = useTranslations("customerTimeline");
   const format = useFormatter();
@@ -79,6 +87,7 @@ export function CustomerTimeline({
     try {
       const formData = new FormData();
       formData.set("body", body);
+      if (followUp) formData.set("followUpId", followUp.id);
       for (const photoId of selected) formData.append("photoId", photoId);
       const res = await sendLineUpdate(caseId, formData);
       if (!res.ok) {
@@ -170,14 +179,20 @@ export function CustomerTimeline({
         </ol>
       )}
 
-      {!readOnly && (
-        <div className="flex flex-col gap-2.5 border-t bg-surface-2/40 px-3.5 py-3">
+      <div className="flex flex-col gap-2.5 border-t bg-surface-2/40 px-3.5 py-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="eyebrow">{t("composeTitle")}</span>
             <span className="text-[11px] text-muted-foreground">
               {t("recipient", { name: recipientName })}
             </span>
           </div>
+
+          {followUp && (
+            <p className="flex items-center gap-2 border border-primary-dim bg-primary-soft/40 px-2.5 py-1.5 text-[11.5px] text-primary">
+              <PhoneOutgoing className="size-3.5 flex-none" aria-hidden />
+              {t("followupContext", { label: followUp.label })}
+            </p>
+          )}
 
           {blockedReason && (
             <p
@@ -307,8 +322,7 @@ export function CustomerTimeline({
               ))}
             </div>
           )}
-        </div>
-      )}
+      </div>
     </section>
   );
 }
