@@ -1,10 +1,11 @@
 "use client";
 
-import { FileText, Plus, Wrench } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useFormatter, useTranslations } from "next-intl";
 import { CornerTicks } from "@/components/blocks/corner-ticks";
+import { JobRollupLine } from "@/components/blocks/job-rollup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,10 +22,11 @@ import { issueQuotation, type QuotationError } from "./quotation-actions";
 import { JobCard } from "./job-card";
 
 /**
- * The case page's Jobs & money section (M4 brief §3, §6, §7): the Job list
- * with its two creation paths, the money summary, and the quotation lineage
- * with the explicit Issue action. Client state holds jobs / quotations /
- * ungrouped findings and reconciles with what server actions return.
+ * The case page's Jobs section (M4 brief §3, §6, §7; M7.5 D-7/D-8): the Job
+ * list with its two creation paths and the quotation lineage. The per-status
+ * rollup lives here now — demoted from the header (D-6) to one quiet
+ * sentence of detail. Client state holds jobs / quotations / ungrouped
+ * findings and reconciles with what server actions return.
  */
 
 type Props = {
@@ -87,7 +89,7 @@ export function JobsPanel({
   const findingLabel = (f: JobFindingRef) =>
     f.zone ? ti(`zones.${f.zone}` as never) : ti(`checklist.${f.checklistItem}` as never);
 
-  /* ---------- derived money summary ---------- */
+  /* ---------- derived detail (D-6: rollup demoted here) ---------- */
 
   const totals = useMemo(() => {
     let proposed = 0;
@@ -105,8 +107,7 @@ export function JobsPanel({
   }, [jobs]);
 
   const quotableJobs = jobs.filter((job) => job.priceSatang != null && isQuotable(job.status));
-  const latestStale =
-    quotations.length > 0 && isQuotationStale(quotations[0], jobs);
+  const latestStale = quotations.length > 0 && isQuotationStale(quotations[0], jobs);
 
   /* ---------- state reconciliation ---------- */
 
@@ -242,36 +243,38 @@ export function JobsPanel({
     />
   );
 
+  const showQuotations = quotations.length > 0 || (!readOnly && quotableJobs.length > 0);
+
   return (
-    <section id="jobs" className="relative border bg-card">
+    <section id="jobs" className="relative scroll-mt-16 border bg-card">
       <CornerTicks />
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-dashed px-3.5 py-2.5">
-        <Wrench className="size-4 text-muted-foreground" aria-hidden />
-        <h3 className="text-[12.5px] font-semibold tracking-wide">{t("sectionTitle")}</h3>
-        <span className="num border border-border-strong px-1.5 text-[10.5px] text-primary">
-          {jobs.length}
-        </span>
-        <span className="ml-auto flex flex-wrap items-center gap-2 text-[11px]">
-          {totals.proposed > 0 && (
-            <span className="border border-warn/45 px-1.5 py-px text-warn">
-              {t("totalProposed", { amount: formatBaht(totals.proposed) })}
-            </span>
-          )}
-          {totals.authorized > 0 && (
-            <span className="border border-ok/45 px-1.5 py-px text-ok">
-              {t("totalAuthorized", { amount: formatBaht(totals.authorized) })}
-            </span>
-          )}
-          {totals.unpriced > 0 && (
-            <span className="border border-border-strong px-1.5 py-px text-faint">
-              {t("countUnpriced", { count: totals.unpriced })}
-            </span>
-          )}
-        </span>
+      <header className="flex flex-col gap-1 border-b border-dashed px-4 py-2.5 sm:px-5">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h3 className="text-[13px] font-semibold">{t("sectionTitle")}</h3>
+          <span className="num text-[11px] text-faint">{jobs.length}</span>
+          {/* The per-status rollup, demoted here as a sentence (D-6/D-8). */}
+          <JobRollupLine
+            className="ml-auto"
+            jobs={jobs.map((job) => ({ status: job.status, waitingReason: job.waitingReason }))}
+          />
+        </div>
+        {(totals.proposed > 0 || totals.authorized > 0 || totals.unpriced > 0) && (
+          <p className="num flex flex-wrap gap-x-2.5 text-[11px] text-muted-foreground">
+            {totals.proposed > 0 && (
+              <span>{t("totalProposed", { amount: formatBaht(totals.proposed) })}</span>
+            )}
+            {totals.authorized > 0 && (
+              <span>{t("totalAuthorized", { amount: formatBaht(totals.authorized) })}</span>
+            )}
+            {totals.unpriced > 0 && (
+              <span className="text-warn">{t("countUnpriced", { count: totals.unpriced })}</span>
+            )}
+          </p>
+        )}
       </header>
 
       {jobs.length === 0 ? (
-        <p className="px-3.5 py-4 text-xs text-faint">
+        <p className="px-4 py-4 text-xs text-faint sm:px-5">
           {readOnly ? t("emptyReadOnly") : t("empty")}
         </p>
       ) : (
@@ -297,7 +300,7 @@ export function JobsPanel({
 
       {/* creation paths */}
       {!readOnly && (
-        <div className="flex flex-col gap-2.5 border-t border-dashed px-3.5 py-3">
+        <div className="flex flex-col gap-2.5 border-t border-dashed px-4 py-3 sm:px-5">
           {creator == null ? (
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -328,7 +331,9 @@ export function JobsPanel({
             </div>
           ) : creator === "findings" ? (
             <div className="flex flex-col gap-2 border border-dashed p-2.5">
-              <span className="eyebrow">{t("createFromFindings")}</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {t("createFromFindings")}
+              </span>
               {ungrouped.length === 0 ? (
                 <span className="text-[11px] text-faint">{t("noUngroupedFindings")}</span>
               ) : (
@@ -391,7 +396,9 @@ export function JobsPanel({
             </div>
           ) : (
             <div className="flex flex-col gap-2 border border-dashed p-2.5">
-              <span className="eyebrow">{t("createFromCatalog")}</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {t("createFromCatalog")}
+              </span>
               <div className="flex flex-wrap items-center gap-1.5">
                 <select
                   className="min-w-0 flex-1 border border-border-strong bg-transparent px-1.5 py-1.5 text-xs focus:border-primary focus:outline-none [&>option]:bg-popover"
@@ -427,132 +434,126 @@ export function JobsPanel({
         </div>
       )}
 
-      {/* quotations */}
-      <div className="flex flex-col gap-2 border-t border-dashed px-3.5 py-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <FileText className="size-3.5 text-muted-foreground" aria-hidden />
-          <span className="eyebrow">{tq("sectionTitle")}</span>
-          {latestStale && (
-            <span className="hatch-soft border border-warn/45 px-1.5 py-px text-[10.5px] text-warn">
-              {tq("stale")}
-            </span>
+      {/* quotations — no scaffolding when there is nothing to show (D-7) */}
+      {showQuotations && (
+        <div
+          id="quotations"
+          className="flex scroll-mt-16 flex-col gap-2 border-t border-dashed px-4 py-3 sm:px-5"
+        >
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-xs font-medium text-muted-foreground">{tq("sectionTitle")}</span>
+            {latestStale && <span className="text-[11px] text-warn">{tq("stale")}</span>}
+            {!readOnly && !issueOpen && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="ml-auto h-7"
+                disabled={quotableJobs.length === 0}
+                title={quotableJobs.length === 0 ? tq("nothingToQuote") : undefined}
+                onClick={() => {
+                  setIssueSelection(new Set(quotableJobs.map((job) => job.id)));
+                  setIssueOpen(true);
+                }}
+              >
+                <Plus data-icon="inline-start" />
+                {tq("issue")}
+              </Button>
+            )}
+          </div>
+
+          {issueOpen && (
+            <div className="flex flex-col gap-2 border border-dashed p-2.5">
+              <span className="text-[11px] text-muted-foreground">{tq("issueHint")}</span>
+              <div className="flex flex-col gap-1">
+                {quotableJobs.map((job) => {
+                  const on = issueSelection.has(job.id);
+                  return (
+                    <label key={job.id} className="flex cursor-pointer items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={() =>
+                          setIssueSelection((set) => {
+                            const next = new Set(set);
+                            if (next.has(job.id)) next.delete(job.id);
+                            else next.add(job.id);
+                            return next;
+                          })
+                        }
+                        className="accent-[var(--primary)]"
+                      />
+                      <span className="min-w-0 flex-1 truncate">{job.title}</span>
+                      <span className="num">{formatBaht(job.priceSatang!)}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="num text-xs text-muted-foreground">
+                  {tq("issueTotal", {
+                    amount: formatBaht(
+                      quotableJobs
+                        .filter((job) => issueSelection.has(job.id))
+                        .reduce((sum, job) => sum + (job.priceSatang ?? 0), 0),
+                    ),
+                  })}
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={busy || issueSelection.size === 0}
+                  className="ml-auto h-7 font-semibold"
+                  onClick={() => void handleIssue()}
+                >
+                  {tq("issueConfirm")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7"
+                  onClick={() => setIssueOpen(false)}
+                >
+                  {tc("cancel")}
+                </Button>
+              </div>
+            </div>
           )}
-          {!readOnly && !issueOpen && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="ml-auto h-7"
-              disabled={quotableJobs.length === 0}
-              title={quotableJobs.length === 0 ? tq("nothingToQuote") : undefined}
-              onClick={() => {
-                setIssueSelection(new Set(quotableJobs.map((job) => job.id)));
-                setIssueOpen(true);
-              }}
-            >
-              <Plus data-icon="inline-start" />
-              {tq("issue")}
-            </Button>
+
+          {quotations.length > 0 && (
+            <ul className="flex flex-col gap-1">
+              {quotations.map((quotation, index) => (
+                <li key={quotation.id} className="flex flex-wrap items-baseline gap-2 text-xs">
+                  <Link
+                    href={`/cases/${caseId}/quotations/${quotation.id}`}
+                    className="font-mono text-[12px] font-semibold text-primary hover:underline"
+                  >
+                    {quotation.label}
+                  </Link>
+                  <span className="text-faint">
+                    {tq("lineCount", { count: quotation.lines.length })}
+                  </span>
+                  {index === 0 && latestStale && (
+                    <span className="text-[11px] text-warn">{tq("staleShort")}</span>
+                  )}
+                  <span className="num ml-auto">{formatBaht(quotation.totalSatang)}</span>
+                  <span className="num text-[10.5px] text-faint">
+                    {format.dateTime(new Date(quotation.issuedAt), {
+                      day: "numeric",
+                      month: "short",
+                    })}{" "}
+                    · {quotation.issuedByName}
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
-
-        {issueOpen && (
-          <div className="flex flex-col gap-2 border border-dashed p-2.5">
-            <span className="text-[11px] text-muted-foreground">{tq("issueHint")}</span>
-            <div className="flex flex-col gap-1">
-              {quotableJobs.map((job) => {
-                const on = issueSelection.has(job.id);
-                return (
-                  <label key={job.id} className="flex cursor-pointer items-center gap-2 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={on}
-                      onChange={() =>
-                        setIssueSelection((set) => {
-                          const next = new Set(set);
-                          if (next.has(job.id)) next.delete(job.id);
-                          else next.add(job.id);
-                          return next;
-                        })
-                      }
-                      className="accent-[var(--primary)]"
-                    />
-                    <span className="min-w-0 flex-1 truncate">{job.title}</span>
-                    <span className="num">{formatBaht(job.priceSatang!)}</span>
-                  </label>
-                );
-              })}
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="num text-xs text-muted-foreground">
-                {tq("issueTotal", {
-                  amount: formatBaht(
-                    quotableJobs
-                      .filter((job) => issueSelection.has(job.id))
-                      .reduce((sum, job) => sum + (job.priceSatang ?? 0), 0),
-                  ),
-                })}
-              </span>
-              <Button
-                type="button"
-                size="sm"
-                disabled={busy || issueSelection.size === 0}
-                className="ml-auto h-7 font-semibold"
-                onClick={() => void handleIssue()}
-              >
-                {tq("issueConfirm")}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="h-7"
-                onClick={() => setIssueOpen(false)}
-              >
-                {tc("cancel")}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {quotations.length === 0 ? (
-          <p className="text-[11px] text-faint">{tq("empty")}</p>
-        ) : (
-          <ul className="flex flex-col gap-1">
-            {quotations.map((quotation, index) => (
-              <li key={quotation.id} className="flex flex-wrap items-center gap-2 text-xs">
-                <Link
-                  href={`/cases/${caseId}/quotations/${quotation.id}`}
-                  className="font-mono text-[12px] font-semibold text-primary hover:underline"
-                >
-                  {quotation.label}
-                </Link>
-                <span className="text-faint">
-                  {tq("lineCount", { count: quotation.lines.length })}
-                </span>
-                {index === 0 && latestStale && (
-                  <span className="hatch-soft border border-warn/45 px-1.5 py-px text-[10px] text-warn">
-                    {tq("staleShort")}
-                  </span>
-                )}
-                <span className="num ml-auto">{formatBaht(quotation.totalSatang)}</span>
-                <span className="num text-[10.5px] text-faint">
-                  {format.dateTime(new Date(quotation.issuedAt), {
-                    day: "numeric",
-                    month: "short",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}{" "}
-                  · {quotation.issuedByName}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      )}
 
       {error && (
-        <p role="alert" className="mx-3.5 mb-3 border border-bad/45 px-2 py-1 text-[11px] text-bad">
+        <p role="alert" className="mx-4 mb-3 border border-bad/45 px-2 py-1 text-[11px] text-bad sm:mx-5">
           {t.has(`errors.${error}` as never)
             ? t(`errors.${error}` as never)
             : tq(`errors.${error}` as never)}

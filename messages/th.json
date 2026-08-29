@@ -69,19 +69,49 @@
     "DELIVERED": "ส่งมอบแล้ว"
   },
   "cases": {
-    "checkedInAt": "รับรถเมื่อ",
-    "openedBy": "ผู้รับรถ",
-    "vehicle": "รถ",
-    "contact": "ผู้ติดต่อ",
-    "primaryCustomer": "ลูกค้าหลัก",
-    "note": "อาการ / หมายเหตุ",
-    "odometer": "เลขไมล์",
+    "checkedInLine": "รับรถ {date}",
     "odometerValue": "{km} กม.",
-    "photos": "รูปถ่ายรอบคัน",
-    "noPhotos": "ยังไม่มีรูปในเคสนี้",
+    "carPhotoAlt": "รูปรถ {plate}",
+    "note": "อาการที่แจ้ง",
     "photoAlt": "รูปเคสที่ {n}",
-    "readySince": "พร้อมส่งมอบ — {when}",
-    "deliveredLine": "ส่งมอบแล้ว {when} · {name}",
+    "noPhotos": "ยังไม่มีรูปรอบคัน",
+    "spine": {
+      "ASSESSMENT": "ตรวจประเมิน",
+      "AUTHORIZATION": "อนุมัติ",
+      "WORK": "ซ่อม",
+      "READY": "พร้อมส่งมอบ",
+      "DELIVERED": "ส่งมอบ"
+    },
+    "sub": {
+      "awaitingAuth": "รออนุมัติ {count} งาน",
+      "waiting": "รอ — {reasons}",
+      "inProgress": "กำลังซ่อม {count} งาน",
+      "inQc": "ตรวจ QC {count} งาน",
+      "ready": "ตั้งแต่ {when}",
+      "balanceDue": "ค้างชำระ {amount}",
+      "delivered": "{date} · {name}"
+    },
+    "money": {
+      "proposed": "รออนุมัติ {amount}",
+      "authorized": "อนุมัติแล้ว {amount}",
+      "authorizedPaid": "อนุมัติแล้ว {amount} · ชำระแล้ว {paid}",
+      "collect": "เก็บเงิน {amount}",
+      "settled": "ชำระครบแล้ว"
+    },
+    "blocker": {
+      "parts": "อะไหล่ค้าง {count} รายการ",
+      "partsEta": "อะไหล่ {count} รายการ ถึง {date}",
+      "partsArrived": "อะไหล่ถึงครบแล้ว"
+    },
+    "action": {
+      "openInspection": "เปิดหน้าตรวจสภาพ",
+      "groupFindings": "จัดกลุ่มเป็นงาน",
+      "setPrices": "ตีราคางาน",
+      "recordAuthorization": "บันทึกการอนุมัติ",
+      "issueQuotation": "ออกใบเสนอราคา",
+      "recordQc": "บันทึกผล QC",
+      "recordPayment": "บันทึกรับเงิน"
+    },
     "flow": {
       "markReady": "ตั้งเป็นพร้อมส่งมอบ",
       "markReadyConfirm": "ยืนยัน — ไม่มีงานค้างในเคสนี้?",
@@ -235,7 +265,7 @@
     "summaryChecklist": "เช็กลิสต์ {count}",
     "summaryPhotos": "รูปถ่าย {count} รูป",
     "lastRecorded": "บันทึกล่าสุด",
-    "notInspected": "ยังไม่ได้ตรวจสภาพ — เปิดหน้าตรวจสภาพเพื่อเริ่ม",
+    "notInspected": "ยังไม่ได้ตรวจสภาพ",
     "expandView": "ขยายมุมมอง",
     "closeView": "ปิด",
     "views": {
@@ -394,11 +424,11 @@
     }
   },
   "jobs": {
-    "sectionTitle": "งานซ่อมและค่าใช้จ่าย",
+    "sectionTitle": "งานซ่อม",
     "totalProposed": "รออนุมัติ {amount}",
     "totalAuthorized": "อนุมัติแล้ว {amount}",
     "countUnpriced": "ยังไม่ตีราคา {count} งาน",
-    "empty": "ยังไม่มีงานซ่อม — จัดกลุ่มรายการที่ตรวจพบเป็นงาน หรือเพิ่มงานบริการมาตรฐาน",
+    "empty": "ยังไม่มีงานซ่อม",
     "emptyReadOnly": "ไม่มีงานซ่อมในเคสนี้",
     "createFromFindings": "สร้างงานจากรายการตรวจ",
     "createFromCatalog": "งานบริการมาตรฐาน",
@@ -413,11 +443,9 @@
       "INSURER": "เบิกประกัน"
     },
     "insurerPlaceholder": "ชื่อบริษัทประกัน",
-    "partsRollup": "อะไหล่ {arrived}/{total}",
+    "partsRollup": "อะไหล่ถึงแล้ว {arrived}/{total}",
     "unpriced": "ยังไม่ตีราคา",
-    "titleLabel": "งาน",
-    "payerLabel": "ผู้ชำระ",
-    "priceLabel": "ราคา",
+    "titleLabel": "ชื่องาน",
     "pricePlaceholder": "ราคา (บาท)",
     "fromCatalog": "แคตตาล็อก",
     "priceLockedHint": "ราคาแคตตาล็อก — ผู้จัดการเท่านั้นที่แก้ได้",
@@ -427,9 +455,12 @@
     "unassigned": "ยังไม่มอบหมาย",
     "findingsLabel": "จากรายการตรวจ",
     "notePlaceholder": "หมายเหตุงาน (ไม่บังคับ)",
+    "editDone": "เสร็จ",
+    "byTechnician": "ช่าง {name}",
+    "partsSummary": "อะไหล่ {count} รายการ",
+    "cancelledLine": "ยกเลิก {when} · {name}",
+    "declinedLine": "ไม่อนุมัติ {when} · {name}",
     "parts": {
-      "title": "อะไหล่",
-      "empty": "ยังไม่มีรายการอะไหล่ — เพิ่มของที่งานนี้ต้องใช้",
       "name": "ชื่ออะไหล่",
       "quantity": "จำนวน",
       "unitCost": "ต้นทุน/หน่วย (บาท)",
@@ -452,20 +483,18 @@
         "ARRIVED": "ของถึงแล้ว"
       }
     },
-    "photosLabel": "รูประหว่างซ่อม",
     "photoAlt": "รูปงานที่ {n}",
     "addPhoto": "เพิ่มรูป",
     "removePhoto": "ลบรูป",
     "auth": {
-      "title": "การอนุมัติงาน",
       "channelLabel": "ช่องทาง",
       "quotationLabel": "ใบเสนอราคาที่ใช้",
       "noQuotation": "ไม่ระบุใบเสนอราคา",
       "notePlaceholder": "หมายเหตุ (ไม่บังคับ)",
       "recordAuthorized": "บันทึกอนุมัติ",
       "recordDeclined": "บันทึกปฏิเสธ",
-      "needsPrice": "ต้องตีราคางานก่อนบันทึกการอนุมัติ",
-      "revert": "ย้อนกลับเป็นรออนุมัติ (ผู้จัดการ)",
+      "needsPrice": "ตีราคางานก่อนบันทึกการอนุมัติ",
+      "revert": "ย้อนกลับเป็นรออนุมัติ",
       "revertConfirm": "ยืนยันย้อนสถานะ? ประวัติการอนุมัติยังคงอยู่",
       "decision": {
         "AUTHORIZED": "อนุมัติ",
@@ -480,7 +509,6 @@
       }
     },
     "flow": {
-      "title": "สถานะงาน",
       "startWork": "เริ่มงาน",
       "resumeWork": "กลับมาทำต่อ",
       "setWaiting": "ตั้งสถานะรอ…",
@@ -499,7 +527,6 @@
       "revertStep": "ย้อนสถานะ",
       "revertStepConfirm": "ยืนยันย้อนสถานะหนึ่งขั้น?"
     },
-    "createdAt": "สร้างเมื่อ {when}",
     "delete": "ลบงาน",
     "deleteConfirm": "ยืนยันลบ? รายการตรวจจะกลับเป็นยังไม่จัดกลุ่ม",
     "errors": {
@@ -529,7 +556,7 @@
   },
   "quotations": {
     "sectionTitle": "ใบเสนอราคา",
-    "stale": "ราคาหรือรายการงานเปลี่ยนไปจากฉบับล่าสุด — ออกฉบับใหม่?",
+    "stale": "ราคาหรือรายการงานเปลี่ยนไปจากฉบับล่าสุด",
     "staleShort": "ไม่ตรงปัจจุบัน",
     "issue": "ออกใบเสนอราคา",
     "issueHint": "เลือกงานที่จะรวมในใบเสนอราคา — ระบบจะบันทึกชื่องานและราคาปัจจุบันไว้ถาวร แก้ไขไม่ได้",
@@ -632,9 +659,9 @@
     }
   },
   "payments": {
-    "sectionTitle": "การชำระเงินและยอดค้าง",
-    "nothingOwed": "ยังไม่มีงานที่อนุมัติให้ต้องชำระ",
-    "empty": "ยังไม่มีการบันทึกรับเงิน — เงินมัดจำคือการชำระล่วงหน้าตามปกติ",
+    "sectionTitle": "การเงิน",
+    "nothingOwed": "ยังไม่มียอดต้องชำระ",
+    "empty": "ยังไม่มีการรับเงิน — มัดจำคือการชำระล่วงหน้า",
     "dueChip": "{payer}ค้าง {amount}",
     "overpaidChip": "{payer}ชำระเกิน {amount}",
     "settledChip": "{payer}ครบแล้ว",

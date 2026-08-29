@@ -573,10 +573,14 @@ export async function addPartLine(
 ): Promise<JobActionResult<JobDto>> {
   try {
     const { session, db } = await tenantContext();
-    await editableJob(db, jobId);
+    const job = await editableJob(db, jobId);
     await db.partLine.create({
       data: { shopId: session.shopId, jobId, ...parsePartLine(input) },
     });
+    // The case header's Waiting blocker and the board's parts progress read
+    // part lines since M7.5 (D-6) — keep the server render fresh.
+    revalidatePath(`/cases/${job.repairCase.id}`);
+    revalidatePath("/");
     return { ok: true, value: await freshDto(db, jobId) };
   } catch (error) {
     return fail(error);
@@ -594,7 +598,7 @@ export async function updatePartLine(
       select: { id: true, jobId: true },
     });
     if (!line) throw new JobInputError("partMissing");
-    await editableJob(db, line.jobId);
+    const job = await editableJob(db, line.jobId);
     if (!(PART_ORDER_STATUSES as readonly string[]).includes(input.orderStatus)) {
       throw new JobInputError("invalidInput");
     }
@@ -605,6 +609,8 @@ export async function updatePartLine(
         orderStatus: input.orderStatus as (typeof PART_ORDER_STATUSES)[number],
       },
     });
+    revalidatePath(`/cases/${job.repairCase.id}`);
+    revalidatePath("/");
     return { ok: true, value: await freshDto(db, line.jobId) };
   } catch (error) {
     return fail(error);
@@ -621,8 +627,10 @@ export async function removePartLine(
       select: { id: true, jobId: true },
     });
     if (!line) throw new JobInputError("partMissing");
-    await editableJob(db, line.jobId);
+    const job = await editableJob(db, line.jobId);
     await db.partLine.delete({ where: { id: partLineId } });
+    revalidatePath(`/cases/${job.repairCase.id}`);
+    revalidatePath("/");
     return { ok: true, value: await freshDto(db, line.jobId) };
   } catch (error) {
     return fail(error);

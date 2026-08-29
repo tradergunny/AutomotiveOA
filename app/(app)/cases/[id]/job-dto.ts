@@ -11,6 +11,7 @@ import { quotationLabel, type JobDto, type QuotationDto } from "@/lib/jobs";
 export const JOB_INCLUDE = {
   catalogItem: { select: { name: true, priceSatang: true } },
   priceOverriddenBy: { select: { name: true } },
+  assignedStaff: { select: { name: true } },
   findings: {
     select: { id: true, source: true, zone: true, checklistItem: true },
     orderBy: { recordedAt: "asc" },
@@ -23,6 +24,14 @@ export const JOB_INCLUDE = {
       quotation: { select: { number: true, version: true } },
     },
     orderBy: { recordedAt: "asc" },
+  },
+  // The one-line Cancelled rendering (D-7) needs the reason, which lives on
+  // the JOB_CANCELLED event, not the Job row.
+  events: {
+    where: { type: "JOB_CANCELLED" },
+    orderBy: { at: "desc" },
+    take: 1,
+    select: { note: true, at: true, actorStaff: { select: { name: true } } },
   },
 } as const satisfies Prisma.JobInclude;
 
@@ -42,6 +51,7 @@ export function toJobDto(row: JobWithRelations): JobDto {
     priceSatang: row.priceSatang,
     priceOverriddenByName: row.priceOverriddenBy?.name ?? null,
     assignedStaffId: row.assignedStaffId,
+    assignedStaffName: row.assignedStaff?.name ?? null,
     note: row.note,
     findings: row.findings,
     partLines: row.partLines.map((line) => ({
@@ -66,6 +76,13 @@ export function toJobDto(row: JobWithRelations): JobDto {
       recordedAt: auth.recordedAt.toISOString(),
       recordedByName: auth.recordedBy.name,
     })),
+    cancelled: row.events[0]
+      ? {
+          note: row.events[0].note,
+          at: row.events[0].at.toISOString(),
+          byName: row.events[0].actorStaff.name,
+        }
+      : null,
     createdAt: row.createdAt.toISOString(),
   };
 }

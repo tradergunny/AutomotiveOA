@@ -105,10 +105,10 @@ export function CustomerTimeline({
   const sent = updates.filter((update) => update.deliveryStatus === "SENT");
 
   return (
-    <section className="relative border bg-card">
-      <header className="flex flex-wrap items-center gap-2 border-b border-dashed px-3.5 py-2.5">
-        <MessageCircle className="size-4 text-primary" aria-hidden />
-        <h3 className="text-[12.5px] font-semibold tracking-wide">{t("title")}</h3>
+    <section className="border bg-card">
+      <header className="flex flex-wrap items-center gap-2.5 px-4 py-2.5 sm:px-5">
+        <MessageCircle className="size-3.5 text-primary" aria-hidden />
+        <h3 className="text-[13px] font-semibold">{t("title")}</h3>
         <span className="border border-dashed border-primary-dim px-1.5 py-px font-mono text-[9px] tracking-wider text-primary">
           {t("customerVisible")}
         </span>
@@ -118,13 +118,15 @@ export function CustomerTimeline({
       </header>
 
       {updates.length === 0 ? (
-        <p className="px-3.5 py-3 text-xs text-faint">{t("empty")}</p>
+        <p className="border-t border-dashed px-4 py-3 text-xs text-faint sm:px-5">
+          {t("empty")}
+        </p>
       ) : (
-        <ol>
+        <ol className="border-t border-dashed">
           {updates.map((update) => (
             <li
               key={update.id}
-              className="flex flex-col gap-1.5 border-b border-dashed px-3.5 py-2.5 last:border-0"
+              className="flex flex-col gap-1.5 border-b border-dashed px-4 py-2.5 last:border-0 sm:px-5"
             >
               <div className="flex flex-wrap items-center gap-2 text-[10.5px] text-faint">
                 {update.deliveryStatus === "FAILED" ? (
@@ -179,10 +181,10 @@ export function CustomerTimeline({
         </ol>
       )}
 
-      <div className="flex flex-col gap-2.5 border-t bg-surface-2/40 px-3.5 py-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="eyebrow">{t("composeTitle")}</span>
-            <span className="text-[11px] text-muted-foreground">
+      <div className="flex flex-col gap-2.5 border-t bg-surface-2/40 px-4 py-3 sm:px-5">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="text-xs font-medium text-muted-foreground">{t("composeTitle")}</span>
+            <span className="text-[11px] text-faint">
               {t("recipient", { name: recipientName })}
             </span>
           </div>
@@ -216,7 +218,7 @@ export function CustomerTimeline({
 
           {sendable.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              <span className="eyebrow">
+              <span className="num text-[11px] text-faint">
                 {t("photosTitle", { selected: selected.length, max: maxPhotos })}
               </span>
               <div className="flex flex-wrap gap-1.5">
@@ -304,7 +306,7 @@ export function CustomerTimeline({
 
           {showPreview && (
             <div className="flex flex-col gap-1.5 border border-dashed px-2.5 py-2">
-              <span className="eyebrow">{t("previewTitle")}</span>
+              <span className="text-[11px] text-faint">{t("previewTitle")}</span>
               <p className="whitespace-pre-wrap border bg-background px-2.5 py-2 text-[13px] leading-relaxed">
                 {body}
               </p>
