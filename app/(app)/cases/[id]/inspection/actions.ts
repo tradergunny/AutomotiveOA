@@ -30,6 +30,8 @@ export type InspectionError =
   | "findingMissing"
   | "noAction"
   | "noDamage"
+  | "findingAccepted"
+  | "findingGrouped"
   | "photoInvalid"
   | "photoTooLarge"
   | "failed";
@@ -109,6 +111,19 @@ async function editableFinding(db: TenantDb, findingId: string) {
   return finding;
 }
 
+/**
+ * A Finding on a Job has stopped being an inspection note: it is the stated
+ * reason for work that may already be priced, quoted and authorized. Editing
+ * it silently un-accepts it (updateFinding), which would leave a Job holding
+ * an unaccepted Finding, and deleting it would leave the Job with no stated
+ * reason at all. There is no per-Finding ungroup — the only release is
+ * deleting the Job, which refuses once the Job is past PROPOSED — so freezing
+ * the Finding here is what keeps the two sides honest.
+ */
+function assertUngrouped(finding: { jobId: string | null }) {
+  if (finding.jobId) throw new InspectionInputError("findingGrouped");
+}
+
 function fail(error: unknown): { ok: false; error: InspectionError } {
   if (error instanceof InspectionInputError) return { ok: false, error: error.code };
   console.error("[inspection] failed:", error);
@@ -161,6 +176,7 @@ export async function updateFinding(
   try {
     const { db } = await tenantContext();
     const existing = await editableFinding(db, findingId);
+    assertUngrouped(existing);
 
     const data: {
       damageTypes?: DamageType[];
@@ -210,10 +226,14 @@ export async function setFindingConfirmed(
   try {
     const { db } = await tenantContext();
     const existing = await editableFinding(db, findingId);
-    if (confirmed && existing.proposedActions.length === 0) {
-      throw new InspectionInputError("noAction");
+    assertUngrouped(existing);
+    if (confirmed && !canConfirm(existing)) {
+      throw new InspectionInputError(
+        existing.source === "DAMAGE_MAP" && existing.damageTypes.length === 0
+          ? "noDamage"
+          : "noAction",
+      );
     }
-    if (confirmed && !canConfirm(existing)) throw new InspectionInputError("noDamage");
 
     const updated = await db.finding.update({
       where: { id: findingId },
@@ -234,6 +254,7 @@ export async function removeFinding(
   try {
     const { db } = await tenantContext();
     const existing = await editableFinding(db, findingId);
+    assertUngrouped(existing);
     await db.$transaction(async (tx) => {
       await tx.photo.deleteMany({ where: { findingId } });
       await tx.finding.delete({ where: { id: findingId } });
@@ -260,17 +281,23 @@ export async function setChecklistState(
     await editableCase(db, caseId);
     if (!isChecklistItem(item)) throw new InspectionInputError("invalidItem");
 
+    // An accepted Finding is a record, not a form (D-11) — and this path can
+    // delete it and its photos, so a disabled button in the client is not the
+    // place to enforce that. Reopening from the record is the way back in.
+    const current = await db.finding.findFirst({
+      where: { caseId, checklistItem: item },
+      select: { id: true, confirmedAt: true, jobId: true },
+    });
+    if (current) assertUngrouped(current);
+    if (current?.confirmedAt) throw new InspectionInputError("findingAccepted");
+
     if (state === "OK") {
-      await db.$transaction(async (tx) => {
-        const existing = await tx.finding.findFirst({
-          where: { caseId, checklistItem: item },
-          select: { id: true },
+      if (current) {
+        await db.$transaction(async (tx) => {
+          await tx.photo.deleteMany({ where: { findingId: current.id } });
+          await tx.finding.delete({ where: { id: current.id } });
         });
-        if (existing) {
-          await tx.photo.deleteMany({ where: { findingId: existing.id } });
-          await tx.finding.delete({ where: { id: existing.id } });
-        }
-      });
+      }
       revalidatePath(`/cases/${caseId}`);
       return { ok: true, value: null };
     }
@@ -310,6 +337,7 @@ export async function addFindingPhoto(
   try {
     const { session, db } = await tenantContext();
     const existing = await editableFinding(db, findingId);
+    assertUngrouped(existing);
 
     const file = formData.get("photo");
     if (!(file instanceof File) || file.size === 0 || !PHOTO_TYPES.has(file.type)) {
@@ -356,6 +384,7 @@ export async function removeFindingPhoto(
     });
     if (!photo?.findingId) throw new InspectionInputError("findingMissing");
     const finding = await editableFinding(db, photo.findingId);
+    assertUngrouped(finding);
     await db.photo.delete({ where: { id: photoId } });
 
     const fresh = await db.finding.findUniqueOrThrow({

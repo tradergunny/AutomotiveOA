@@ -96,6 +96,20 @@ export const PROPOSED_ACTIONS = ["REPAIR", "REPAINT", "REPLACE", "SERVICE"] as c
   readonly ProposedAction[];
 
 /**
+ * What may be proposed for a wear item. A checklist Finding is never
+ * repainted — that is a paint-booth action on a body panel, and it was
+ * nonsense on every row of the Service Checklist. The other three all land
+ * somewhere: repair the aircon, replace the battery, service the oil.
+ */
+export const CHECKLIST_ACTIONS = ["REPAIR", "REPLACE", "SERVICE"] as const satisfies
+  readonly ProposedAction[];
+
+/** The actions offered for a Finding, by the surface that captured it. */
+export function actionsFor(source: FindingDto["source"]): readonly ProposedAction[] {
+  return source === "CHECKLIST" ? CHECKLIST_ACTIONS : PROPOSED_ACTIONS;
+}
+
+/**
  * Severity is DERIVED, never stored (DESIGN.md D-3): crack/broken ⇒ severe
  * (red hatch), anything else ⇒ minor (amber). Checklist findings map
  * NEEDS_WORK ⇒ severe, DUE_SOON ⇒ minor so both surfaces tint alike.
@@ -142,14 +156,35 @@ export type FindingDto = {
  * never empty (the screen keeps at least one), so they need no check.
  */
 export function canConfirm(
-  f: Pick<FindingDto, "source" | "damageTypes" | "proposedActions">,
+  f: Pick<FindingDto, "source" | "condition" | "damageTypes" | "proposedActions">,
 ): boolean {
-  if (f.proposedActions.length === 0) return false;
-  // A map Finding also has to name what is wrong. Accepting means "this is work
-  // we intend to register", and a repaint with no damage behind it registers a
-  // price with no reason for it. Checklist Findings carry a condition instead,
-  // which the tri-state already required before the Finding existed.
-  return f.source !== "DAMAGE_MAP" || f.damageTypes.length > 0;
+  // A checklist Finding was decided by its tri-state before it existed, and
+  // "due soon" means exactly that no work is proposed now. Demanding an action
+  // anyway made such an item impossible to accept and its case impossible to
+  // move past assessment. "Needs work" still has to say what work.
+  if (f.source === "CHECKLIST") {
+    if (f.condition === null) return false;
+    return f.condition === "DUE_SOON" || f.proposedActions.length > 0;
+  }
+  // A map Finding names what is wrong and what to do about it: accepting means
+  // "this is work we intend to register", and a repaint with no damage behind
+  // it registers a price with no reason for it.
+  return f.damageTypes.length > 0 && f.proposedActions.length > 0;
+}
+
+/**
+ * Findings offered for grouping into a Job — accepted, not already on one, and
+ * actually proposing work. A "due soon" wear item is a complete record with
+ * nothing to price: leaving it in the candidate set stranded its case at
+ * "Group into Jobs", because the only way out of that set is acquiring a Job.
+ */
+export function isGroupable(f: {
+  jobId: string | null;
+  /** ISO from the DTO, Date straight off a Prisma row — both are callers. */
+  confirmedAt: Date | string | null;
+  proposedActions: readonly ProposedAction[];
+}): boolean {
+  return f.jobId === null && f.confirmedAt !== null && f.proposedActions.length > 0;
 }
 
 export function findingSeverity(f: Pick<FindingDto, "damageTypes" | "condition">): Severity {

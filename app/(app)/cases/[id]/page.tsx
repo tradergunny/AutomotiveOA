@@ -10,7 +10,7 @@ import {
 } from "@/lib/case-flow";
 import { LINE_MAX_PHOTOS_PER_UPDATE } from "@/lib/line";
 import { buildDraftBody, buildFollowUpDraftBody } from "@/lib/line-draft";
-import { findingSeverity } from "@/lib/inspection";
+import { findingSeverity, isGroupable } from "@/lib/inspection";
 import { hasUnquotedProposed } from "@/lib/jobs";
 import { caseBalance } from "@/lib/payments";
 import { can } from "@/lib/permissions";
@@ -138,10 +138,11 @@ export default async function CasePage({
   const balance = caseBalance(jobs, payments);
   const stage = stageFor(repairCase.status, jobs, balance.totalDueSatang);
 
-  // Only an accepted Finding is offered for grouping: an advisor still
-  // keying one in has not decided what the work is yet.
+  // Only an accepted Finding proposing actual work is offered for grouping: an
+  // advisor still keying one in has not decided what the work is yet, and a
+  // "due soon" wear item has decided there is none (lib/inspection isGroupable).
   const ungroupedFindings = repairCase.findings
-    .filter((f) => f.jobId === null && f.confirmedAt !== null)
+    .filter(isGroupable)
     .map((f) => ({ id: f.id, source: f.source, zone: f.zone, checklistItem: f.checklistItem }))
     .reverse(); // oldest first, matching the inspection screen's order
 
