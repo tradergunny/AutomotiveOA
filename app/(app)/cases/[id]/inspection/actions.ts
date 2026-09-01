@@ -9,6 +9,7 @@ import type {
 import {
   DAMAGE_TYPES,
   PROPOSED_ACTIONS,
+  canConfirm,
   isChecklistItem,
   isZoneForBodyType,
   type FindingDto,
@@ -27,6 +28,8 @@ export type InspectionError =
   | "invalidItem"
   | "caseDelivered"
   | "findingMissing"
+  | "noAction"
+  | "noDamage"
   | "photoInvalid"
   | "photoTooLarge"
   | "failed";
@@ -60,6 +63,7 @@ type FindingRow = {
   jobId: string | null;
   recordedAt: Date;
   recordedBy: { name: string };
+  confirmedAt: Date | null;
   photos: { id: string }[];
 };
 
@@ -76,6 +80,7 @@ function toDto(row: FindingRow): FindingDto {
     jobId: row.jobId,
     recordedAt: row.recordedAt.toISOString(),
     recordedByName: row.recordedBy.name,
+    confirmedAt: row.confirmedAt?.toISOString() ?? null,
     photos: row.photos,
   };
 }
@@ -130,8 +135,9 @@ export async function createMapFinding(
         caseId,
         source: "DAMAGE_MAP",
         zone,
-        damageTypes: ["SCRATCH"], // the mockup's starting point; edited in place
-        proposedActions: ["REPAIR"],
+        // Both lists start empty. Seeding "scratch, repair" meant a Finding was
+        // born asserting a damage and a price the inspector had never chosen,
+        // and Accept would carry it through unnoticed.
         recordedByStaffId: session.staffId,
       },
       include: FINDING_INCLUDE,
@@ -160,11 +166,12 @@ export async function updateFinding(
       damageTypes?: DamageType[];
       proposedActions?: ProposedAction[];
       note?: string | null;
+      confirmedAt?: Date | null;
     } = {};
     if (patch.damageTypes !== undefined && existing.source === "DAMAGE_MAP") {
-      const types = dedupe(patch.damageTypes as DamageType[], DAMAGE_TYPES);
-      // A map finding always names at least one damage type.
-      data.damageTypes = types.length ? types : ["SCRATCH"];
+      // Clearing the last damage type is allowed while the Finding is being
+      // captured; it is Accept that insists on one (canConfirm).
+      data.damageTypes = dedupe(patch.damageTypes as DamageType[], DAMAGE_TYPES);
     }
     if (patch.proposedActions !== undefined) {
       data.proposedActions = dedupe(patch.proposedActions as ProposedAction[], PROPOSED_ACTIONS);
@@ -172,10 +179,45 @@ export async function updateFinding(
     if (patch.note !== undefined) {
       data.note = patch.note.trim().slice(0, MAX_NOTE_LENGTH) || null;
     }
+    // Editing a confirmed Finding reopens it: "confirmed" has to mean the
+    // advisor accepted THESE values, not an earlier version of them. The
+    // screen already reopens before it lets anyone type; this holds the
+    // invariant for every other caller.
+    if (existing.confirmedAt) data.confirmedAt = null;
 
     const updated = await db.finding.update({
       where: { id: findingId },
       data,
+      include: FINDING_INCLUDE,
+    });
+    revalidatePath(`/cases/${existing.repairCase.id}`);
+    return { ok: true, value: toDto(updated) };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/**
+ * The accept step: flip a Finding between "still being captured" and
+ * "accepted as final". Never a save — every field persisted the moment it
+ * was tapped, so an interrupted inspection loses nothing either way. Only a
+ * confirmed Finding is offered for grouping into a Job (see job-actions.ts).
+ */
+export async function setFindingConfirmed(
+  findingId: string,
+  confirmed: boolean,
+): Promise<ActionResult<FindingDto>> {
+  try {
+    const { db } = await tenantContext();
+    const existing = await editableFinding(db, findingId);
+    if (confirmed && existing.proposedActions.length === 0) {
+      throw new InspectionInputError("noAction");
+    }
+    if (confirmed && !canConfirm(existing)) throw new InspectionInputError("noDamage");
+
+    const updated = await db.finding.update({
+      where: { id: findingId },
+      data: { confirmedAt: confirmed ? new Date() : null },
       include: FINDING_INCLUDE,
     });
     revalidatePath(`/cases/${existing.repairCase.id}`);

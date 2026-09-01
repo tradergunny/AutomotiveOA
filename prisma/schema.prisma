@@ -315,6 +315,11 @@ model Finding {
   /// from the check-in inspection by this timestamp.
   recordedByStaffId String            @map("recorded_by_staff_id")
   recordedAt        DateTime          @default(now()) @map("recorded_at")
+  /// When the advisor accepted this Finding as final. NULL = still being
+  /// captured: it stays fully editable and is NOT offered for grouping into
+  /// a Job. Accepting is a status flip, never a save — every field already
+  /// persisted the moment it was tapped.
+  confirmedAt       DateTime?         @map("confirmed_at")
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
 

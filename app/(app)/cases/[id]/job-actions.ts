@@ -142,11 +142,12 @@ export async function createJobFromFindings(
     const priceSatang = parseOptionalPrice(input.price);
 
     // Zero findings is allowed (founder ruling: customer-requested work),
-    // but every named finding must be this case's and still ungrouped.
+    // but every named finding must be this case's, still ungrouped, and
+    // accepted by the advisor — the inspection's accept step is the gate.
     const findingIds = [...new Set(input.findingIds)];
     if (findingIds.length > 0) {
       const owned = await db.finding.count({
-        where: { id: { in: findingIds }, caseId, jobId: null },
+        where: { id: { in: findingIds }, caseId, jobId: null, confirmedAt: { not: null } },
       });
       if (owned !== findingIds.length) throw new JobInputError("invalidFindings");
     }
@@ -164,7 +165,7 @@ export async function createJobFromFindings(
       });
       if (findingIds.length > 0) {
         await tx.finding.updateMany({
-          where: { id: { in: findingIds }, caseId, jobId: null },
+          where: { id: { in: findingIds }, caseId, jobId: null, confirmedAt: { not: null } },
           data: { jobId: created.id },
         });
       }

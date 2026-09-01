@@ -130,8 +130,27 @@ export type FindingDto = {
   jobId: string | null;
   recordedAt: string; // ISO — serializable across the RSC boundary
   recordedByName: string;
+  /** When the advisor accepted it as final — null while still being captured. */
+  confirmedAt: string | null;
   photos: { id: string }[];
 };
+
+/**
+ * What accepting a Finding requires: a proposed action. That is the whole
+ * point of the gate — "confirm" means "this is work we intend to register",
+ * and a Finding with nothing proposed registers nothing. Damage types are
+ * never empty (the screen keeps at least one), so they need no check.
+ */
+export function canConfirm(
+  f: Pick<FindingDto, "source" | "damageTypes" | "proposedActions">,
+): boolean {
+  if (f.proposedActions.length === 0) return false;
+  // A map Finding also has to name what is wrong. Accepting means "this is work
+  // we intend to register", and a repaint with no damage behind it registers a
+  // price with no reason for it. Checklist Findings carry a condition instead,
+  // which the tri-state already required before the Finding existed.
+  return f.source !== "DAMAGE_MAP" || f.damageTypes.length > 0;
+}
 
 export function findingSeverity(f: Pick<FindingDto, "damageTypes" | "condition">): Severity {
   if (f.condition) return conditionSeverity(f.condition);
