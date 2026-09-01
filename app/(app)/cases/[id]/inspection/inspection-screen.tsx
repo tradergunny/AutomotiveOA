@@ -11,6 +11,7 @@ import {
   CHECKLIST_ITEMS,
   DAMAGE_TYPES,
   PROPOSED_ACTIONS,
+  actionsFor,
   canConfirm,
   findingSeverity,
   type FindingDto,
@@ -543,7 +544,7 @@ export function InspectionScreen({
                 aria-label={t("fixLabel")}
                 className="flex min-w-0 flex-1 border border-faint"
               >
-                {PROPOSED_ACTIONS.map((action) => {
+                {actionsFor(f.source).map((action) => {
                   const on = f.proposedActions.includes(action);
                   return (
                     <button
@@ -830,6 +831,12 @@ export function InspectionScreen({
             {CHECKLIST_ITEMS.map((item) => {
               const finding = checklistFindings.get(item);
               const state = finding?.condition;
+              // Accepted means accepted here too (D-11). A live tri-state over
+              // a closed record let one stray tap rewrite the condition without
+              // passing the gate — and "OK" deletes the Finding and its photos
+              // outright, with none of the damage side's arm-then-confirm. The
+              // Edit control on the record beneath is the way back in.
+              const locked = finding?.confirmedAt != null;
               const itemLabel = t(`checklist.${item}` as never);
               const options = [
                 {
@@ -852,18 +859,26 @@ export function InspectionScreen({
                 <li key={item} className="border-b last:border-b-0">
                   <div className="flex items-center gap-2.5 px-3.5 py-2">
                     <span className="min-w-0 flex-1 text-[13px]">{itemLabel}</span>
-                    <span className="flex border border-faint">
+                    <span
+                      className={cn("flex border", locked ? "border-border-strong" : "border-faint")}
+                      title={locked ? t("checklistLocked") : undefined}
+                    >
                       {options.map((option) => {
                         const on = (state ?? "OK") === option.key;
                         return (
                           <button
                             key={option.key}
                             type="button"
-                            disabled={readOnly || busy[`cl:${item}`]}
+                            disabled={readOnly || locked || busy[`cl:${item}`]}
                             onClick={() => void handleChecklist(item, option.key)}
                             className={cn(
-                              "flex h-8 items-center border-l border-faint px-3 text-[11px] transition-colors first:border-l-0",
-                              on ? option.cls : "text-muted-foreground hover:bg-raise hover:text-foreground",
+                              "flex h-8 items-center border-l px-3 text-[11px] transition-colors first:border-l-0",
+                              locked ? "border-border-strong" : "border-faint",
+                              on
+                                ? option.cls
+                                : locked
+                                  ? "text-faint"
+                                  : "text-muted-foreground hover:bg-raise hover:text-foreground",
                             )}
                             aria-pressed={on}
                           >
