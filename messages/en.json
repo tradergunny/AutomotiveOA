@@ -259,6 +259,7 @@
     "noDamageYet": "No damage chosen yet",
     "noWorkProposed": "No work proposed",
     "checklistLocked": "Accepted — reopen the finding below to change this",
+    "checklistGrouped": "Grouped into a job — delete the job to change this",
     "inJob": "→ {title}",
     "deliveredLocked": "This case is delivered — the inspection is read-only.",
     "summaryTitle": "Inspection",
@@ -353,6 +354,7 @@
       "noAction": "Choose a proposed action before accepting",
       "noDamage": "Say what is wrong before accepting",
       "findingAccepted": "Reopen this finding before changing it",
+      "findingGrouped": "This finding belongs to a job — delete the job first",
       "photoInvalid": "Photos must be JPEG, PNG, or WebP",
       "photoTooLarge": "Photo too large (max 10 MB)",
       "failed": "Something went wrong — try again"
