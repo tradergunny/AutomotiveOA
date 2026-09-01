@@ -208,6 +208,8 @@ export type StageAction =
 
 export type NextActionFacts = {
   findingsCount: number;
+  /** Findings the advisor has not accepted yet — they cannot be grouped. */
+  unconfirmedFindingsCount: number;
   ungroupedFindingsCount: number;
   /** PROPOSED Jobs with no price — an authorization needs one (M4). */
   unpricedProposedCount: number;
@@ -223,8 +225,9 @@ export type NextMove = {
 };
 
 /**
- * The assessment cascade runs no Findings → ungrouped Findings → unpriced
- * Jobs; the pricing tail lives under AWAITING_AUTH because a Job's existence
+ * The assessment cascade runs no Findings → unaccepted Findings → ungrouped
+ * Findings → unpriced Jobs; the pricing tail lives under AWAITING_AUTH
+ * because a Job's existence
  * already files the case there (D-2 precedence). Issue quotation is only
  * ever the suggested path — a walk-in's authorization is recorded with no
  * Quotation at all (founder ruling 2026-08-27). WAITING returns no action:
@@ -234,6 +237,11 @@ export function nextActionFor(stage: Stage, facts: NextActionFacts): NextMove {
   switch (stage) {
     case "IN_ASSESSMENT":
       if (facts.findingsCount === 0) return { primary: "OPEN_INSPECTION", secondary: null };
+      // Findings still being keyed in send the advisor back to the inspection
+      // rather than to a grouping step that would have nothing to offer.
+      if (facts.unconfirmedFindingsCount > 0) {
+        return { primary: "OPEN_INSPECTION", secondary: null };
+      }
       if (facts.ungroupedFindingsCount > 0) return { primary: "GROUP_FINDINGS", secondary: null };
       return { primary: null, secondary: null };
     case "AWAITING_AUTH":

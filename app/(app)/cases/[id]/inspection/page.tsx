@@ -47,6 +47,7 @@ export default async function InspectionPage({
     jobId: f.jobId,
     recordedAt: f.recordedAt.toISOString(),
     recordedByName: f.recordedBy.name,
+    confirmedAt: f.confirmedAt?.toISOString() ?? null,
     photos: f.photos,
   }));
 

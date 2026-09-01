@@ -161,6 +161,7 @@ describe("stageFor (M7.5 brief §1): board groups + two Delivered flavors", () =
 describe("nextActionFor (D-6): one primary, at most one secondary", () => {
   const facts = (overrides: Partial<NextActionFacts> = {}): NextActionFacts => ({
     findingsCount: 0,
+    unconfirmedFindingsCount: 0,
     ungroupedFindingsCount: 0,
     unpricedProposedCount: 0,
     hasUnquotedProposed: false,
@@ -173,6 +174,15 @@ describe("nextActionFor (D-6): one primary, at most one secondary", () => {
       primary: "OPEN_INSPECTION",
       secondary: null,
     });
+    // A finding the advisor has not accepted yet cannot be grouped, so the
+    // cascade sends them back to the inspection rather than to an empty
+    // grouping step.
+    expect(
+      nextActionFor(
+        "IN_ASSESSMENT",
+        facts({ findingsCount: 3, unconfirmedFindingsCount: 1, ungroupedFindingsCount: 2 }),
+      ),
+    ).toEqual({ primary: "OPEN_INSPECTION", secondary: null });
     expect(
       nextActionFor("IN_ASSESSMENT", facts({ findingsCount: 3, ungroupedFindingsCount: 3 })),
     ).toEqual({ primary: "GROUP_FINDINGS", secondary: null });

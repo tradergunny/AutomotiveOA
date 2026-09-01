@@ -65,7 +65,9 @@ export default async function CasePage({
           jobId: true,
           damageTypes: true,
           condition: true,
+          proposedActions: true,
           recordedAt: true,
+          confirmedAt: true,
           _count: { select: { photos: true } },
         },
         orderBy: { recordedAt: "desc" },
@@ -136,13 +138,16 @@ export default async function CasePage({
   const balance = caseBalance(jobs, payments);
   const stage = stageFor(repairCase.status, jobs, balance.totalDueSatang);
 
+  // Only an accepted Finding is offered for grouping: an advisor still
+  // keying one in has not decided what the work is yet.
   const ungroupedFindings = repairCase.findings
-    .filter((f) => f.jobId === null)
+    .filter((f) => f.jobId === null && f.confirmedAt !== null)
     .map((f) => ({ id: f.id, source: f.source, zone: f.zone, checklistItem: f.checklistItem }))
     .reverse(); // oldest first, matching the inspection screen's order
 
   const move = nextActionFor(stage, {
     findingsCount: repairCase.findings.length,
+    unconfirmedFindingsCount: repairCase.findings.filter((f) => f.confirmedAt === null).length,
     ungroupedFindingsCount: ungroupedFindings.length,
     unpricedProposedCount: jobs.filter(
       (job) => job.status === "PROPOSED" && job.priceSatang == null,
