@@ -352,13 +352,20 @@ export function InspectionScreen({
         : "";
     const willDo = f.proposedActions.map((a) => t(`actions.${a}`)).join(", ");
     // What still stands between this Finding and Accept, named in the row
-    // instead of left blank. Both bars can be empty now, so there are two
-    // reasons and a draft may be carrying either or both.
+    // instead of left blank — mirroring canConfirm, so a "due soon" wear item
+    // is never told it is missing an action it does not need.
     const missing: string[] = [];
-    if (isMap && f.damageTypes.length === 0) missing.push(t("noDamageYet"));
-    if (!willDo) missing.push(t("noActionYet"));
+    if (isMap) {
+      if (f.damageTypes.length === 0) missing.push(t("noDamageYet"));
+      if (!willDo) missing.push(t("noActionYet"));
+    } else if (f.condition === "NEEDS_WORK" && !willDo) {
+      missing.push(t("noActionYet"));
+    }
     const facts = [f.note, what, willDo].filter(Boolean) as string[];
     facts.push(...missing);
+    // A watched wear item with no note has nothing else to say; it still says
+    // that, rather than rendering a blank line under its checklist row.
+    if (facts.length === 0) facts.push(t("noWorkProposed"));
     const lead = facts[0] ?? "";
     const trail = facts.slice(1).join(" · ");
     // Ordinal, state and Job sit on a quiet line above the choice bars, and only

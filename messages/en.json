@@ -257,6 +257,7 @@
     "continueFinding": "Continue",
     "noActionYet": "No action chosen yet",
     "noDamageYet": "No damage chosen yet",
+    "noWorkProposed": "No work proposed",
     "inJob": "→ {title}",
     "deliveredLocked": "This case is delivered — the inspection is read-only.",
     "summaryTitle": "Inspection",

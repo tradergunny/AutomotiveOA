@@ -257,6 +257,7 @@
     "continueFinding": "ทำต่อ",
     "noActionYet": "ยังไม่ระบุการซ่อม",
     "noDamageYet": "ยังไม่ระบุความเสียหาย",
+    "noWorkProposed": "ไม่มีงานซ่อม",
     "inJob": "→ {title}",
     "deliveredLocked": "เคสนี้ส่งมอบแล้ว — หน้าตรวจสภาพเปิดดูได้อย่างเดียว",
     "summaryTitle": "ผลตรวจสภาพ",
