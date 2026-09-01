@@ -30,6 +30,7 @@ export type InspectionError =
   | "findingMissing"
   | "noAction"
   | "noDamage"
+  | "findingAccepted"
   | "photoInvalid"
   | "photoTooLarge"
   | "failed";
@@ -263,17 +264,22 @@ export async function setChecklistState(
     await editableCase(db, caseId);
     if (!isChecklistItem(item)) throw new InspectionInputError("invalidItem");
 
+    // An accepted Finding is a record, not a form (D-11) — and this path can
+    // delete it and its photos, so a disabled button in the client is not the
+    // place to enforce that. Reopening from the record is the way back in.
+    const current = await db.finding.findFirst({
+      where: { caseId, checklistItem: item },
+      select: { id: true, confirmedAt: true },
+    });
+    if (current?.confirmedAt) throw new InspectionInputError("findingAccepted");
+
     if (state === "OK") {
-      await db.$transaction(async (tx) => {
-        const existing = await tx.finding.findFirst({
-          where: { caseId, checklistItem: item },
-          select: { id: true },
+      if (current) {
+        await db.$transaction(async (tx) => {
+          await tx.photo.deleteMany({ where: { findingId: current.id } });
+          await tx.finding.delete({ where: { id: current.id } });
         });
-        if (existing) {
-          await tx.photo.deleteMany({ where: { findingId: existing.id } });
-          await tx.finding.delete({ where: { id: existing.id } });
-        }
-      });
+      }
       revalidatePath(`/cases/${caseId}`);
       return { ok: true, value: null };
     }

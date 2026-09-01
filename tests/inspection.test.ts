@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canConfirm, findingSeverity, isGroupable } from "@/lib/inspection";
+import { actionsFor, canConfirm, findingSeverity, isGroupable } from "@/lib/inspection";
 
 /**
  * The accept step's rule (M3 + the confirmation gate). A map Finding must say
@@ -116,5 +116,25 @@ describe("findingSeverity: what the row's severity edge reads", () => {
   it("lets a checklist condition win over damage types", () => {
     expect(findingSeverity({ damageTypes: [], condition: "DUE_SOON" })).toBe("MINOR");
     expect(findingSeverity({ damageTypes: [], condition: "NEEDS_WORK" })).toBe("SEVERE");
+  });
+});
+
+/**
+ * A wear item is never repainted — that is a paint-booth action on a body
+ * panel, and offering it on every Service Checklist row asked the advisor to
+ * consider repainting the engine oil.
+ */
+describe("actionsFor: what each capture surface may propose", () => {
+  it("offers a wear item repair, replace and service — never repaint", () => {
+    expect(actionsFor("CHECKLIST")).toEqual(["REPAIR", "REPLACE", "SERVICE"]);
+    expect(actionsFor("CHECKLIST")).not.toContain("REPAINT");
+  });
+
+  it("leaves the damage map its full vocabulary", () => {
+    expect(actionsFor("DAMAGE_MAP")).toEqual(["REPAIR", "REPAINT", "REPLACE", "SERVICE"]);
+  });
+
+  it("keeps the default the checklist chose for needs-work in range", () => {
+    expect(actionsFor("CHECKLIST")).toContain("SERVICE");
   });
 });

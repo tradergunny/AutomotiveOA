@@ -96,6 +96,20 @@ export const PROPOSED_ACTIONS = ["REPAIR", "REPAINT", "REPLACE", "SERVICE"] as c
   readonly ProposedAction[];
 
 /**
+ * What may be proposed for a wear item. A checklist Finding is never
+ * repainted — that is a paint-booth action on a body panel, and it was
+ * nonsense on every row of the Service Checklist. The other three all land
+ * somewhere: repair the aircon, replace the battery, service the oil.
+ */
+export const CHECKLIST_ACTIONS = ["REPAIR", "REPLACE", "SERVICE"] as const satisfies
+  readonly ProposedAction[];
+
+/** The actions offered for a Finding, by the surface that captured it. */
+export function actionsFor(source: FindingDto["source"]): readonly ProposedAction[] {
+  return source === "CHECKLIST" ? CHECKLIST_ACTIONS : PROPOSED_ACTIONS;
+}
+
+/**
  * Severity is DERIVED, never stored (DESIGN.md D-3): crack/broken ⇒ severe
  * (red hatch), anything else ⇒ minor (amber). Checklist findings map
  * NEEDS_WORK ⇒ severe, DUE_SOON ⇒ minor so both surfaces tint alike.
