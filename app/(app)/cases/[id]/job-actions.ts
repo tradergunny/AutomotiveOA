@@ -147,7 +147,15 @@ export async function createJobFromFindings(
     const findingIds = [...new Set(input.findingIds)];
     if (findingIds.length > 0) {
       const owned = await db.finding.count({
-        where: { id: { in: findingIds }, caseId, jobId: null, confirmedAt: { not: null } },
+        where: {
+          id: { in: findingIds },
+          caseId,
+          jobId: null,
+          confirmedAt: { not: null },
+          // mirrors isGroupable (lib/inspection): a Finding proposing no work
+          // may not be grouped, however the ids were posted.
+          proposedActions: { isEmpty: false },
+        },
       });
       if (owned !== findingIds.length) throw new JobInputError("invalidFindings");
     }
@@ -165,7 +173,13 @@ export async function createJobFromFindings(
       });
       if (findingIds.length > 0) {
         await tx.finding.updateMany({
-          where: { id: { in: findingIds }, caseId, jobId: null, confirmedAt: { not: null } },
+          where: {
+            id: { in: findingIds },
+            caseId,
+            jobId: null,
+            confirmedAt: { not: null },
+            proposedActions: { isEmpty: false }, // as the count above
+          },
           data: { jobId: created.id },
         });
       }

@@ -210,10 +210,13 @@ export async function setFindingConfirmed(
   try {
     const { db } = await tenantContext();
     const existing = await editableFinding(db, findingId);
-    if (confirmed && existing.proposedActions.length === 0) {
-      throw new InspectionInputError("noAction");
+    if (confirmed && !canConfirm(existing)) {
+      throw new InspectionInputError(
+        existing.source === "DAMAGE_MAP" && existing.damageTypes.length === 0
+          ? "noDamage"
+          : "noAction",
+      );
     }
-    if (confirmed && !canConfirm(existing)) throw new InspectionInputError("noDamage");
 
     const updated = await db.finding.update({
       where: { id: findingId },
