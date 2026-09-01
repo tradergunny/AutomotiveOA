@@ -326,7 +326,12 @@ export function InspectionScreen({
   ) {
     const isMap = f.source === "DAMAGE_MAP";
     const confirmed = f.confirmedAt !== null;
-    const open = !confirmed && openFindingId === f.id;
+    // Once a Finding is on a Job it is the stated reason for work that may be
+    // priced and authorized, and the server refuses to edit, un-accept or
+    // delete it (assertUngrouped). Offering Edit and discard here would only
+    // raise errors — the way back in is deleting the Job, on the case page.
+    const grouped = f.jobId !== null;
+    const open = !confirmed && !grouped && openFindingId === f.id;
     // The Job chip earns its place only when the Job is named something other
     // than the place itself: "Hood → Hood" is a coloured repeat of the word
     // sitting above it.
@@ -375,7 +380,7 @@ export function InspectionScreen({
     // are the two ways a finding form ends, and keeping it out of the bars lets
     // both bars run the full width and line up with each other.
     const hasMeta = Boolean((showCondition && f.condition) || jobChip);
-    const removeBtn = !readOnly && (
+    const removeBtn = !readOnly && !grouped && (
       <button
         type="button"
         onClick={() => void handleRemove(f)}
@@ -456,7 +461,7 @@ export function InspectionScreen({
               )}
             </span>
             {jobChip}
-            {!readOnly && (
+            {!readOnly && !grouped && (
               <button
                 type="button"
                 disabled={busy[f.id]}
@@ -836,7 +841,7 @@ export function InspectionScreen({
               // passing the gate — and "OK" deletes the Finding and its photos
               // outright, with none of the damage side's arm-then-confirm. The
               // Edit control on the record beneath is the way back in.
-              const locked = finding?.confirmedAt != null;
+              const locked = finding != null && (finding.confirmedAt != null || finding.jobId != null);
               const itemLabel = t(`checklist.${item}` as never);
               const options = [
                 {
@@ -861,7 +866,13 @@ export function InspectionScreen({
                     <span className="min-w-0 flex-1 text-[13px]">{itemLabel}</span>
                     <span
                       className={cn("flex border", locked ? "border-border-strong" : "border-faint")}
-                      title={locked ? t("checklistLocked") : undefined}
+                      title={
+                        finding?.jobId
+                          ? t("checklistGrouped")
+                          : locked
+                            ? t("checklistLocked")
+                            : undefined
+                      }
                     >
                       {options.map((option) => {
                         const on = (state ?? "OK") === option.key;
