@@ -6,7 +6,13 @@ Built first with a pilot shop, sold to other garages (see [ADR-001](docs/adr/ADR
 
 ## Status
 
-M6 (LINE integration) gives the customer their half of the story. Each Shop connects its **own** LINE Official Account in `/settings` (ADR-002) — credentials verified against LINE, then stored encrypted (ADR-004) — and the OA's webhook captures the LINE identities staff match to Customers by hand (ADR-005). On a case, the **Customer timeline** sits beside M5's internal one: a Thai draft is pre-filled from the case's real Jobs in customer-safe wording, staff edit it, attach up to four case photos, preview exactly what will go out, and press send. Every send is an immutable record of what the customer actually saw, and appears on the internal timeline as an event. Nothing is ever sent automatically (ADR-003). Setting up an Official Account is walked through step by step in [docs/LINE-SETUP.md](docs/LINE-SETUP.md).
+**M7.5 is merged; M8 (hardening & pilot readiness) is the last milestone before the pilot goes live** — see [docs/MILESTONES.md](docs/MILESTONES.md) for the full ledger.
+
+The build so far: check-in opens a Repair Case (M2), an inspection turns the car into Findings (M3), Findings are grouped into priced, per-Job-authorized work with versioned Quotations (M4), that work moves through Waiting / In Progress / QC to Delivered on an attention-grouped board with a staff-only internal timeline (M5), the customer gets their curated half through the Shop's own LINE OA (M6), and Payments, per-payer balances, the Customer/Vehicle history split, and a Follow-up worklist close the money-and-relationships loop (M7).
+
+**M7.5** made all of that legible. A Repair Case now has exactly one derived **Stage** ([CONTEXT.md](CONTEXT.md)) — In assessment · Awaiting authorization · Waiting · In progress · In QC · Ready · Delivered / Balance due — computed once in [lib/case-flow.ts](lib/case-flow.ts) and shared by the board and the case page, so both speak the same vocabulary. The page leads with a stage spine and a derived next action, wears the car's own check-in photo, renders Job cards as records with an explicit Edit toggle, and keeps a fixed section order that shrinks around the current Stage (D-6 – D-10 in [docs/design/DESIGN.md](docs/design/DESIGN.md)).
+
+Each Shop connects its **own** LINE Official Account in `/settings` (ADR-002) — credentials verified against LINE, then stored encrypted (ADR-004) — and the OA's webhook captures the LINE identities staff match to Customers by hand (ADR-005). On a case, the **Customer timeline** sits beside the internal one: a Thai draft is pre-filled from the case's real Jobs in customer-safe wording, staff edit it, attach up to four case photos, preview exactly what will go out, and press send. Every send is an immutable record of what the customer actually saw, and appears on the internal timeline as an event. Nothing is ever sent automatically (ADR-003). Setting up an Official Account is walked through step by step in [docs/LINE-SETUP.md](docs/LINE-SETUP.md).
 
 **Staging is live on Vercel** (since 2026-08-26) at <https://automotive-oa.vercel.app>: production branch `main` — every merged PR deploys automatically. Neon Postgres (pooled `DATABASE_URL` at runtime; `vercel.json` runs `prisma migrate deploy` on the unpooled URL at build time) and a **private** Vercel Blob store for photos (`BLOB_READ_WRITE_TOKEN` selects the driver in [lib/storage.ts](lib/storage.ts)). Env vars live in the Vercel dashboard and are baked in at build time — connecting a store or changing a value does nothing until the next deploy. The full deploy guide is an M8 deliverable.
 
@@ -45,6 +51,16 @@ Open http://localhost:3000 and log in with a seeded pilot-shop account:
 
 Tests (`npm test`) need the dev database running.
 
+### Staged cases for a Stage walkthrough
+
+`npm run cases:stage` fills the pilot shop with one Repair Case per **Stage** (RC-1010 – RC-1019): fresh assessment, ungrouped findings, unpriced proposal, awaiting authorization, waiting on parts, in progress with a cancelled job, in QC, ready, delivered-with-balance, and delivered-settled — each with generated walkaround photos so the board's car thumbnails (D-9) are real.
+
+```bash
+npm run cases:stage
+```
+
+Dev only. It writes rows directly rather than performing the flows, so it is a viewing aid for the M7.5 walkthrough gate, never a substitute for exercising check-in or inspection by hand. It is idempotent: a re-run deletes what the previous run created (tracked in `.data/staged-cases.json`, gitignored) before staging afresh, and it touches nothing the seed or your own testing created.
+
 ### LINE in dev
 
 You do **not** need a LINE Official Account to run or test the app. With no `LINE_TRANSPORT` set, development uses a stand-in transport that writes the exact payload it *would* have posted to `.data/line/outbox.jsonl` (gitignored) and charges nothing — everything else runs for real, so the Customer timeline, the internal event, and the photo links are all genuine.
@@ -80,6 +96,7 @@ npm run db:migrate:new
 | [docs/design/mockup.html](docs/design/mockup.html) | M0 clickable visual mockup (Case Board + Inspection / Damage Map) |
 | [docs/adr/](docs/adr/) | Architecture Decision Records |
 | [docs/LINE-SETUP.md](docs/LINE-SETUP.md) | Step-by-step: creating a LINE Official Account and connecting it |
+| [docs/MILESTONES.md](docs/MILESTONES.md) | Build plan — milestone ledger, gates, and what is next |
 | [docs/LATER.md](docs/LATER.md) | Deliberately deferred scope |
 | [docs/INTERVIEW-QUESTIONS.md](docs/INTERVIEW-QUESTIONS.md) | Garage-interview checklist validating working assumptions |
 

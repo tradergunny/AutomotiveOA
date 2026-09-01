@@ -14,6 +14,7 @@
     "db:seed": "prisma db seed",
     "line:simulate": "npx tsx scripts/line-simulate.ts",
     "followups:backfill": "npx tsx scripts/followups-backfill.ts",
+    "cases:stage": "npx tsx scripts/stage-cases.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
