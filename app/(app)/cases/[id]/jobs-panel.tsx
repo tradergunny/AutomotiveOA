@@ -1,39 +1,45 @@
 "use client";
 
-import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { useFormatter, useTranslations } from "next-intl";
 import { CornerTicks } from "@/components/blocks/corner-ticks";
 import { JobRollupLine } from "@/components/blocks/job-rollup";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Dialog } from "@/components/ui/dialog";
+import { isActiveJob } from "@/lib/case-flow";
 import {
-  isQuotable,
-  isQuotationStale,
+  offerNeedsSending,
+  offerParts,
   type JobDto,
-  type JobFindingRef,
+  type OfferPart,
   type QuotationDto,
 } from "@/lib/jobs";
+import type { SentUpdateDto } from "@/lib/line-send";
 import { formatBaht } from "@/lib/money";
-import { cn } from "@/lib/utils";
-import { createCatalogJob, createJobFromFindings, type JobError } from "./job-actions";
-import { issueQuotation, type QuotationError } from "./quotation-actions";
+import { AddJobDialog } from "./add-job-dialog";
+import type { SendBlockedReason } from "./customer-timeline";
 import { JobCard } from "./job-card";
+import { useJobsFlow } from "./jobs-flow-context";
+import { OfferTable } from "./offer-table";
+import { RecordResponseDialog } from "./record-response-dialog";
+import { SendQuotationDialog } from "./send-quotation-dialog";
 
 /**
- * The case page's Jobs section (M4 brief §3, §6, §7; M7.5 D-7/D-8): the Job
- * list with its two creation paths and the quotation lineage. The per-status
- * rollup lives here now — demoted from the header (D-6) to one quiet
- * sentence of detail. Client state holds jobs / quotations / ungrouped
- * findings and reconciles with what server actions return.
+ * The case page's Jobs section, organized by phase (D-19): Offer → Work →
+ * Done in one fixed order, mirroring the header spine. Offer holds every
+ * Proposed line with the set-level tooling at its foot; Work holds the
+ * active Jobs as cards, each leading with one primary next step; Done holds
+ * Completed, Declined and Cancelled as one-line records. A phase with no
+ * members renders nothing, and phase headings appear only when two or more
+ * phases have members. The section header carries "Jobs" and the count; the
+ * per-status rollup is each phase's sub-line. Client state holds jobs and
+ * quotations and reconciles with what server actions return; the header's
+ * next-action strip reaches in through JobsFlowProvider (D-22).
  */
 
 type Props = {
   caseId: string;
   initialJobs: JobDto[];
   initialQuotations: QuotationDto[]; // newest first
-  initialUngrouped: JobFindingRef[];
   catalogItems: { id: string; name: string; priceSatang: number }[];
   staffOptions: { id: string; name: string }[];
   isManager: boolean;
@@ -42,14 +48,24 @@ type Props = {
   canRevertStep: boolean;
   viewerStaffId: string;
   readOnly: boolean;
-  preselectFindingId?: string;
+  /** The LINE gate, for Send quotation's explanations. */
+  blockedReason: SendBlockedReason;
+  recipientName: string;
+  /** Set on a delivered case — the section reads as a closed record. */
+  deliveredAt: string | null;
+  onUpdateSent?: (update: SentUpdateDto) => void;
 };
+
+type DialogState =
+  | null
+  | { kind: "add" }
+  | { kind: "send"; part: OfferPart | null }
+  | { kind: "respond"; part: OfferPart | null };
 
 export function JobsPanel({
   caseId,
   initialJobs,
   initialQuotations,
-  initialUngrouped,
   catalogItems,
   staffOptions,
   isManager,
@@ -58,218 +74,107 @@ export function JobsPanel({
   canRevertStep,
   viewerStaffId,
   readOnly,
-  preselectFindingId,
+  blockedReason,
+  recipientName,
+  deliveredAt,
 }: Props) {
   const t = useTranslations("jobs");
-  const tq = useTranslations("quotations");
-  const ti = useTranslations("inspection");
-  const tc = useTranslations("common");
   const format = useFormatter();
+  const { request } = useJobsFlow();
 
   const [jobs, setJobs] = useState(initialJobs);
   const [quotations, setQuotations] = useState(initialQuotations);
-  const [ungrouped, setUngrouped] = useState(initialUngrouped);
-  const [creator, setCreator] = useState<"findings" | "catalog" | null>(
-    preselectFindingId ? "findings" : null,
-  );
-  const [selectedFindings, setSelectedFindings] = useState<Set<string>>(
-    () => new Set(preselectFindingId ? [preselectFindingId] : []),
-  );
-  const [titleTouched, setTitleTouched] = useState(false);
-  const [title, setTitle] = useState("");
-  const [payer, setPayer] = useState<"CUSTOMER" | "INSURER">("CUSTOMER");
-  const [insurerName, setInsurerName] = useState("");
-  const [price, setPrice] = useState("");
-  const [catalogItemId, setCatalogItemId] = useState(catalogItems[0]?.id ?? "");
-  const [issueOpen, setIssueOpen] = useState(false);
-  const [issueSelection, setIssueSelection] = useState<Set<string>>(new Set());
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<JobError | QuotationError | null>(null);
+  const [dialog, setDialog] = useState<DialogState>(null);
+  const [focusNonce, setFocusNonce] = useState(0);
 
-  const findingLabel = (f: JobFindingRef) =>
-    f.zone ? ti(`zones.${f.zone}` as never) : ti(`checklist.${f.checklistItem}` as never);
+  /* ---------- the header reaches in (D-22) ---------- */
 
-  /* ---------- derived detail (D-6: rollup demoted here) ---------- */
-
-  const totals = useMemo(() => {
-    let proposed = 0;
-    let authorized = 0;
-    let unpriced = 0;
-    for (const job of jobs) {
-      if (job.priceSatang == null) {
-        if (isQuotable(job.status)) unpriced += 1;
-        continue;
-      }
-      if (job.status === "PROPOSED") proposed += job.priceSatang;
-      if (job.status === "AUTHORIZED") authorized += job.priceSatang;
-    }
-    return { proposed, authorized, unpriced };
-  }, [jobs]);
-
-  const quotableJobs = jobs.filter((job) => job.priceSatang != null && isQuotable(job.status));
-  const latestStale = quotations.length > 0 && isQuotationStale(quotations[0], jobs);
+  // Each request is answered exactly once, as state adjusted during render
+  // on a changed nonce — no effect, no cascading re-render.
+  const [answeredNonce, setAnsweredNonce] = useState(0);
+  if (request && request.nonce !== answeredNonce) {
+    setAnsweredNonce(request.nonce);
+    if (request.action === "SET_PRICES") setFocusNonce((n) => n + 1);
+    else if (request.action === "SEND_QUOTATION") setDialog({ kind: "send", part: null });
+    else if (request.action === "RECORD_RESPONSE") setDialog({ kind: "respond", part: null });
+  }
 
   /* ---------- state reconciliation ---------- */
 
-  function jobChanged(dto: JobDto) {
+  const jobChanged = (dto: JobDto) =>
     setJobs((list) => list.map((job) => (job.id === dto.id ? dto : job)));
-  }
-
-  function jobDeleted(job: JobDto) {
-    setJobs((list) => list.filter((x) => x.id !== job.id));
-    setUngrouped((list) => [...list, ...job.findings]);
-  }
-
-  function resetCreator() {
-    setCreator(null);
-    setSelectedFindings(new Set());
-    setTitle("");
-    setTitleTouched(false);
-    setPayer("CUSTOMER");
-    setInsurerName("");
-    setPrice("");
-  }
-
-  function toggleFinding(id: string) {
-    setSelectedFindings((set) => {
-      const next = new Set(set);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      if (!titleTouched) {
-        const labels = ungrouped.filter((f) => next.has(f.id)).map(findingLabel);
-        setTitle(labels.slice(0, 3).join(" + "));
-      }
-      return next;
+  const jobsChanged = (dtos: JobDto[]) =>
+    setJobs((list) => list.map((job) => dtos.find((dto) => dto.id === job.id) ?? job));
+  const jobAdded = (dto: JobDto) => setJobs((list) => [...list, dto]);
+  const jobDeleted = (jobId: string) => setJobs((list) => list.filter((job) => job.id !== jobId));
+  const jobsMerged = (survivor: JobDto, absorbedIds: string[]) =>
+    setJobs((list) =>
+      list
+        .filter((job) => !absorbedIds.includes(job.id))
+        .map((job) => (job.id === survivor.id ? survivor : job)),
+    );
+  const quotationStamped = (quotation: QuotationDto) =>
+    setQuotations((list) => {
+      const rest = list.filter((q) => q.id !== quotation.id);
+      return [quotation, ...rest].sort((a, b) => b.version - a.version);
     });
-  }
 
-  /* ---------- mutations ---------- */
+  /* ---------- phases (D-19) ---------- */
 
-  async function handleCreateFromFindings() {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      // A preselected id could point at an already-grouped finding (stale
-      // link) — only ever submit ids still on the ungrouped list.
-      const findingIds = [...selectedFindings].filter((fid) =>
-        ungrouped.some((f) => f.id === fid),
-      );
-      const res = await createJobFromFindings(caseId, {
-        findingIds,
-        title,
-        price,
-        payerType: payer,
-        insurerName,
-      });
-      if (!res.ok) {
-        setError(res.error);
-        return;
-      }
-      setJobs((list) => [...list, res.value]);
-      setUngrouped((list) => list.filter((f) => !findingIds.includes(f.id)));
-      resetCreator();
-    } finally {
-      setBusy(false);
-    }
-  }
+  const phases = useMemo(() => {
+    const offer = jobs.filter((job) => job.status === "PROPOSED");
+    const work = jobs.filter((job) => isActiveJob(job.status));
+    const done = jobs.filter(
+      (job) => job.status === "COMPLETED" || job.status === "DECLINED" || job.status === "CANCELLED",
+    );
+    return { offer, work, done };
+  }, [jobs]);
+  const populated = [phases.offer, phases.work, phases.done].filter((list) => list.length > 0).length;
+  const showHeadings = !readOnly && populated >= 2;
 
-  async function handleCreateCatalogJob() {
-    if (busy || !catalogItemId) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await createCatalogJob(caseId, {
-        catalogItemId,
-        payerType: payer,
-        insurerName,
-      });
-      if (!res.ok) {
-        setError(res.error);
-        return;
-      }
-      setJobs((list) => [...list, res.value]);
-      resetCreator();
-    } finally {
-      setBusy(false);
-    }
-  }
+  const offerTotal = phases.offer.reduce((sum, job) => sum + (job.priceSatang ?? 0), 0);
+  const offerUnpriced = phases.offer.filter((job) => job.priceSatang == null).length;
+  const sendPrimary = offerNeedsSending(jobs, quotations);
+  const parts = offerParts(jobs);
+  const insurerName = jobs.find((job) => job.insurerName)?.insurerName ?? null;
 
-  async function handleIssue() {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await issueQuotation(caseId, [...issueSelection]);
-      if (!res.ok) {
-        setError(res.error);
-        return;
-      }
-      setQuotations((list) => [res.value, ...list]);
-      setIssueOpen(false);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const rollup = (list: JobDto[]) =>
+    list.map((job) => ({ status: job.status, waitingReason: job.waitingReason }));
 
-  /* ---------- shared bits ---------- */
+  const phaseHead = (title: string, sub: React.ReactNode) =>
+    showHeadings ? (
+      <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 px-4 pt-2.5 pb-1 sm:px-5">
+        <span className="text-[12px] font-medium">{title}</span>
+        <span className="flex flex-wrap items-baseline gap-x-2 text-[11px] text-muted-foreground">
+          {sub}
+        </span>
+      </div>
+    ) : null;
 
-  const payerChips = (
-    <span className="flex border border-border-strong">
-      {(["CUSTOMER", "INSURER"] as const).map((option, index) => (
-        <button
-          key={option}
-          type="button"
-          onClick={() => setPayer(option)}
-          className={cn(
-            "px-2 py-0.5 text-[10.5px]",
-            index > 0 && "border-l border-border-strong",
-            payer === option ? "bg-primary-soft text-primary" : "text-faint hover:text-foreground",
-          )}
-          aria-pressed={payer === option}
-        >
-          {t(`payer.${option}`)}
-        </button>
-      ))}
-    </span>
-  );
-
-  const insurerInput = payer === "INSURER" && (
-    <Input
-      value={insurerName}
-      onChange={(e) => setInsurerName(e.currentTarget.value)}
-      placeholder={t("insurerPlaceholder")}
-      className="h-7 w-44 text-xs"
-    />
-  );
-
-  const showQuotations = quotations.length > 0 || (!readOnly && quotableJobs.length > 0);
+  const cardProps = {
+    caseId,
+    staffOptions,
+    isManager,
+    canSignOffQc,
+    canCancelJob,
+    canRevertStep,
+    viewerStaffId,
+    readOnly,
+    onChanged: jobChanged,
+  };
 
   return (
     <section id="jobs" className="relative scroll-mt-16 border bg-card">
       <CornerTicks />
-      <header className="flex flex-col gap-1 border-b border-dashed px-4 py-2.5 sm:px-5">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h3 className="text-[13px] font-semibold">{t("sectionTitle")}</h3>
-          <span className="num text-[11px] text-faint">{jobs.length}</span>
-          {/* The per-status rollup, demoted here as a sentence (D-6/D-8). */}
-          <JobRollupLine
-            className="ml-auto"
-            jobs={jobs.map((job) => ({ status: job.status, waitingReason: job.waitingReason }))}
-          />
-        </div>
-        {(totals.proposed > 0 || totals.authorized > 0 || totals.unpriced > 0) && (
-          <p className="num flex flex-wrap gap-x-2.5 text-[11px] text-muted-foreground">
-            {totals.proposed > 0 && (
-              <span>{t("totalProposed", { amount: formatBaht(totals.proposed) })}</span>
-            )}
-            {totals.authorized > 0 && (
-              <span>{t("totalAuthorized", { amount: formatBaht(totals.authorized) })}</span>
-            )}
-            {totals.unpriced > 0 && (
-              <span className="text-warn">{t("countUnpriced", { count: totals.unpriced })}</span>
-            )}
-          </p>
+      <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-dashed px-4 py-2.5 sm:px-5">
+        <h3 className="text-[13px] font-semibold">{t("sectionTitle")}</h3>
+        <span className="num text-[11px] text-faint">{jobs.length}</span>
+        {readOnly && deliveredAt && (
+          <span className="ml-auto text-[11px] text-muted-foreground">
+            {t("deliveredLine", {
+              date: format.dateTime(new Date(deliveredAt), { day: "numeric", month: "short" }),
+            })}
+          </span>
         )}
       </header>
 
@@ -277,288 +182,128 @@ export function JobsPanel({
         <p className="px-4 py-4 text-xs text-faint sm:px-5">
           {readOnly ? t("emptyReadOnly") : t("empty")}
         </p>
-      ) : (
+      ) : readOnly ? (
+        /* A Delivered case: Done rows alone — no heading, no controls (D-19). */
         <ul>
           {jobs.map((job) => (
-            <JobCard
-              key={job.id}
-              job={job}
-              quotations={quotations}
-              staffOptions={staffOptions}
-              isManager={isManager}
-              canSignOffQc={canSignOffQc}
-              canCancelJob={canCancelJob}
-              canRevertStep={canRevertStep}
-              viewerStaffId={viewerStaffId}
-              readOnly={readOnly}
-              onChanged={jobChanged}
-              onDeleted={jobDeleted}
-            />
+            <JobCard key={job.id} job={job} {...cardProps} />
           ))}
         </ul>
-      )}
-
-      {/* creation paths */}
-      {!readOnly && (
-        <div className="flex flex-col gap-2.5 border-t border-dashed px-4 py-3 sm:px-5">
-          {creator == null ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-7"
-                onClick={() => setCreator("findings")}
-              >
-                <Plus data-icon="inline-start" />
-                {t("createFromFindings")}
-                {ungrouped.length > 0 && (
-                  <span className="num ml-1 text-[10px] text-primary">({ungrouped.length})</span>
-                )}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-7"
-                onClick={() => setCreator("catalog")}
-                disabled={catalogItems.length === 0}
-                title={catalogItems.length === 0 ? t("noCatalogItems") : undefined}
-              >
-                <Plus data-icon="inline-start" />
-                {t("createFromCatalog")}
-              </Button>
-            </div>
-          ) : creator === "findings" ? (
-            <div className="flex flex-col gap-2 border border-dashed p-2.5">
-              <span className="text-xs font-medium text-muted-foreground">
-                {t("createFromFindings")}
-              </span>
-              {ungrouped.length === 0 ? (
-                <span className="text-[11px] text-faint">{t("noUngroupedFindings")}</span>
-              ) : (
-                <div className="flex flex-wrap gap-1.5">
-                  {ungrouped.map((f) => {
-                    const on = selectedFindings.has(f.id);
-                    return (
-                      <button
-                        key={f.id}
-                        type="button"
-                        onClick={() => toggleFinding(f.id)}
-                        className={cn(
-                          "border px-2 py-0.5 text-[11px]",
-                          on
-                            ? "border-primary-dim bg-primary-soft text-primary"
-                            : "border-border-strong text-faint hover:text-foreground",
-                        )}
-                        aria-pressed={on}
-                      >
-                        {findingLabel(f)}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Input
-                  value={title}
-                  onChange={(e) => {
-                    setTitle(e.currentTarget.value);
-                    setTitleTouched(true);
-                  }}
-                  placeholder={t("titlePlaceholder")}
-                  className="h-8 min-w-0 flex-1 text-[13px]"
-                />
-                <Input
-                  value={price}
-                  onChange={(e) => setPrice(e.currentTarget.value)}
-                  placeholder={t("priceOptionalPlaceholder")}
-                  inputMode="decimal"
-                  className="num h-8 w-28 text-right text-[13px]"
-                />
-                {payerChips}
-                {insurerInput}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={busy || !title.trim()}
-                  className="h-7 font-semibold"
-                  onClick={() => void handleCreateFromFindings()}
-                >
-                  {t("createJob")}
-                </Button>
-                <Button type="button" size="sm" variant="ghost" className="h-7" onClick={resetCreator}>
-                  {tc("cancel")}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2 border border-dashed p-2.5">
-              <span className="text-xs font-medium text-muted-foreground">
-                {t("createFromCatalog")}
-              </span>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <select
-                  className="min-w-0 flex-1 border border-border-strong bg-transparent px-1.5 py-1.5 text-xs focus:border-primary focus:outline-none [&>option]:bg-popover"
-                  value={catalogItemId}
-                  onChange={(e) => setCatalogItemId(e.currentTarget.value)}
-                >
-                  {catalogItems.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name} — {formatBaht(item.priceSatang)}
-                    </option>
-                  ))}
-                </select>
-                {payerChips}
-                {insurerInput}
-              </div>
-              <p className="text-[10.5px] text-faint">{t("catalogPriceHint")}</p>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={busy || !catalogItemId}
-                  className="h-7 font-semibold"
-                  onClick={() => void handleCreateCatalogJob()}
-                >
-                  {t("createJob")}
-                </Button>
-                <Button type="button" size="sm" variant="ghost" className="h-7" onClick={resetCreator}>
-                  {tc("cancel")}
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* quotations — no scaffolding when there is nothing to show (D-7) */}
-      {showQuotations && (
-        <div
-          id="quotations"
-          className="flex scroll-mt-16 flex-col gap-2 border-t border-dashed px-4 py-3 sm:px-5"
-        >
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="text-xs font-medium text-muted-foreground">{tq("sectionTitle")}</span>
-            {latestStale && <span className="text-[11px] text-warn">{tq("stale")}</span>}
-            {!readOnly && !issueOpen && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="ml-auto h-7"
-                disabled={quotableJobs.length === 0}
-                title={quotableJobs.length === 0 ? tq("nothingToQuote") : undefined}
-                onClick={() => {
-                  setIssueSelection(new Set(quotableJobs.map((job) => job.id)));
-                  setIssueOpen(true);
-                }}
-              >
-                <Plus data-icon="inline-start" />
-                {tq("issue")}
-              </Button>
-            )}
-          </div>
-
-          {issueOpen && (
-            <div className="flex flex-col gap-2 border border-dashed p-2.5">
-              <span className="text-[11px] text-muted-foreground">{tq("issueHint")}</span>
-              <div className="flex flex-col gap-1">
-                {quotableJobs.map((job) => {
-                  const on = issueSelection.has(job.id);
-                  return (
-                    <label key={job.id} className="flex cursor-pointer items-center gap-2 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={on}
-                        onChange={() =>
-                          setIssueSelection((set) => {
-                            const next = new Set(set);
-                            if (next.has(job.id)) next.delete(job.id);
-                            else next.add(job.id);
-                            return next;
-                          })
-                        }
-                        className="accent-[var(--primary)]"
-                      />
-                      <span className="min-w-0 flex-1 truncate">{job.title}</span>
-                      <span className="num">{formatBaht(job.priceSatang!)}</span>
-                    </label>
-                  );
-                })}
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="num text-xs text-muted-foreground">
-                  {tq("issueTotal", {
-                    amount: formatBaht(
-                      quotableJobs
-                        .filter((job) => issueSelection.has(job.id))
-                        .reduce((sum, job) => sum + (job.priceSatang ?? 0), 0),
-                    ),
-                  })}
-                </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={busy || issueSelection.size === 0}
-                  className="ml-auto h-7 font-semibold"
-                  onClick={() => void handleIssue()}
-                >
-                  {tq("issueConfirm")}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="h-7"
-                  onClick={() => setIssueOpen(false)}
-                >
-                  {tc("cancel")}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {quotations.length > 0 && (
-            <ul className="flex flex-col gap-1">
-              {quotations.map((quotation, index) => (
-                <li key={quotation.id} className="flex flex-wrap items-baseline gap-2 text-xs">
-                  <Link
-                    href={`/cases/${caseId}/quotations/${quotation.id}`}
-                    className="font-mono text-[12px] font-semibold text-primary hover:underline"
-                  >
-                    {quotation.label}
-                  </Link>
-                  <span className="text-faint">
-                    {tq("lineCount", { count: quotation.lines.length })}
-                  </span>
-                  {index === 0 && latestStale && (
-                    <span className="text-[11px] text-warn">{tq("staleShort")}</span>
+      ) : (
+        <>
+          {phases.offer.length > 0 && (
+            <div>
+              {phaseHead(
+                t("phase.offer"),
+                <>
+                  <span>{t("phaseSub.jobs", { count: phases.offer.length })}</span>
+                  {offerTotal > 0 && (
+                    <span className="num">· {t("phaseSub.proposed", { amount: formatBaht(offerTotal) })}</span>
                   )}
-                  <span className="num ml-auto">{formatBaht(quotation.totalSatang)}</span>
-                  <span className="num text-[10.5px] text-faint">
-                    {format.dateTime(new Date(quotation.issuedAt), {
-                      day: "numeric",
-                      month: "short",
-                    })}{" "}
-                    · {quotation.issuedByName}
-                  </span>
-                </li>
-              ))}
-            </ul>
+                  {offerUnpriced > 0 && (
+                    <span className="text-warn">· {t("phaseSub.unpriced", { count: offerUnpriced })}</span>
+                  )}
+                </>,
+              )}
+              <OfferTable
+                caseId={caseId}
+                jobs={phases.offer}
+                quotations={quotations}
+                staffOptions={staffOptions}
+                isManager={isManager}
+                readOnly={readOnly}
+                sendPrimary={sendPrimary}
+                focusNonce={focusNonce}
+                onChanged={jobChanged}
+                onDeleted={jobDeleted}
+                onMerged={jobsMerged}
+                onAddJob={() => setDialog({ kind: "add" })}
+                onSend={(part) => setDialog({ kind: "send", part })}
+                onRespond={(part) => setDialog({ kind: "respond", part })}
+              />
+            </div>
           )}
-        </div>
+
+          {phases.work.length > 0 && (
+            <div className={phases.offer.length > 0 ? "border-t" : undefined}>
+              {phaseHead(
+                t("phase.work"),
+                <>
+                  <span>{t("phaseSub.jobs", { count: phases.work.length })}</span>
+                  <span>·</span>
+                  <JobRollupLine jobs={rollup(phases.work)} />
+                </>,
+              )}
+              <ul className={showHeadings ? "border-t border-dashed" : undefined}>
+                {phases.work.map((job) => (
+                  <JobCard key={job.id} job={job} {...cardProps} />
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {phases.done.length > 0 && (
+            <div className={populated > 1 ? "border-t" : undefined}>
+              {phaseHead(t("phase.done"), <JobRollupLine jobs={rollup(phases.done)} />)}
+              <ul className={showHeadings ? "border-t border-dashed" : undefined}>
+                {phases.done.map((job) => (
+                  <JobCard key={job.id} job={job} {...cardProps} />
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* An Offer with nothing in it yet still offers Add job. */}
+          {phases.offer.length === 0 && (
+            <div className="flex items-center border-t border-dashed px-4 py-2 sm:px-5">
+              <button
+                type="button"
+                onClick={() => setDialog({ kind: "add" })}
+                className="text-[11px] text-faint hover:text-primary"
+              >
+                + {t("offer.addJob")}
+              </button>
+            </div>
+          )}
+        </>
       )}
 
-      {error && (
-        <p role="alert" className="mx-4 mb-3 border border-bad/45 px-2 py-1 text-[11px] text-bad sm:mx-5">
-          {t.has(`errors.${error}` as never)
-            ? t(`errors.${error}` as never)
-            : tq(`errors.${error}` as never)}
-        </p>
-      )}
+      {/* the dialogs (D-22, D-20, D-25) */}
+      <Dialog open={dialog !== null} onOpenChange={(open) => !open && setDialog(null)}>
+        {dialog?.kind === "add" && (
+          <AddJobDialog
+            caseId={caseId}
+            catalogItems={catalogItems}
+            defaultInsurerName={insurerName}
+            onAdded={jobAdded}
+            onClose={() => setDialog(null)}
+          />
+        )}
+        {dialog?.kind === "send" && (
+          <SendQuotationDialog
+            caseId={caseId}
+            jobs={jobs}
+            quotations={quotations}
+            parts={parts}
+            initialPart={dialog.part}
+            blockedReason={blockedReason}
+            recipientName={recipientName}
+            onSent={(quotation) => quotationStamped(quotation)}
+            onClose={() => setDialog(null)}
+          />
+        )}
+        {dialog?.kind === "respond" && (
+          <RecordResponseDialog
+            caseId={caseId}
+            jobs={jobs}
+            quotations={quotations}
+            parts={parts}
+            initialPart={dialog.part}
+            onSaved={jobsChanged}
+            onClose={() => setDialog(null)}
+          />
+        )}
+      </Dialog>
     </section>
   );
 }

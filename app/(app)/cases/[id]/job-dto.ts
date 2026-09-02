@@ -26,12 +26,12 @@ export const JOB_INCLUDE = {
     orderBy: { recordedAt: "asc" },
   },
   // The one-line Cancelled rendering (D-7) needs the reason, which lives on
-  // the JOB_CANCELLED event, not the Job row.
+  // the JOB_CANCELLED event, not the Job row; the Completed receipt (D-23)
+  // needs who passed QC and when, which lives on JOB_QC_PASSED.
   events: {
-    where: { type: "JOB_CANCELLED" },
+    where: { type: { in: ["JOB_CANCELLED", "JOB_QC_PASSED"] } },
     orderBy: { at: "desc" },
-    take: 1,
-    select: { note: true, at: true, actorStaff: { select: { name: true } } },
+    select: { type: true, note: true, at: true, actorStaff: { select: { name: true } } },
   },
 } as const satisfies Prisma.JobInclude;
 
@@ -76,13 +76,16 @@ export function toJobDto(row: JobWithRelations): JobDto {
       recordedAt: auth.recordedAt.toISOString(),
       recordedByName: auth.recordedBy.name,
     })),
-    cancelled: row.events[0]
-      ? {
-          note: row.events[0].note,
-          at: row.events[0].at.toISOString(),
-          byName: row.events[0].actorStaff.name,
-        }
-      : null,
+    cancelled: (() => {
+      const event = row.events.find((e) => e.type === "JOB_CANCELLED");
+      return event
+        ? { note: event.note, at: event.at.toISOString(), byName: event.actorStaff.name }
+        : null;
+    })(),
+    qcPassed: (() => {
+      const event = row.events.find((e) => e.type === "JOB_QC_PASSED");
+      return event ? { at: event.at.toISOString(), byName: event.actorStaff.name } : null;
+    })(),
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -90,6 +93,14 @@ export function toJobDto(row: JobWithRelations): JobDto {
 export const QUOTATION_INCLUDE = {
   lines: { orderBy: { sortOrder: "asc" } },
   issuedBy: { select: { name: true } },
+  // The last time this version reached the customer (M7.7, D-25) — what the
+  // Offer's foot reads as "sent Sep 2 via LINE".
+  lineUpdates: {
+    where: { deliveryStatus: "SENT" },
+    orderBy: { sentAt: "desc" },
+    take: 1,
+    select: { sentAt: true },
+  },
 } as const satisfies Prisma.QuotationInclude;
 
 export type QuotationWithRelations = Prisma.QuotationGetPayload<{
@@ -105,6 +116,8 @@ export function toQuotationDto(row: QuotationWithRelations): QuotationDto {
     totalSatang: row.totalSatang,
     issuedAt: row.issuedAt.toISOString(),
     issuedByName: row.issuedBy.name,
+    publicToken: row.publicToken,
+    sentAt: row.lineUpdates[0]?.sentAt.toISOString() ?? null,
     lines: row.lines.map((line) => ({
       jobId: line.jobId,
       title: line.title,

@@ -87,6 +87,48 @@ export function buildDraftBody(input: {
 }
 
 /* ------------------------------------------------------------------ */
+/* The quotation message (M7.7 brief §6, D-25).                        */
+/* ------------------------------------------------------------------ */
+
+export type QuotationBodyLine = { title: string; priceSatang: number };
+
+/**
+ * What Send quotation pushes: a greeting, the document number, one line per
+ * Job with its price, the total, the unguessable document link, and the
+ * shop's name. Thai-first data like every other message here — the
+ * customer opens a real numbered document inside LINE (D-25), so the text
+ * is a summary that points at it, not the document itself. Rich (Flex)
+ * messages stay in LATER.md; this is the MVP text-plus-link.
+ */
+export function buildQuotationBody(input: {
+  shopName: string;
+  customerName: string;
+  plate: string;
+  reference: string;
+  label: string;
+  lines: QuotationBodyLine[];
+  totalSatang: number;
+  documentUrl: string;
+}): string {
+  const lines: string[] = [];
+  lines.push(`สวัสดีค่ะ คุณ${input.customerName}`);
+  lines.push(`ใบเสนอราคา ${input.label} สำหรับรถทะเบียน ${input.plate} (${input.reference})`);
+  lines.push("");
+  for (const line of input.lines) {
+    lines.push(`· ${line.title} — ${formatBaht(line.priceSatang)}`);
+  }
+  lines.push(`รวม ${formatBaht(input.totalSatang)}`);
+  lines.push("");
+  lines.push("เปิดดูใบเสนอราคาฉบับเต็มได้ที่");
+  lines.push(input.documentUrl);
+  lines.push("");
+  lines.push("หากตกลงหรือมีข้อสงสัย ตอบกลับได้เลยนะคะ");
+  lines.push("");
+  lines.push(`${input.shopName}`);
+  return lines.join("\n");
+}
+
+/* ------------------------------------------------------------------ */
 /* Follow-up drafts (M7 brief §6, decision 5).                         */
 /* ------------------------------------------------------------------ */
 

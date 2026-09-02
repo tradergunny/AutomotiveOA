@@ -1275,3 +1275,72 @@ describe("M7 database-level defense in depth", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("M7.7 — the quotation document link and the Update that carried it", () => {
+  // 32 hex characters, like a real minted token, unique per run.
+  const token = `d0c${Date.now().toString(16)}`.padEnd(32, "0").slice(0, 32);
+
+  it("LineUpdate→Quotation is a same-shop composite FK: a cross-shop link is rejected by the database", async () => {
+    await expect(
+      prismaUnscoped.lineUpdate.create({
+        data: {
+          shopId: shopB.id,
+          caseId: caseB.id,
+          customerId: customerB.id,
+          lineUserId: SHARED_LINE_USER_ID,
+          recipientName: `${run} Customer B`,
+          bodyText: "ใบเสนอราคา",
+          deliveryStatus: "SENT",
+          quotationId: quotationA.id, // shop A's quotation
+          sentByStaffId: staffB.id,
+        },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("a nested create through the guard cannot smuggle another shop's quotation either", async () => {
+    await expect(
+      forShop(shopB.id).lineUpdate.create({
+        data: {
+          caseId: caseB.id,
+          customerId: customerB.id,
+          lineUserId: SHARED_LINE_USER_ID,
+          recipientName: `${run} Customer B`,
+          bodyText: "ใบเสนอราคา",
+          deliveryStatus: "SENT",
+          quotationId: quotationA.id,
+          sentByStaffId: staffB.id,
+        } as never,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("publicToken is unique across shops, and a token resolves to its own shop's document only", async () => {
+    await prismaUnscoped.quotation.update({
+      where: { id: quotationA.id },
+      data: { publicToken: token },
+    });
+    // Another shop cannot mint the same token.
+    await expect(
+      prismaUnscoped.quotation.create({
+        data: {
+          shopId: shopB.id,
+          caseId: caseB.id,
+          number: `${run}-Q-B`,
+          version: 1,
+          totalSatang: 1,
+          issuedByStaffId: staffB.id,
+          publicToken: token,
+        },
+      }),
+    ).rejects.toThrow();
+    // Shop B's guarded client cannot see it by token.
+    expect(await forShop(shopB.id).quotation.findFirst({ where: { publicToken: token } })).toBeNull();
+    // The public resolver hands back shop A's document, read through the guard.
+    const { resolvePublishedQuotation } = await import("@/lib/line-public");
+    const published = await resolvePublishedQuotation(token);
+    expect(published?.id).toBe(quotationA.id);
+    expect(published?.repairCase.shop.name).toBe(`${run} Shop A`);
+    expect(await resolvePublishedQuotation(token.replace(/0/g, "1"))).toBeNull();
+  });
+});

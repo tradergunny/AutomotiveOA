@@ -198,23 +198,25 @@ export function spineStepFor(stage: Stage): SpineStep {
 
 export type StageAction =
   | "OPEN_INSPECTION"
-  | "GROUP_FINDINGS"
   | "SET_PRICES"
-  | "RECORD_AUTHORIZATION"
-  | "ISSUE_QUOTATION"
+  | "SEND_QUOTATION"
+  | "RECORD_RESPONSE"
   | "RECORD_QC"
   | "RECORD_PAYMENT"
   | "MARK_DELIVERED";
 
 export type NextActionFacts = {
   findingsCount: number;
-  /** Findings the advisor has not accepted yet — they cannot be grouped. */
+  /** Findings the advisor has not accepted yet — the inspection is not done. */
   unconfirmedFindingsCount: number;
-  ungroupedFindingsCount: number;
   /** PROPOSED Jobs with no price — an authorization needs one (M4). */
   unpricedProposedCount: number;
-  /** A priced PROPOSED Job no Quotation covers (lib/jobs.ts). */
-  hasUnquotedProposed: boolean;
+  /**
+   * A payer part of the Offer holds priced lines that no Quotation covers at
+   * their current prices — unsent, or stale since the last send
+   * (lib/jobs.ts offerNeedsSending).
+   */
+  offerNeedsSending: boolean;
   /** Blended due across both payer sides — what READY leads with. */
   totalDueSatang: number;
 };
@@ -225,31 +227,29 @@ export type NextMove = {
 };
 
 /**
- * The assessment cascade runs no Findings → unaccepted Findings → ungrouped
- * Findings → unpriced Jobs; the pricing tail lives under AWAITING_AUTH
- * because a Job's existence
- * already files the case there (D-2 precedence). Issue quotation is only
- * ever the suggested path — a walk-in's authorization is recorded with no
- * Quotation at all (founder ruling 2026-08-27). WAITING returns no action:
- * the header renders the blocker itself instead of a button.
+ * The cascade since D-24 retired the grouping step: no Findings or unaccepted
+ * Findings → Open inspection, else nothing while In assessment (accepting a
+ * Finding that proposes work already put its line in the Offer). The pricing
+ * tail lives under AWAITING_AUTH because a Job's existence already files the
+ * case there (D-2 precedence): unpriced lines → Set prices; unsent or stale →
+ * Send quotation, with Record response beside it because the walk-in's
+ * answer is recorded with no Quotation at all (founder ruling 2026-08-27);
+ * otherwise Record response leads. WAITING returns no action: the header
+ * renders the blocker itself instead of a button.
  */
 export function nextActionFor(stage: Stage, facts: NextActionFacts): NextMove {
   switch (stage) {
     case "IN_ASSESSMENT":
-      if (facts.findingsCount === 0) return { primary: "OPEN_INSPECTION", secondary: null };
-      // Findings still being keyed in send the advisor back to the inspection
-      // rather than to a grouping step that would have nothing to offer.
-      if (facts.unconfirmedFindingsCount > 0) {
+      if (facts.findingsCount === 0 || facts.unconfirmedFindingsCount > 0) {
         return { primary: "OPEN_INSPECTION", secondary: null };
       }
-      if (facts.ungroupedFindingsCount > 0) return { primary: "GROUP_FINDINGS", secondary: null };
       return { primary: null, secondary: null };
     case "AWAITING_AUTH":
       if (facts.unpricedProposedCount > 0) return { primary: "SET_PRICES", secondary: null };
-      return {
-        primary: "RECORD_AUTHORIZATION",
-        secondary: facts.hasUnquotedProposed ? "ISSUE_QUOTATION" : null,
-      };
+      if (facts.offerNeedsSending) {
+        return { primary: "SEND_QUOTATION", secondary: "RECORD_RESPONSE" };
+      }
+      return { primary: "RECORD_RESPONSE", secondary: null };
     case "WAITING":
     case "IN_PROGRESS":
     case "DELIVERED":

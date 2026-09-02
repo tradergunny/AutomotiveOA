@@ -1,46 +1,45 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type {
-  AuthorizationChannel,
-  PayerType,
-} from "@/lib/generated/prisma/enums";
+import type { PayerType } from "@/lib/generated/prisma/enums";
 import { applyCaseReadiness } from "@/lib/case-flow";
-import { AUTH_CHANNELS, PAYER_TYPES, PART_ORDER_STATUSES, type JobDto } from "@/lib/jobs";
+import { PAYER_TYPES, PART_ORDER_STATUSES, type JobDto } from "@/lib/jobs";
 import { bahtToSatang } from "@/lib/money";
+import {
+  OfferError,
+  deleteProposedLine,
+  mergeProposedLines,
+  recordOfferResponse as recordOfferResponseCore,
+  type OfferDecision,
+  type OfferErrorCode,
+} from "@/lib/offer";
 import { can } from "@/lib/permissions";
 import { tenantContext } from "@/lib/session";
 import type { TenantDb } from "@/lib/tenant";
 import { newPhotoKey, photoStore } from "@/lib/storage";
 import { JOB_INCLUDE, toJobDto } from "./job-dto";
 
-// Job actions (M4 brief §3–§5). Same shape as the M3 inspection actions:
-// every mutation re-checks case ownership through the tenant guard, refuses
-// DELIVERED cases, and returns the fresh JobDto so the client panel can
-// reconcile its state. This file writes PROPOSED / AUTHORIZED / DECLINED;
-// the working transitions live in flow-actions.ts (M5). Since M5, mutations
-// that are timeline material also write their CaseEvent in the same
-// transaction (ruling 1), and authorization changes re-derive READY
-// (ruling 4a).
+// Job actions (M4 brief §3–§5; M7.7 D-20/D-22/D-24). Same shape as the M3
+// inspection actions: every mutation re-checks case ownership through the
+// tenant guard, refuses DELIVERED cases, and returns the fresh JobDto so the
+// client panel can reconcile its state. This file writes PROPOSED /
+// AUTHORIZED / DECLINED; the working transitions live in flow-actions.ts
+// (M5). Mutations that are timeline material write their CaseEvent in the
+// same transaction (M5 ruling 1), and authorization changes re-derive READY
+// (ruling 4a). Since M7.7 the Offer's own rules — merge, the Response as a
+// set, delete-reopens — live in lib/offer.ts and are only wrapped here.
 
 export type JobError =
-  | "caseMissing"
-  | "caseDelivered"
-  | "jobMissing"
-  | "notProposed"
+  | OfferErrorCode
   | "titleRequired"
   | "priceInvalid"
-  | "priceRequired"
   | "priceLocked"
-  | "invalidFindings"
   | "catalogMissing"
   | "insurerRequired"
-  | "invalidInput"
   | "forbidden"
   | "partMissing"
   | "photoInvalid"
   | "photoTooLarge"
-  | "quotationMissing"
   | "failed";
 
 export type JobActionResult<T> = { ok: true; value: T } | { ok: false; error: JobError };
@@ -87,8 +86,18 @@ async function freshDto(db: TenantDb, jobId: string): Promise<JobDto> {
   return toJobDto(row);
 }
 
+async function freshDtos(db: TenantDb, jobIds: string[]): Promise<JobDto[]> {
+  const rows = await db.job.findMany({
+    where: { id: { in: jobIds } },
+    include: JOB_INCLUDE,
+    orderBy: { createdAt: "asc" },
+  });
+  return rows.map(toJobDto);
+}
+
 function fail(error: unknown): { ok: false; error: JobError } {
   if (error instanceof JobInputError) return { ok: false, error: error.code };
+  if (error instanceof OfferError) return { ok: false, error: error.code };
   console.error("[jobs] failed:", error);
   return { ok: false, error: "failed" };
 }
@@ -117,20 +126,20 @@ function parseOptionalPrice(input: string): number | null {
   return satang;
 }
 
+function revalidateCase(caseId: string) {
+  revalidatePath(`/cases/${caseId}`);
+  revalidatePath("/");
+}
+
 /* ------------------------------------------------------------------ */
-/* Job creation (brief §3): two paths.                                 */
+/* Job creation — the Add job dialog's two sources (D-22). Findings    */
+/* make their own lines on Accept (D-24, inspection/actions.ts).       */
 /* ------------------------------------------------------------------ */
 
-/** Path (a): group ungrouped Findings into one quoted Job. */
-export async function createJobFromFindings(
+/** Custom: customer-requested work with no Finding — a typed title, optional price. */
+export async function createCustomJob(
   caseId: string,
-  input: {
-    findingIds: string[];
-    title: string;
-    price: string;
-    payerType: string;
-    insurerName?: string;
-  },
+  input: { title: string; price: string; payerType: string; insurerName?: string },
 ): Promise<JobActionResult<JobDto>> {
   try {
     const { session, db } = await tenantContext();
@@ -140,25 +149,6 @@ export async function createJobFromFindings(
     if (!title) throw new JobInputError("titleRequired");
     const payer = parsePayer(input.payerType, input.insurerName);
     const priceSatang = parseOptionalPrice(input.price);
-
-    // Zero findings is allowed (founder ruling: customer-requested work),
-    // but every named finding must be this case's, still ungrouped, and
-    // accepted by the advisor — the inspection's accept step is the gate.
-    const findingIds = [...new Set(input.findingIds)];
-    if (findingIds.length > 0) {
-      const owned = await db.finding.count({
-        where: {
-          id: { in: findingIds },
-          caseId,
-          jobId: null,
-          confirmedAt: { not: null },
-          // mirrors isGroupable (lib/inspection): a Finding proposing no work
-          // may not be grouped, however the ids were posted.
-          proposedActions: { isEmpty: false },
-        },
-      });
-      if (owned !== findingIds.length) throw new JobInputError("invalidFindings");
-    }
 
     const job = await db.$transaction(async (tx) => {
       const created = await tx.job.create({
@@ -171,18 +161,6 @@ export async function createJobFromFindings(
           createdByStaffId: session.staffId,
         },
       });
-      if (findingIds.length > 0) {
-        await tx.finding.updateMany({
-          where: {
-            id: { in: findingIds },
-            caseId,
-            jobId: null,
-            confirmedAt: { not: null },
-            proposedActions: { isEmpty: false }, // as the count above
-          },
-          data: { jobId: created.id },
-        });
-      }
       await tx.caseEvent.create({
         data: {
           shopId: session.shopId,
@@ -196,15 +174,14 @@ export async function createJobFromFindings(
       return created;
     });
 
-    revalidatePath(`/cases/${caseId}`);
-    revalidatePath("/");
+    revalidateCase(caseId);
     return { ok: true, value: await freshDto(db, job.id) };
   } catch (error) {
     return fail(error);
   }
 }
 
-/** Path (b): a standard service from the catalog — price locked to the entry. */
+/** Standard service from the catalog — price locked to the entry. */
 export async function createCatalogJob(
   caseId: string,
   input: { catalogItemId: string; payerType: string; insurerName?: string },
@@ -245,8 +222,7 @@ export async function createCatalogJob(
       return created;
     });
 
-    revalidatePath(`/cases/${caseId}`);
-    revalidatePath("/");
+    revalidateCase(caseId);
     return { ok: true, value: await freshDto(db, job.id) };
   } catch (error) {
     return fail(error);
@@ -316,8 +292,7 @@ export async function updateJob(
         });
       }
     });
-    revalidatePath(`/cases/${job.repairCase.id}`);
-    revalidatePath("/");
+    revalidateCase(job.repairCase.id);
     return { ok: true, value: await freshDto(db, jobId) };
   } catch (error) {
     return fail(error);
@@ -325,9 +300,11 @@ export async function updateJob(
 }
 
 /**
- * Price edits, only while PROPOSED. Quoted (non-catalog) Jobs: any staff.
- * Catalog Jobs: Manager only (CONTEXT.md price override) — recorded via
- * priceOverriddenBy, cleared again when the price returns to the entry's.
+ * Price edits, only while PROPOSED — the Offer's one live cell (D-21).
+ * Quoted (non-catalog) Jobs: any staff. Catalog Jobs: Manager only
+ * (CONTEXT.md price override) — recorded via priceOverriddenBy, cleared
+ * again when the price returns to the entry's. Pricing a line is what
+ * freezes its Findings (D-24); nothing extra to write for that.
  */
 export async function updateJobPrice(
   jobId: string,
@@ -371,7 +348,7 @@ export async function updateJobPrice(
       await db.job.update({ where: { id: jobId }, data: { priceSatang } });
     }
 
-    revalidatePath(`/cases/${job.repairCase.id}`);
+    revalidateCase(job.repairCase.id);
     return { ok: true, value: await freshDto(db, jobId) };
   } catch (error) {
     return fail(error);
@@ -379,10 +356,9 @@ export async function updateJobPrice(
 }
 
 /**
- * Delete a still-PROPOSED Job: releases its Findings back to ungrouped,
- * removes its part lines, authorization history, and photo rows (storage
- * bytes orphan — same accepted trade-off as M3 finding removal). Any
- * quotation line keeps its snapshot; the DB sets its soft job link NULL.
+ * Delete a still-PROPOSED line. Its Findings REOPEN — off the line and
+ * un-accepted (D-24, amending D-11): deleting the line is the release of a
+ * frozen Finding, and the inspection screen takes it from there.
  */
 export async function deleteJob(jobId: string): Promise<JobActionResult<{ id: string }>> {
   try {
@@ -390,110 +366,74 @@ export async function deleteJob(jobId: string): Promise<JobActionResult<{ id: st
     const job = await editableJob(db, jobId);
     if (job.status !== "PROPOSED") throw new JobInputError("notProposed");
 
-    await db.$transaction(async (tx) => {
-      await tx.finding.updateMany({ where: { jobId }, data: { jobId: null } });
-      await tx.partLine.deleteMany({ where: { jobId } });
-      await tx.jobAuthorization.deleteMany({ where: { jobId } });
-      await tx.photo.deleteMany({ where: { jobId } });
-      await tx.job.delete({ where: { id: jobId } });
-      // jobId stays NULL on purpose: the row is gone, the snapshot title
-      // keeps the timeline entry renderable (schema comment).
-      await tx.caseEvent.create({
-        data: {
-          shopId: session.shopId,
-          caseId: job.repairCase.id,
-          type: "JOB_DELETED",
-          jobTitle: job.title,
-          actorStaffId: session.staffId,
-        },
-      });
-    });
+    const actor = { shopId: session.shopId, staffId: session.staffId };
+    await db.$transaction((tx) =>
+      deleteProposedLine(tx, actor, { id: job.id, title: job.title, caseId: job.repairCase.id }),
+    );
 
-    revalidatePath(`/cases/${job.repairCase.id}`);
-    revalidatePath("/");
+    revalidateCase(job.repairCase.id);
     return { ok: true, value: { id: jobId } };
   } catch (error) {
     return fail(error);
   }
 }
 
-/* ------------------------------------------------------------------ */
-/* Authorization recording (brief §4): append-only history.            */
-/* ------------------------------------------------------------------ */
-
-export async function recordAuthorization(
-  jobId: string,
-  input: {
-    decision: "AUTHORIZED" | "DECLINED";
-    channel: string;
-    note?: string;
-    quotationId?: string;
-  },
-): Promise<JobActionResult<JobDto>> {
+/**
+ * Merge (D-24): two or more Proposed lines of one payer become one — the
+ * three-panel repaint. The oldest survives with every Finding, part and photo;
+ * the price stays only if exactly one part had one. Returns the survivor and
+ * the ids that left.
+ */
+export async function mergeJobs(
+  caseId: string,
+  jobIds: string[],
+): Promise<JobActionResult<{ survivor: JobDto; absorbedIds: string[] }>> {
   try {
     const { session, db } = await tenantContext();
-    const job = await editableJob(db, jobId);
-    if (job.status !== "PROPOSED") throw new JobInputError("notProposed");
-    if (input.decision !== "AUTHORIZED" && input.decision !== "DECLINED") {
-      throw new JobInputError("invalidInput");
-    }
-    // The payer authorizes an amount — an unpriced Job can be declined
-    // ("no thanks" to a suggestion) but never authorized.
-    if (input.decision === "AUTHORIZED" && job.priceSatang == null) {
-      throw new JobInputError("priceRequired");
-    }
-    if (!(AUTH_CHANNELS as readonly string[]).includes(input.channel)) {
-      throw new JobInputError("invalidInput");
-    }
+    await editableCase(db, caseId);
+    const actor = { shopId: session.shopId, staffId: session.staffId };
+    const survivorId = await mergeProposedLines(db, actor, caseId, jobIds);
+    revalidateCase(caseId);
+    return {
+      ok: true,
+      value: {
+        survivor: await freshDto(db, survivorId),
+        absorbedIds: jobIds.filter((id) => id !== survivorId),
+      },
+    };
+  } catch (error) {
+    return fail(error);
+  }
+}
 
-    let quotationId: string | null = null;
-    if (input.quotationId) {
-      const quotation = await db.quotation.findUnique({
-        where: { id: input.quotationId },
-        select: { id: true, caseId: true },
-      });
-      if (!quotation || quotation.caseId !== job.repairCase.id) {
-        throw new JobInputError("quotationMissing");
-      }
-      quotationId = quotation.id;
-    }
+/* ------------------------------------------------------------------ */
+/* The Response (D-20): one payer's answer to the Offer, as a set.     */
+/* ------------------------------------------------------------------ */
 
-    const note = cleanText(input.note, MAX_NOTE_LENGTH);
-    await db.$transaction(async (tx) => {
-      await tx.jobAuthorization.create({
-        data: {
-          shopId: session.shopId,
-          jobId,
-          decision: input.decision,
-          channel: input.channel as AuthorizationChannel,
-          quotationId,
-          note,
-          recordedByStaffId: session.staffId,
-        },
-      });
-      await tx.job.update({ where: { id: jobId }, data: { status: input.decision } });
-      await tx.caseEvent.create({
-        data: {
-          shopId: session.shopId,
-          caseId: job.repairCase.id,
-          type: "JOB_AUTHORIZATION_RECORDED",
-          jobId,
-          jobTitle: job.title,
-          fromStatus: "PROPOSED",
-          toStatus: input.decision,
-          note,
-          actorStaffId: session.staffId,
-        },
-      });
-      // New authorized work on a READY case revokes it (ruling 4a).
-      if (input.decision === "AUTHORIZED") {
-        await applyCaseReadiness(tx, session.shopId, job.repairCase.id, session.staffId);
-      }
+export async function recordOfferResponse(
+  caseId: string,
+  input: {
+    payerType: string;
+    insurerName?: string;
+    channel: string;
+    quotationId?: string;
+    note?: string;
+    decisions: OfferDecision[];
+  },
+): Promise<JobActionResult<JobDto[]>> {
+  try {
+    const { session, db } = await tenantContext();
+    const part = parsePayer(input.payerType, input.insurerName);
+    const actor = { shopId: session.shopId, staffId: session.staffId };
+    const { jobIds } = await recordOfferResponseCore(db, actor, caseId, {
+      part,
+      channel: input.channel,
+      quotationId: input.quotationId || null,
+      note: input.note,
+      decisions: input.decisions,
     });
-
-    revalidatePath(`/cases/${job.repairCase.id}`);
-    revalidatePath("/");
-    return { ok: true, value: await freshDto(db, jobId) };
+    revalidateCase(caseId);
+    return { ok: true, value: await freshDtos(db, jobIds) };
   } catch (error) {
     return fail(error);
   }
@@ -541,8 +481,7 @@ export async function revertAuthorization(
       }
     });
 
-    revalidatePath(`/cases/${job.repairCase.id}`);
-    revalidatePath("/");
+    revalidateCase(job.repairCase.id);
     return { ok: true, value: await freshDto(db, jobId) };
   } catch (error) {
     return fail(error);
@@ -594,8 +533,7 @@ export async function addPartLine(
     });
     // The case header's Waiting blocker and the board's parts progress read
     // part lines since M7.5 (D-6) — keep the server render fresh.
-    revalidatePath(`/cases/${job.repairCase.id}`);
-    revalidatePath("/");
+    revalidateCase(job.repairCase.id);
     return { ok: true, value: await freshDto(db, jobId) };
   } catch (error) {
     return fail(error);
@@ -624,8 +562,7 @@ export async function updatePartLine(
         orderStatus: input.orderStatus as (typeof PART_ORDER_STATUSES)[number],
       },
     });
-    revalidatePath(`/cases/${job.repairCase.id}`);
-    revalidatePath("/");
+    revalidateCase(job.repairCase.id);
     return { ok: true, value: await freshDto(db, line.jobId) };
   } catch (error) {
     return fail(error);
@@ -644,8 +581,7 @@ export async function removePartLine(
     if (!line) throw new JobInputError("partMissing");
     const job = await editableJob(db, line.jobId);
     await db.partLine.delete({ where: { id: partLineId } });
-    revalidatePath(`/cases/${job.repairCase.id}`);
-    revalidatePath("/");
+    revalidateCase(job.repairCase.id);
     return { ok: true, value: await freshDto(db, line.jobId) };
   } catch (error) {
     return fail(error);

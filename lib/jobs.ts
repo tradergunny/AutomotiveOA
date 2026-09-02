@@ -91,6 +91,8 @@ export type JobDto = {
   authorizations: AuthorizationDto[];
   /** The JOB_CANCELLED event, when one exists — D-7's one-line rendering. */
   cancelled: { note: string | null; at: string; byName: string } | null;
+  /** The latest JOB_QC_PASSED event — the Completed receipt's provenance (D-23). */
+  qcPassed: { at: string; byName: string } | null;
   createdAt: string;
 };
 
@@ -110,49 +112,117 @@ export type QuotationDto = {
   totalSatang: number;
   issuedAt: string;
   issuedByName: string;
+  /** The document link's token — set once the version was sent (D-25). */
+  publicToken: string | null;
+  /** When it last reached the customer over LINE, if it ever did. */
+  sentAt: string | null;
   lines: QuotationLineDto[];
 };
 
+/* ------------------------------------------------------------------ */
+/* The Offer (M7.7, CONTEXT.md): the payer parts a Quotation and a     */
+/* Response are made against.                                          */
+/* ------------------------------------------------------------------ */
+
 /**
- * Staleness of the LATEST quotation (M4 brief §6): true when the offer on
- * the table no longer matches the live Jobs — a line's Job was deleted or
- * re-priced, or a priced, still-quotable Job exists that the quotation
- * doesn't cover. Issuing stays a human act; this only nudges.
+ * One payer's half of the Offer. Where a case mixes self-pay and
+ * insurer-paid Jobs, each payer sees and answers only their own part, so a
+ * Quotation snapshots one part and a Response answers one part.
  */
+export type OfferPart = { payerType: PayerType; insurerName: string | null };
+
+export function partKey(part: OfferPart): string {
+  return part.payerType === "CUSTOMER" ? "CUSTOMER" : `INSURER:${part.insurerName ?? ""}`;
+}
+
+export function samePart(a: OfferPart, b: OfferPart): boolean {
+  return partKey(a) === partKey(b);
+}
+
+/** A Job's part, with the insurer name dropped for self-pay Jobs. */
+export function partOf(job: Pick<JobDto, "payerType" | "insurerName">): OfferPart {
+  return {
+    payerType: job.payerType,
+    insurerName: job.payerType === "INSURER" ? job.insurerName : null,
+  };
+}
+
 /**
- * True while a priced PROPOSED Job is covered by no Quotation line at its
- * current price — the D-6 trigger for suggesting Issue quotation on an
- * Awaiting-authorization case. A suggestion only: a Quotation is the
- * professional path, never a gate (founder ruling 2026-08-27).
+ * The parts the Offer currently holds — Customer first, then insurers by
+ * name — from its PROPOSED Jobs. A single-payer Offer is one part.
  */
-export function hasUnquotedProposed(
-  jobs: Pick<JobDto, "id" | "status" | "priceSatang">[],
-  quotations: { lines: Pick<QuotationLineDto, "jobId" | "priceSatang">[] }[],
-): boolean {
-  return jobs.some(
-    (job) =>
-      job.status === "PROPOSED" &&
-      job.priceSatang != null &&
-      !quotations.some((quotation) =>
-        quotation.lines.some(
-          (line) => line.jobId === job.id && line.priceSatang === job.priceSatang,
-        ),
-      ),
+export function offerParts(
+  jobs: Pick<JobDto, "status" | "payerType" | "insurerName">[],
+): OfferPart[] {
+  const seen = new Map<string, OfferPart>();
+  for (const job of jobs) {
+    if (job.status !== "PROPOSED") continue;
+    const part = partOf(job);
+    if (!seen.has(partKey(part))) seen.set(partKey(part), part);
+  }
+  return [...seen.values()].sort((a, b) => {
+    if (a.payerType !== b.payerType) return a.payerType === "CUSTOMER" ? -1 : 1;
+    return (a.insurerName ?? "").localeCompare(b.insurerName ?? "");
+  });
+}
+
+/** The lines a Quotation for this part would carry: priced and still on offer. */
+export function pricedOfferLines<
+  T extends Pick<JobDto, "status" | "priceSatang" | "payerType" | "insurerName">,
+>(jobs: T[], part: OfferPart): T[] {
+  return jobs.filter(
+    (job) => job.status === "PROPOSED" && job.priceSatang != null && samePart(partOf(job), part),
   );
 }
 
-export function isQuotationStale(
-  quotation: Pick<QuotationDto, "lines">,
-  jobs: Pick<JobDto, "id" | "status" | "priceSatang">[],
+/**
+ * The reuse rule (D-25): a Quotation covers a set of lines when its lines are
+ * exactly those Jobs at exactly those prices. Sending an Offer that a version
+ * already covers reuses it; anything else stamps a new version.
+ */
+export function quotationCovers(
+  quotation: { lines: Pick<QuotationLineDto, "jobId" | "priceSatang">[] },
+  jobs: Pick<JobDto, "id" | "priceSatang">[],
 ): boolean {
-  const jobById = new Map(jobs.map((job) => [job.id, job]));
-  for (const line of quotation.lines) {
-    const job = line.jobId ? jobById.get(line.jobId) : undefined;
-    if (!job) return true; // the offered Job no longer exists
-    if (job.priceSatang !== line.priceSatang) return true;
-  }
-  const covered = new Set(quotation.lines.map((line) => line.jobId));
-  return jobs.some(
-    (job) => job.priceSatang != null && isQuotable(job.status) && !covered.has(job.id),
+  if (jobs.length === 0 || quotation.lines.length !== jobs.length) return false;
+  const wanted = new Map(jobs.map((job) => [job.id, job.priceSatang]));
+  return quotation.lines.every(
+    (line) => line.jobId != null && wanted.get(line.jobId) === line.priceSatang,
   );
+}
+
+/** The latest Quotation covering these lines (quotations newest first), or null. */
+export function coveringQuotation<Q extends { lines: Pick<QuotationLineDto, "jobId" | "priceSatang">[] }>(
+  quotations: Q[],
+  jobs: Pick<JobDto, "id" | "priceSatang">[],
+): Q | null {
+  return quotations.find((quotation) => quotationCovers(quotation, jobs)) ?? null;
+}
+
+/** The latest Quotation issued for this payer part, whatever it covers now. */
+export function latestQuotationForPart<
+  Q extends { lines: Pick<QuotationLineDto, "payerType" | "insurerName">[] },
+>(quotations: Q[], part: OfferPart): Q | null {
+  return (
+    quotations.find(
+      (quotation) =>
+        quotation.lines.length > 0 && quotation.lines.every((line) => samePart(line, part)),
+    ) ?? null
+  );
+}
+
+/**
+ * The header's Send-quotation trigger (D-6 as amended): some part of the
+ * Offer holds priced lines that no version covers at their current prices —
+ * never sent, or changed since. A suggestion only: a Quotation is the
+ * professional path, never a gate.
+ */
+export function offerNeedsSending(
+  jobs: Pick<JobDto, "id" | "status" | "priceSatang" | "payerType" | "insurerName">[],
+  quotations: { lines: Pick<QuotationLineDto, "jobId" | "priceSatang">[] }[],
+): boolean {
+  return offerParts(jobs).some((part) => {
+    const lines = pricedOfferLines(jobs, part);
+    return lines.length > 0 && coveringQuotation(quotations, lines) === null;
+  });
 }

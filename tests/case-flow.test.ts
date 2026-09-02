@@ -14,7 +14,6 @@ import {
   type NextActionFacts,
   type Stage,
 } from "@/lib/case-flow";
-import { hasUnquotedProposed } from "@/lib/jobs";
 import type { JobStatus, WaitingReason } from "@/lib/generated/prisma/enums";
 
 const j = (status: JobStatus, waitingReason: WaitingReason | null = null) => ({
@@ -158,53 +157,49 @@ describe("stageFor (M7.5 brief §1): board groups + two Delivered flavors", () =
   });
 });
 
-describe("nextActionFor (D-6): one primary, at most one secondary", () => {
+describe("nextActionFor (D-6, as amended by D-24/D-25): one primary, at most one secondary", () => {
   const facts = (overrides: Partial<NextActionFacts> = {}): NextActionFacts => ({
     findingsCount: 0,
     unconfirmedFindingsCount: 0,
-    ungroupedFindingsCount: 0,
     unpricedProposedCount: 0,
-    hasUnquotedProposed: false,
+    offerNeedsSending: false,
     totalDueSatang: 0,
     ...overrides,
   });
 
-  it("walks the assessment cascade", () => {
+  it("walks the assessment cascade — the grouping step is gone", () => {
     expect(nextActionFor("IN_ASSESSMENT", facts())).toEqual({
       primary: "OPEN_INSPECTION",
       secondary: null,
     });
-    // A finding the advisor has not accepted yet cannot be grouped, so the
-    // cascade sends them back to the inspection rather than to an empty
-    // grouping step.
+    // A finding the advisor has not accepted yet sends them back to the
+    // inspection; accepting it is what puts its line in the Offer.
     expect(
-      nextActionFor(
-        "IN_ASSESSMENT",
-        facts({ findingsCount: 3, unconfirmedFindingsCount: 1, ungroupedFindingsCount: 2 }),
-      ),
+      nextActionFor("IN_ASSESSMENT", facts({ findingsCount: 3, unconfirmedFindingsCount: 1 })),
     ).toEqual({ primary: "OPEN_INSPECTION", secondary: null });
-    expect(
-      nextActionFor("IN_ASSESSMENT", facts({ findingsCount: 3, ungroupedFindingsCount: 3 })),
-    ).toEqual({ primary: "GROUP_FINDINGS", secondary: null });
-    // Everything grouped, nothing live (all declined/cancelled): no push.
+    // Everything accepted, nothing live (all declined/cancelled, or due-soon
+    // items proposing no work): no push.
     expect(nextActionFor("IN_ASSESSMENT", facts({ findingsCount: 3 }))).toEqual({
       primary: null,
       secondary: null,
     });
   });
-  it("prices before authorization — the cascade's tail lives under Awaiting auth", () => {
+  it("prices before sending — the cascade's tail lives under Awaiting auth", () => {
     expect(
-      nextActionFor("AWAITING_AUTH", facts({ findingsCount: 3, unpricedProposedCount: 2 })),
+      nextActionFor(
+        "AWAITING_AUTH",
+        facts({ findingsCount: 3, unpricedProposedCount: 2, offerNeedsSending: true }),
+      ),
     ).toEqual({ primary: "SET_PRICES", secondary: null });
   });
-  it("suggests the quotation as the professional path, never a gate", () => {
-    expect(nextActionFor("AWAITING_AUTH", facts({ hasUnquotedProposed: true }))).toEqual({
-      primary: "RECORD_AUTHORIZATION",
-      secondary: "ISSUE_QUOTATION",
+  it("sends while the Offer is unsent or stale, with Record response beside it for the walk-in", () => {
+    expect(nextActionFor("AWAITING_AUTH", facts({ offerNeedsSending: true }))).toEqual({
+      primary: "SEND_QUOTATION",
+      secondary: "RECORD_RESPONSE",
     });
-    // Covered by a quotation — recording is all that is left.
+    // Sent and unchanged — recording the answer is all that is left.
     expect(nextActionFor("AWAITING_AUTH", facts())).toEqual({
-      primary: "RECORD_AUTHORIZATION",
+      primary: "RECORD_RESPONSE",
       secondary: null,
     });
   });
@@ -263,25 +258,6 @@ describe("waitingBlockerFor (D-6): the header renders the blocker itself", () =>
     expect(blocker.reasons).toEqual(["PAINT_BOOTH", "TECHNICIAN"]);
     expect(blocker.pendingParts).toBe(0);
     expect(blocker.nextEta).toBeNull();
-  });
-});
-
-describe("hasUnquotedProposed (D-6's Issue-quotation trigger)", () => {
-  const quote = (lines: { jobId: string | null; priceSatang: number }[]) => ({ lines });
-  it("true while a priced proposed job is uncovered, at its current price", () => {
-    const jobs = [{ id: "a", status: "PROPOSED" as const, priceSatang: 100_000 }];
-    expect(hasUnquotedProposed(jobs, [])).toBe(true);
-    // Covered at a stale price still counts as uncovered.
-    expect(hasUnquotedProposed(jobs, [quote([{ jobId: "a", priceSatang: 90_000 }])])).toBe(true);
-    expect(hasUnquotedProposed(jobs, [quote([{ jobId: "a", priceSatang: 100_000 }])])).toBe(false);
-  });
-  it("unpriced, non-proposed, and quoted jobs never trigger it", () => {
-    expect(hasUnquotedProposed([{ id: "a", status: "PROPOSED", priceSatang: null }], [])).toBe(
-      false,
-    );
-    expect(hasUnquotedProposed([{ id: "a", status: "AUTHORIZED", priceSatang: 100 }], [])).toBe(
-      false,
-    );
   });
 });
 

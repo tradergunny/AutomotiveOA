@@ -142,6 +142,12 @@ export type FindingDto = {
   note: string | null;
   /** The Job fulfilling this Finding (M4) — null while ungrouped. */
   jobId: string | null;
+  /**
+   * M7.7 (D-24): true once the Finding's line is priced or sent — from then
+   * on the inspection may not edit, reopen or discard it; deleting the line
+   * on the case page is the only release.
+   */
+  frozen: boolean;
   recordedAt: string; // ISO — serializable across the RSC boundary
   recordedByName: string;
   /** When the advisor accepted it as final — null while still being captured. */
@@ -173,10 +179,11 @@ export function canConfirm(
 }
 
 /**
- * Findings offered for grouping into a Job — accepted, not already on one, and
- * actually proposing work. A "due soon" wear item is a complete record with
- * nothing to price: leaving it in the candidate set stranded its case at
- * "Group into Jobs", because the only way out of that set is acquiring a Job.
+ * Whether an accepted Finding makes an Offer line (D-24 — D-16's grouping
+ * candidate rule, kept as "makes a line or not"): accepted, not already on
+ * one, and actually proposing work. A "due soon" wear item is a complete
+ * record with nothing to price, so it creates nothing. The backfill script
+ * (scripts/offer-backfill.ts) is the other caller.
  */
 export function isGroupable(f: {
   jobId: string | null;

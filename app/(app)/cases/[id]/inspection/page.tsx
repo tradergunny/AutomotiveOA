@@ -5,6 +5,7 @@ import { getTranslations } from "next-intl/server";
 import { CaseStatusBadge } from "@/components/blocks/case-status-badge";
 import { formatPhone } from "@/lib/normalize";
 import type { FindingDto } from "@/lib/inspection";
+import { isLineFrozen } from "@/lib/offer";
 import { tenantDb } from "@/lib/session";
 import { InspectionScreen } from "./inspection-screen";
 
@@ -27,6 +28,14 @@ export default async function InspectionPage({
         include: {
           recordedBy: { select: { name: true } },
           photos: { select: { id: true }, orderBy: { capturedAt: "asc" } },
+          // The freeze point (D-24): a Finding on a priced or sent line.
+          job: {
+            select: {
+              status: true,
+              priceSatang: true,
+              _count: { select: { quotationLines: true } },
+            },
+          },
         },
       },
     },
@@ -45,6 +54,13 @@ export default async function InspectionPage({
     proposedActions: f.proposedActions,
     note: f.note,
     jobId: f.jobId,
+    frozen:
+      f.job != null &&
+      isLineFrozen({
+        status: f.job.status,
+        priceSatang: f.job.priceSatang,
+        quotationLineCount: f.job._count.quotationLines,
+      }),
     recordedAt: f.recordedAt.toISOString(),
     recordedByName: f.recordedBy.name,
     confirmedAt: f.confirmedAt?.toISOString() ?? null,

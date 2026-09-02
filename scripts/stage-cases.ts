@@ -1,8 +1,10 @@
 import "./load-env";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { randomBytes } from "node:crypto";
 import { deflateSync } from "node:zlib";
 import { prismaUnscoped } from "../lib/db";
+import { buildQuotationBody } from "../lib/line-draft";
 import type {
   DamageType,
   FindingCondition,
@@ -14,9 +16,11 @@ import type {
 import { newPhotoKey, photoStore } from "../lib/storage";
 
 /**
- * M7.5 staging (brief "Done when"): one Repair Case per Stage, on the pilot
- * shop, so the rebuilt page and board can be walked as a stranger — fresh
- * assessment, ungrouped findings, unpriced proposal, awaiting authorization,
+ * M7.5 staging (brief "Done when"), extended in M7.7: one Repair Case per
+ * Stage, on the pilot shop, so the rebuilt page and board can be walked as
+ * a stranger — fresh assessment, findings still being keyed in, an unpriced
+ * line, a priced Offer not yet sent, a SENT Offer (Quotation + LINE Update
+ * with the document link), a recorded Response (Work and Done phases),
  * waiting on parts, in progress (with a cancelled job), in QC, ready,
  * delivered-with-balance, delivered-settled. DEV ONLY — direct writes, not
  * the flows; performing the flows remains each milestone's gate.
@@ -95,6 +99,12 @@ function carPng(body: Rgb, width = 480, height = 360): Buffer {
 /* ------------------------------------------------------------------ */
 
 const SHOP_NAME = "Somchai Garage";
+/**
+ * The LINE identities the sent-Offer cases are linked to — stand-in userIds
+ * (M7.7), one per case because a Customer holds at most one contact.
+ */
+const STAGED_LINE_USER_PREFIX = "U00000000000000000000000000stage";
+let stagedLineUsers = 0;
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000);
 const daysAhead = (d: number) => new Date(Date.now() + d * 86_400_000);
 const baht = (b: number) => b * 100;
@@ -142,13 +152,21 @@ async function main() {
     await prismaUnscoped.$transaction([
       prismaUnscoped.followUp.deleteMany({ where: { caseId: { in: previous } } }),
       prismaUnscoped.caseEvent.deleteMany({ where: { caseId: { in: previous } } }),
+      prismaUnscoped.payment.deleteMany({ where: { caseId: { in: previous } } }),
+      prismaUnscoped.lineUpdatePhoto.deleteMany({ where: { lineUpdate: { caseId: { in: previous } } } }),
+      prismaUnscoped.lineUpdate.deleteMany({ where: { caseId: { in: previous } } }),
       prismaUnscoped.photo.deleteMany({ where: { caseId: { in: previous } } }),
       prismaUnscoped.partLine.deleteMany({ where: { job: { caseId: { in: previous } } } }),
       prismaUnscoped.jobAuthorization.deleteMany({ where: { job: { caseId: { in: previous } } } }),
+      prismaUnscoped.quotationLine.deleteMany({ where: { quotation: { caseId: { in: previous } } } }),
       prismaUnscoped.quotation.deleteMany({ where: { caseId: { in: previous } } }),
       prismaUnscoped.finding.deleteMany({ where: { caseId: { in: previous } } }),
       prismaUnscoped.job.deleteMany({ where: { caseId: { in: previous } } }),
       prismaUnscoped.repairCase.deleteMany({ where: { id: { in: previous } } }),
+      // The stand-in LINE identity the sent-Offer case links (M7.7).
+      prismaUnscoped.lineContact.deleteMany({
+        where: { shopId, lineUserId: { startsWith: STAGED_LINE_USER_PREFIX } },
+      }),
     ]);
     console.log(`cleared previous staging run (${previous.length} cases)`);
   }
@@ -210,8 +228,8 @@ async function main() {
     insurerName?: string;
     priceBaht?: number;
     tech?: { id: string };
-    authorized?: { channel: "PHONE" | "IN_PERSON" | "LINE"; note?: string };
-    declined?: { channel: "PHONE" | "IN_PERSON" | "LINE"; note?: string };
+    authorized?: { channel: "PHONE" | "IN_PERSON" | "LINE"; note?: string; againstQuotation?: boolean };
+    declined?: { channel: "PHONE" | "IN_PERSON" | "LINE"; note?: string; againstQuotation?: boolean };
     cancelledNote?: string;
     parts?: {
       name: string;
@@ -232,6 +250,8 @@ async function main() {
     note?: string;
     /** Index into the jobs array once created; omitted = ungrouped. */
     jobIndex?: number;
+    /** Still being keyed in (confirmedAt NULL). Grouped findings are always accepted. */
+    draft?: boolean;
   };
 
   async function stageCase(spec: {
@@ -245,6 +265,12 @@ async function main() {
     deliveredHoursAgo?: number;
     jobs?: JobSpec[];
     findings?: FindingSpec[];
+    /**
+     * M7.7: a Quotation covering the listed jobs (indexes) at their prices —
+     * the version Send quotation would have stamped — and, when `sent`, the
+     * document link plus the LINE Update that carried it.
+     */
+    quotation?: { jobIndexes: number[]; sent?: boolean; hoursAgo?: number };
     payments?: {
       payerType: PayerType;
       insurerName?: string;
@@ -300,7 +326,8 @@ async function main() {
       });
     }
 
-    const jobRows = [];
+    const jobRows: Awaited<ReturnType<typeof prismaUnscoped.job.create>>[] = [];
+    const pendingAuth: { row: { id: string; title: string }; job: JobSpec }[] = [];
     for (const job of spec.jobs ?? []) {
       const row = await prismaUnscoped.job.create({
         data: {
@@ -318,32 +345,9 @@ async function main() {
         },
       });
       jobRows.push(row);
-      if (job.authorized) {
-        await prismaUnscoped.jobAuthorization.create({
-          data: {
-            shopId,
-            jobId: row.id,
-            decision: "AUTHORIZED",
-            channel: job.authorized.channel,
-            note: job.authorized.note ?? null,
-            recordedByStaffId: advisor.id,
-            recordedAt: new Date(checkedInAt.getTime() + 90 * 60_000),
-          },
-        });
-      }
-      if (job.declined) {
-        await prismaUnscoped.jobAuthorization.create({
-          data: {
-            shopId,
-            jobId: row.id,
-            decision: "DECLINED",
-            channel: job.declined.channel,
-            note: job.declined.note ?? null,
-            recordedByStaffId: advisor.id,
-            recordedAt: new Date(checkedInAt.getTime() + 90 * 60_000),
-          },
-        });
-      }
+      // Authorizations are recorded after the quotation exists (below) so a
+      // Response can name the version it answered.
+      pendingAuth.push({ row, job });
       if (job.cancelledNote) {
         await prismaUnscoped.caseEvent.create({
           data: {
@@ -377,7 +381,136 @@ async function main() {
       }
     }
 
+    // The Quotation (M7.7): stamped by sending, immutable — lines snapshot
+    // the jobs' current titles and prices. A sent one carries the document
+    // token and the LINE Update the customer received.
+    let quotationId: string | null = null;
+    if (spec.quotation) {
+      const covered = spec.quotation.jobIndexes.map((index) => jobRows[index]!);
+      const issuedAt = hoursAgo(spec.quotation.hoursAgo ?? spec.checkedInHoursAgo - 2);
+      const quotation = await prismaUnscoped.quotation.create({
+        data: {
+          shopId,
+          caseId: repairCase.id,
+          number: `Q-${reference.replace(/^RC-?/, "")}`,
+          version: 1,
+          totalSatang: covered.reduce((sum, job) => sum + (job.priceSatang ?? 0), 0),
+          issuedByStaffId: advisor.id,
+          issuedAt,
+          publicToken: spec.quotation.sent ? randomBytes(16).toString("hex") : null,
+          lines: {
+            create: covered.map((job, index) => ({
+              jobId: job.id,
+              title: job.title,
+              priceSatang: job.priceSatang ?? 0,
+              payerType: job.payerType,
+              insurerName: job.insurerName,
+              sortOrder: index,
+            })),
+          },
+        },
+      });
+      quotationId = quotation.id;
+      await prismaUnscoped.caseEvent.create({
+        data: {
+          shopId,
+          caseId: repairCase.id,
+          type: "QUOTATION_ISSUED",
+          quotationId: quotation.id,
+          actorStaffId: advisor.id,
+          at: issuedAt,
+        },
+      });
+      if (spec.quotation.sent) {
+        // A linked LINE identity for the contact, so the send gate is open too.
+        stagedLineUsers += 1;
+        const lineUserId = `${STAGED_LINE_USER_PREFIX}${stagedLineUsers}`;
+        await prismaUnscoped.lineContact.deleteMany({
+          where: { shopId, customerId: vehicle.primaryCustomerId },
+        });
+        await prismaUnscoped.lineContact.create({
+          data: {
+            shopId,
+            lineUserId,
+            displayName: "LINE user (staged)",
+            customerId: vehicle.primaryCustomerId,
+            linkedByStaffId: advisor.id,
+            linkedAt: issuedAt,
+          },
+        });
+        const update = await prismaUnscoped.lineUpdate.create({
+          data: {
+            shopId,
+            caseId: repairCase.id,
+            customerId: vehicle.primaryCustomerId,
+            lineUserId,
+            recipientName: vehicle.primaryCustomer.name,
+            bodyText: buildQuotationBody({
+              shopName: SHOP_NAME,
+              customerName: vehicle.primaryCustomer.name,
+              plate: vehicle.plate,
+              reference,
+              label: `Q-${reference.replace(/^RC-?/, "")}`,
+              lines: covered.map((job) => ({ title: job.title, priceSatang: job.priceSatang ?? 0 })),
+              totalSatang: covered.reduce((sum, job) => sum + (job.priceSatang ?? 0), 0),
+              documentUrl: `http://localhost:3000/q/${quotation.publicToken}`,
+            }),
+            deliveryStatus: "SENT",
+            lineRequestId: "staged",
+            quotationId: quotation.id,
+            sentByStaffId: advisor.id,
+            sentAt: issuedAt,
+          },
+        });
+        await prismaUnscoped.caseEvent.create({
+          data: {
+            shopId,
+            caseId: repairCase.id,
+            type: "LINE_UPDATE_SENT",
+            lineUpdateId: update.id,
+            subjectName: vehicle.primaryCustomer.name,
+            actorStaffId: advisor.id,
+            at: issuedAt,
+          },
+        });
+      }
+    }
+
+    for (const { row, job } of pendingAuth) {
+      const decision = job.authorized ? "AUTHORIZED" : job.declined ? "DECLINED" : null;
+      const answer = job.authorized ?? job.declined;
+      if (!decision || !answer) continue;
+      const recordedAt = new Date(checkedInAt.getTime() + 90 * 60_000);
+      await prismaUnscoped.jobAuthorization.create({
+        data: {
+          shopId,
+          jobId: row.id,
+          decision,
+          channel: answer.channel,
+          note: answer.note ?? null,
+          quotationId: answer.againstQuotation ? quotationId : null,
+          recordedByStaffId: advisor.id,
+          recordedAt,
+        },
+      });
+      await prismaUnscoped.caseEvent.create({
+        data: {
+          shopId,
+          caseId: repairCase.id,
+          type: "JOB_AUTHORIZATION_RECORDED",
+          jobId: row.id,
+          jobTitle: row.title,
+          fromStatus: "PROPOSED",
+          toStatus: decision,
+          note: answer.note ?? null,
+          actorStaffId: advisor.id,
+          at: recordedAt,
+        },
+      });
+    }
+
     for (const finding of spec.findings ?? []) {
+      const recordedAt = new Date(checkedInAt.getTime() + 15 * 60_000);
       await prismaUnscoped.finding.create({
         data: {
           shopId,
@@ -390,7 +523,10 @@ async function main() {
           note: finding.note ?? null,
           jobId: finding.jobIndex != null ? jobRows[finding.jobIndex]!.id : null,
           recordedByStaffId: advisor.id,
-          recordedAt: new Date(checkedInAt.getTime() + 15 * 60_000),
+          recordedAt,
+          // Accepted unless still being keyed in; a grouped Finding is always
+          // accepted (D-24: accept is what made its line).
+          confirmedAt: finding.draft ? null : new Date(recordedAt.getTime() + 60_000),
         },
       });
     }
@@ -449,7 +585,8 @@ async function main() {
     photos: 3,
   });
 
-  // 2 · In assessment, findings recorded, nothing grouped → "Group into jobs"
+  // 2 · In assessment, findings still being keyed in (unaccepted) → "Open inspection".
+  //     Accepting any of them puts its line in the Offer (D-24).
   await stageCase({
     plate: "กท5566",
     checkedInHoursAgo: 3,
@@ -457,24 +594,24 @@ async function main() {
     odometerKm: 61_480,
     photos: 2,
     findings: [
-      { zone: "front-bumper", damageTypes: ["DENT", "SCRATCH"] },
-      { zone: "door-fl", damageTypes: ["SCRATCH"] },
-      { checklistItem: "brakes", condition: "NEEDS_WORK", note: "ผ้าเบรกหน้าเหลือ ~20%" },
+      { zone: "front-bumper", damageTypes: ["DENT", "SCRATCH"], draft: true },
+      { zone: "door-fl", damageTypes: ["SCRATCH"], draft: true },
+      { checklistItem: "brakes", condition: "NEEDS_WORK", note: "ผ้าเบรกหน้าเหลือ ~20%", draft: true },
     ],
   });
 
-  // 3 · Awaiting authorization with an unpriced job → "Set prices"
+  // 3 · Awaiting authorization with an unpriced line → "Set prices"
   await stageCase({
     plate: "บล7788",
     checkedInHoursAgo: 5,
     odometerKm: 98_302,
     photos: 1,
-    jobs: [{ title: "เปลี่ยนกันชนหลัง", status: "PROPOSED" }],
+    jobs: [{ title: "กันชนหลัง — เปลี่ยน", status: "PROPOSED" }],
     findings: [{ zone: "rear-bumper", damageTypes: ["BROKEN"], jobIndex: 0 }],
   });
 
-  // 4 · Awaiting authorization, priced, no quotation yet →
-  //     "Record authorization" + "Issue quotation"
+  // 4 · Awaiting authorization, priced, not sent yet (mixed payers) →
+  //     "Send quotation" + "Record response"
   await stageCase({
     plate: "ผก4455",
     checkedInHoursAgo: 26,
@@ -495,6 +632,63 @@ async function main() {
       { zone: "door-fl", damageTypes: ["SCRATCH", "DENT"], jobIndex: 0 },
       { zone: "taillight-r", damageTypes: ["BROKEN"], jobIndex: 1 },
     ],
+  });
+
+  // 4b · Offer SENT (M7.7): Q-10xx stamped and pushed over LINE with the
+  //      document link → "Record response" leads; the foot reads "sent … via LINE"
+  await stageCase({
+    plate: "กท5566",
+    checkedInHoursAgo: 20,
+    note: "เฉี่ยวรถข้างบ้าน ฝั่งซ้าย",
+    odometerKm: 61_530,
+    photos: 2,
+    jobs: [
+      { title: "ทำสีด้านซ้ายทั้งแถบ", status: "PROPOSED", priceBaht: 12_000 },
+      { title: "เปลี่ยนผ้าเบรกหน้า", status: "PROPOSED", priceBaht: 2_800 },
+      { title: "เปลี่ยนกระจกบังลมหลัง", status: "PROPOSED", priceBaht: 6_800 },
+    ],
+    findings: [
+      { zone: "door-fl", damageTypes: ["DENT"], note: "รอยบุบกลางบาน", jobIndex: 0 },
+      { zone: "door-rl", damageTypes: ["SCRATCH"], note: "รอยขีดยาว", jobIndex: 0 },
+      { checklistItem: "brakes", condition: "NEEDS_WORK", jobIndex: 1 },
+      { zone: "rear-glass", damageTypes: ["CRACK"], jobIndex: 2 },
+    ],
+    quotation: { jobIndexes: [0, 1, 2], sent: true, hoursAgo: 18 },
+  });
+
+  // 4c · Response RECORDED (M7.7): two yes, one no against the sent version →
+  //      Work holds two Authorized cards leading with Start work, Done the declined line
+  await stageCase({
+    plate: "บล7788",
+    checkedInHoursAgo: 28,
+    odometerKm: 98_410,
+    photos: 1,
+    jobs: [
+      {
+        title: "ทำสีฝากระโปรงหน้า",
+        status: "AUTHORIZED",
+        priceBaht: 6_500,
+        authorized: { channel: "LINE", againstQuotation: true },
+      },
+      {
+        title: "เปลี่ยนแบตเตอรี่",
+        status: "AUTHORIZED",
+        priceBaht: 3_200,
+        authorized: { channel: "LINE", againstQuotation: true },
+      },
+      {
+        title: "เปลี่ยนกระจกบังลมหน้า",
+        status: "DECLINED",
+        priceBaht: 18_000,
+        declined: { channel: "LINE", note: "ราคากระจกสูงไป — ไว้คราวหน้า", againstQuotation: true },
+      },
+    ],
+    findings: [
+      { zone: "hood", damageTypes: ["DENT"], jobIndex: 0 },
+      { checklistItem: "battery", condition: "NEEDS_WORK", jobIndex: 1 },
+      { zone: "windshield", damageTypes: ["CRACK"], jobIndex: 2 },
+    ],
+    quotation: { jobIndexes: [0, 1, 2], sent: true, hoursAgo: 24 },
   });
 
   // 5 · Waiting — parts (blocker in the header: 2 parts due)

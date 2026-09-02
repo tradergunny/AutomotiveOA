@@ -7,7 +7,6 @@ import {
   spineStepFor,
   type NextMove,
   type Stage,
-  type StageAction,
   type WaitingBlocker,
 } from "@/lib/case-flow";
 import type { BodyType, RepairCaseStatus } from "@/lib/generated/prisma/enums";
@@ -16,13 +15,15 @@ import { formatPhone } from "@/lib/normalize";
 import type { CaseBalance } from "@/lib/payments";
 import { cn } from "@/lib/utils";
 import { CaseFlowPanel } from "./case-flow-panel";
+import { NextActionStrip } from "./next-action-strip";
 
 /**
  * The rebuilt case header (M7.5 brief §3; D-6, D-9, D-10): one identity-plus-
  * state card. Car photo · plate · contact on top, the stage spine with the
  * sub-state beneath the lit step, then the next-action strip with exactly one
  * money line. The lifecycle badge, rollup chips, and due chips are gone —
- * Stage is the only state language spoken here.
+ * Stage is the only state language spoken here. Since M7.7 (D-22) the
+ * strip's Jobs actions open their dialogs rather than scrolling to an anchor.
  */
 
 export type CaseHeaderProps = {
@@ -57,17 +58,6 @@ export type CaseHeaderProps = {
   proposedTotalSatang: number;
   canMarkReady: boolean;
   canDeliver: boolean;
-};
-
-/** Where each suggested action already lives on the page (D-6: a suggestion, never a wizard). */
-const ACTION_TARGET: Record<Exclude<StageAction, "MARK_DELIVERED">, string> = {
-  OPEN_INSPECTION: "/inspection",
-  GROUP_FINDINGS: "#jobs",
-  SET_PRICES: "#jobs",
-  RECORD_AUTHORIZATION: "#jobs",
-  ISSUE_QUOTATION: "#quotations",
-  RECORD_QC: "#jobs",
-  RECORD_PAYMENT: "#money",
 };
 
 export function CaseHeader({
@@ -186,35 +176,6 @@ export function CaseHeader({
         return null;
     }
   })();
-
-  const actionLabel: Record<Exclude<StageAction, "MARK_DELIVERED">, string> = {
-    OPEN_INSPECTION: t("action.openInspection"),
-    GROUP_FINDINGS: t("action.groupFindings"),
-    SET_PRICES: t("action.setPrices"),
-    RECORD_AUTHORIZATION: t("action.recordAuthorization"),
-    ISSUE_QUOTATION: t("action.issueQuotation"),
-    RECORD_QC: t("action.recordQc"),
-    RECORD_PAYMENT: t("action.recordPayment"),
-  };
-
-  const actionLink = (action: StageAction, primary: boolean) => {
-    if (action === "MARK_DELIVERED") return null; // rendered by CaseFlowPanel
-    const target = ACTION_TARGET[action];
-    return (
-      <Link
-        key={action}
-        href={target.startsWith("/") ? `/cases/${repairCase.id}${target}` : target}
-        className={cn(
-          "px-3 py-1.5 text-xs font-semibold",
-          primary
-            ? "bg-primary text-primary-foreground hover:bg-primary/90"
-            : "border border-primary-dim text-primary hover:bg-primary-soft",
-        )}
-      >
-        {actionLabel[action]}
-      </Link>
-    );
-  };
 
   /* The Waiting blocker replaces the button (D-6): the thing itself. */
   const blockerLine =
@@ -356,8 +317,8 @@ export function CaseHeader({
       {/* the next-action strip + the one money line (D-6) */}
       {hasStrip && (
         <div className="flex flex-wrap items-center gap-2 border-t border-dashed px-4 py-3 sm:px-5">
-          {move.primary && actionLink(move.primary, true)}
-          {move.secondary && actionLink(move.secondary, false)}
+          {/* Since M7.7 the Jobs actions open their dialogs (D-22) — a client strip. */}
+          <NextActionStrip caseId={repairCase.id} move={move} />
           {blockerLine}
           <CaseFlowPanel
             caseId={repairCase.id}

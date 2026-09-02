@@ -1,29 +1,30 @@
 "use server";
 
-import { randomBytes } from "node:crypto";
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import {
   isLineImageContentType,
-  lineTransport,
   LINE_MAX_PHOTOS_PER_UPDATE,
   LINE_MAX_TEXT_LENGTH,
   type LineErrorCode,
   type LineMessage,
 } from "@/lib/line";
-import { lineCryptoAvailable, openCredential } from "@/lib/line-credentials";
+import {
+  deliverLineUpdate,
+  lineGateFor,
+  newPublicToken,
+  publicOrigin,
+  type LineGateError,
+  type SentUpdateDto,
+} from "@/lib/line-send";
 import { tenantContext } from "@/lib/session";
 
+export type { SentUpdateDto } from "@/lib/line-send";
+
 /**
- * Sending a LINE Update (M6 brief §7) — the one place in the system that
- * speaks to a customer, and it only ever runs because a human pressed send
- * (ADR-003). No caller anywhere is a status change, a cron, or an event.
- *
- * Order is deliberate and its risk is accepted (M6 brief, decision 4): a
- * LINE push cannot be rolled back, so we push FIRST and record SECOND, in one
- * small transaction. If the database fails in that window the customer has a
- * message we did not record — logged loudly, and preferable to a mutable
- * "pending" row that could not close the window either.
+ * Sending a LINE Update (M6 brief §7) — the composer's action. The push and
+ * its record live in lib/line-send.ts since M7.7, shared with Send quotation
+ * (D-25); this file keeps the composer's own validation and the Follow-up
+ * bookkeeping. It only ever runs because a human pressed send (ADR-003).
  *
  * Since M7 (decision 5, superseding M6's read-only line): DELIVERED cases
  * accept Updates — delivery freezes the WORK record, while money and
@@ -36,10 +37,7 @@ import { tenantContext } from "@/lib/session";
 export type SendUpdateError =
   | "caseMissing"
   | "followUpMissing"
-  | "notConnected"
-  | "cryptoUnavailable"
-  | "noIdentity"
-  | "unfollowed"
+  | LineGateError
   | "bodyRequired"
   | "bodyTooLong"
   | "tooManyPhotos"
@@ -47,32 +45,9 @@ export type SendUpdateError =
   | `line.${LineErrorCode}`
   | "failed";
 
-export type SentUpdateDto = {
-  id: string;
-  bodyText: string;
-  deliveryStatus: "SENT" | "FAILED";
-  errorCode: string | null;
-  recipientName: string;
-  sentByName: string;
-  sentAt: string;
-  photoIds: string[];
-};
-
 export type SendUpdateResult =
   | { ok: true; value: SentUpdateDto }
   | { ok: false; error: SendUpdateError };
-
-/** 128 bits — the whole authorization for a published photo (decision 3). */
-function newPublicToken(): string {
-  return randomBytes(16).toString("hex");
-}
-
-async function publicOrigin(): Promise<string> {
-  const headerList = await headers();
-  const proto = headerList.get("x-forwarded-proto") ?? "http";
-  const host = headerList.get("host") ?? "localhost:3000";
-  return `${proto}://${host}`;
-}
 
 export async function sendLineUpdate(
   caseId: string,
@@ -120,15 +95,8 @@ export async function sendLineUpdate(
       return { ok: false, error: "followUpMissing" };
     }
 
-    if (!lineCryptoAvailable()) return { ok: false, error: "cryptoUnavailable" };
-    const channel = await db.shopLineChannel.findUnique({ where: { shopId: session.shopId } });
-    if (!channel) return { ok: false, error: "notConnected" };
-
-    const contact = await db.lineContact.findFirst({
-      where: { customerId: repairCase.contactCustomer.id },
-    });
-    if (!contact) return { ok: false, error: "noIdentity" };
-    if (contact.followState === "UNFOLLOWED") return { ok: false, error: "unfollowed" };
+    const gate = await lineGateFor(db, session.shopId, repairCase.contactCustomer.id);
+    if (!gate.ok) return { ok: false, error: gate.error };
 
     // Photos must belong to THIS case and be a format LINE will fetch.
     const photos = photoIds.length
@@ -156,61 +124,20 @@ export async function sendLineUpdate(
       }),
     ];
 
-    const accessToken = openCredential(
-      session.shopId,
-      "channelAccessToken",
-      channel.channelAccessTokenEnc,
-    );
-
-    // ---- the irreversible bit ----
-    const push = await lineTransport.push(accessToken, contact.lineUserId, messages);
-
-    const delivered = push.ok;
-    const update = await db.$transaction(async (tx) => {
-      const row = await tx.lineUpdate.create({
-        data: {
-          shopId: session.shopId,
-          caseId,
-          customerId: repairCase.contactCustomer.id,
-          lineUserId: contact.lineUserId,
-          recipientName: repairCase.contactCustomer.name,
-          bodyText,
-          deliveryStatus: delivered ? "SENT" : "FAILED",
-          lineRequestId: push.requestId,
-          errorCode: push.ok ? null : push.code,
-          errorDetail: push.ok ? null : push.detail.slice(0, 500),
-          sentByStaffId: session.staffId,
-          photos: {
-            // shopId comes from the parent LineUpdate via the composite FK.
-            create: ordered.map(({ photoId, token }, index) => ({
-              photoId,
-              sortOrder: index,
-              // A failed send delivered nothing, so nothing becomes public.
-              publicToken: delivered ? token : null,
-            })),
-          },
-        },
-        include: {
-          sentBy: { select: { name: true } },
-          photos: { orderBy: { sortOrder: "asc" }, select: { photoId: true } },
-        },
-      });
-
-      await tx.caseEvent.create({
-        data: {
-          shopId: session.shopId,
-          caseId,
-          type: delivered ? "LINE_UPDATE_SENT" : "LINE_UPDATE_FAILED",
-          lineUpdateId: row.id,
-          subjectName: repairCase.contactCustomer.name,
-          note: push.ok ? null : push.detail.slice(0, 500),
-          actorStaffId: session.staffId,
-        },
-      });
-
+    const delivered = await deliverLineUpdate({
+      db,
+      actor: { shopId: session.shopId, staffId: session.staffId },
+      caseId,
+      customer: repairCase.contactCustomer,
+      gate: gate.value,
+      bodyText,
+      photos: ordered,
+      quotation: null,
+      messages,
       // The follow-up flips CONTACTED only when the message actually reached
       // the customer — a FAILED push leaves the worklist row untouched.
-      if (followUp && delivered) {
+      afterRecord: async (tx, row, wasDelivered) => {
+        if (!followUp || !wasDelivered) return;
         await tx.followUp.update({
           where: { id: followUp.id },
           data: {
@@ -232,28 +159,14 @@ export async function sendLineUpdate(
             actorStaffId: session.staffId,
           },
         });
-      }
-
-      return row;
+      },
     });
 
     revalidatePath(`/cases/${caseId}`);
-    if (followUp && delivered) revalidatePath("/followups");
+    if (followUp && delivered.push.ok) revalidatePath("/followups");
 
-    if (!push.ok) return { ok: false, error: `line.${push.code}` };
-    return {
-      ok: true,
-      value: {
-        id: update.id,
-        bodyText: update.bodyText,
-        deliveryStatus: update.deliveryStatus,
-        errorCode: update.errorCode,
-        recipientName: update.recipientName,
-        sentByName: update.sentBy.name,
-        sentAt: update.sentAt.toISOString(),
-        photoIds: update.photos.map((photo) => photo.photoId),
-      },
-    };
+    if (!delivered.push.ok) return { ok: false, error: `line.${delivered.push.code}` };
+    return { ok: true, value: delivered.update };
   } catch (error) {
     // If we land here AFTER a successful push, the customer has a message we
     // failed to record. Loud on purpose (M6 brief, decision 4).

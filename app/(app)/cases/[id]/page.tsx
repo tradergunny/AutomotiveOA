@@ -10,8 +10,8 @@ import {
 } from "@/lib/case-flow";
 import { LINE_MAX_PHOTOS_PER_UPDATE } from "@/lib/line";
 import { buildDraftBody, buildFollowUpDraftBody } from "@/lib/line-draft";
-import { findingSeverity, isGroupable } from "@/lib/inspection";
-import { hasUnquotedProposed } from "@/lib/jobs";
+import { findingSeverity } from "@/lib/inspection";
+import { offerNeedsSending, quotationLabel } from "@/lib/jobs";
 import { caseBalance } from "@/lib/payments";
 import { can } from "@/lib/permissions";
 import { requireSession, tenantDb } from "@/lib/session";
@@ -25,6 +25,7 @@ import {
 } from "./customer-timeline";
 import { InspectionSection } from "./inspection-section";
 import { JOB_INCLUDE, QUOTATION_INCLUDE, toJobDto, toQuotationDto } from "./job-dto";
+import { JobsFlowProvider } from "./jobs-flow-context";
 import { JobsPanel } from "./jobs-panel";
 import { PAYMENT_INCLUDE, toPaymentDto } from "./payment-dto";
 import { PaymentsPanel } from "./payments-panel";
@@ -107,6 +108,7 @@ export default async function CasePage({
       include: {
         sentBy: { select: { name: true } },
         photos: { orderBy: { sortOrder: "asc" }, select: { photoId: true } },
+        quotation: { select: { number: true, version: true } },
       },
       orderBy: { sentAt: "desc" },
     }),
@@ -138,22 +140,17 @@ export default async function CasePage({
   const balance = caseBalance(jobs, payments);
   const stage = stageFor(repairCase.status, jobs, balance.totalDueSatang);
 
-  // Only an accepted Finding proposing actual work is offered for grouping: an
-  // advisor still keying one in has not decided what the work is yet, and a
-  // "due soon" wear item has decided there is none (lib/inspection isGroupable).
-  const ungroupedFindings = repairCase.findings
-    .filter(isGroupable)
-    .map((f) => ({ id: f.id, source: f.source, zone: f.zone, checklistItem: f.checklistItem }))
-    .reverse(); // oldest first, matching the inspection screen's order
-
+  // Accepting a Finding that proposes work already put its line in the Offer
+  // (D-24), so the cascade has no grouping step left: unaccepted Findings
+  // send the advisor back to the inspection, and the Offer's own facts —
+  // unpriced lines, an unsent or stale part — drive the rest.
   const move = nextActionFor(stage, {
     findingsCount: repairCase.findings.length,
     unconfirmedFindingsCount: repairCase.findings.filter((f) => f.confirmedAt === null).length,
-    ungroupedFindingsCount: ungroupedFindings.length,
     unpricedProposedCount: jobs.filter(
       (job) => job.status === "PROPOSED" && job.priceSatang == null,
     ).length,
-    hasUnquotedProposed: hasUnquotedProposed(jobs, quotations),
+    offerNeedsSending: offerNeedsSending(jobs, quotations),
     totalDueSatang: balance.totalDueSatang,
   });
   const blocker = waitingBlockerFor(jobs);
@@ -187,11 +184,6 @@ export default async function CasePage({
     : null;
   const followUp = followUpRow?.caseId === id ? followUpRow : null;
 
-  const groupFindingParam = query["group-finding"];
-  const preselectFindingId = Array.isArray(groupFindingParam)
-    ? groupFindingParam[0]
-    : groupFindingParam;
-
   const { vehicle, contactCustomer, photos, findings } = repairCase;
   const severe = findings.filter((f) => findingSeverity(f) === "SEVERE").length;
   const checklistCount = findings.filter((f) => f.source === "CHECKLIST").length;
@@ -209,6 +201,7 @@ export default async function CasePage({
         : null;
 
   return (
+    <JobsFlowProvider>
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <Link
         href="/"
@@ -278,7 +271,6 @@ export default async function CasePage({
         caseId={repairCase.id}
         initialJobs={jobs.map(toJobDto)}
         initialQuotations={quotations.map(toQuotationDto)}
-        initialUngrouped={ungroupedFindings}
         catalogItems={catalogItems}
         staffOptions={staffOptions}
         isManager={can(session.role, "catalog.priceOverride")}
@@ -287,7 +279,9 @@ export default async function CasePage({
         canRevertStep={can(session.role, "job.revertStep")}
         viewerStaffId={session.staffId}
         readOnly={repairCase.status === "DELIVERED"}
-        preselectFindingId={preselectFindingId}
+        blockedReason={blockedReason}
+        recipientName={contactCustomer.name}
+        deliveredAt={repairCase.deliveredAt?.toISOString() ?? null}
       />
 
       <PaymentsPanel
@@ -314,6 +308,9 @@ export default async function CasePage({
           sentByName: update.sentBy.name,
           sentAt: update.sentAt.toISOString(),
           photoIds: update.photos.map((photo) => photo.photoId),
+          quotationLabel: update.quotation
+            ? quotationLabel(update.quotation.number, update.quotation.version)
+            : null,
         }))}
         draftBody={
           followUp
@@ -374,5 +371,6 @@ export default async function CasePage({
         openedByName={repairCase.openedByStaff.name}
       />
     </div>
+    </JobsFlowProvider>
   );
 }

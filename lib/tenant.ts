@@ -38,17 +38,20 @@ import { Prisma } from "@/lib/generated/prisma/client";
  * LineUpdatePhoto→{LineUpdate, Photo}, and CaseEvent→LineUpdate in M6;
  * Payment→{RepairCase, Customer, Staff×2}, FollowUp→{RepairCase, Customer,
  * Staff}, FollowUp→{Job, Finding} (same shop AND case), and
- * CaseEvent→{Payment, FollowUp} in M7 — so
+ * CaseEvent→{Payment, FollowUp} in M7; LineUpdate→Quotation in M7.7 (an
+ * Update that carried a Quotation, D-25) — so
  * the database rejects any cross-shop link a nested write could attempt. (Two deliberate exceptions,
  * same reason: QuotationLine→Job and CaseEvent→Job are single-column soft
  * links so ON DELETE SET NULL works — see the schema comments; each row's
  * shop stays pinned through its Quotation/RepairCase.)
  *
- * M6 opens the app's only two UNAUTHENTICATED routes — the LINE webhook and
- * the published-photo route — which by definition have no session to scope
- * by. Neither bypasses this guard: each performs exactly ONE unscoped read
- * to establish which Shop the request belongs to (see lib/line-public.ts),
- * then does all further work through forShop() like everything else.
+ * M6 opens the app's UNAUTHENTICATED routes — the LINE webhook and the
+ * published-photo route, joined in M7.7 by the published-quotation page
+ * (Quotation.publicToken, minted at first send) — which by definition have
+ * no session to scope by. None bypasses this guard: each performs exactly
+ * ONE unscoped read to establish which Shop the request belongs to (see
+ * lib/line-public.ts), then does all further work through forShop() like
+ * everything else.
  */
 
 /** Models that carry shop_id and belong to exactly one Shop. */

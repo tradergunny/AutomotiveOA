@@ -53,7 +53,7 @@ Tests (`npm test`) need the dev database running.
 
 ### Staged cases for a Stage walkthrough
 
-`npm run cases:stage` fills the pilot shop with one Repair Case per **Stage** (RC-1010 – RC-1019): fresh assessment, ungrouped findings, unpriced proposal, awaiting authorization, waiting on parts, in progress with a cancelled job, in QC, ready, delivered-with-balance, and delivered-settled — each with generated walkaround photos so the board's car thumbnails (D-9) are real.
+`npm run cases:stage` fills the pilot shop with one Repair Case per **Stage** (twelve cases): fresh assessment, findings still being keyed in, an unpriced line, a priced Offer not yet sent, a sent Offer (Quotation + LINE Update with the document link), a recorded Response (Work and Done phases), waiting on parts, in progress with a cancelled job, in QC, ready, delivered-with-balance, and delivered-settled — each with generated walkaround photos so the board's car thumbnails (D-9) are real.
 
 ```bash
 npm run cases:stage
