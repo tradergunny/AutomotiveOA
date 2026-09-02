@@ -1,0 +1,147 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans+Thai:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+  <style>
+body{margin:0;background:#09090b;color:#f4f4f5;font-family:"IBM Plex Sans","IBM Plex Sans Thai","Segoe UI","Leelawadee UI","Noto Sans Thai",Arial,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+a{color:#f97316}a:hover{color:#fb923c}
+.num{font-family:"IBM Plex Mono","IBM Plex Sans Thai",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.mono{font-family:"IBM Plex Mono","IBM Plex Sans Thai",Consolas,Menlo,monospace}
+.page{padding:16px;width:768px;display:flex;flex-direction:column;gap:20px}
+.card{position:relative;border:1px solid #26262a;background:#101012}
+.tk{position:absolute;width:8px;height:8px;border-color:#f97316;border-style:solid;border-width:0}
+.tk.tl{left:-1px;top:-1px;border-left-width:2px;border-top-width:2px}
+.tk.tr{right:-1px;top:-1px;border-right-width:2px;border-top-width:2px}
+.tk.bl{left:-1px;bottom:-1px;border-left-width:2px;border-bottom-width:2px}
+.tk.br{right:-1px;bottom:-1px;border-right-width:2px;border-bottom-width:2px}
+.sec-head{display:flex;align-items:baseline;gap:12px;padding:10px 20px;border-bottom:1px dashed #26262a}
+.h3{font-size:13px;font-weight:600}
+.faint{color:#6b6b74}.muted{color:#a1a1aa}.warn{color:#f5a623}.ok{color:#22c55e}.bad{color:#ef4444}.info{color:#3b82f6}.primary{color:#f97316}
+.t10{font-size:10.5px}.t11{font-size:11px}.t12{font-size:12px}.t13{font-size:13px}.t15{font-size:15px}
+.chip{display:inline-flex;align-items:center;border:1px solid;padding:1px 6px;font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.08em;white-space:nowrap;background-image:repeating-linear-gradient(-45deg,color-mix(in srgb,currentColor 14%,transparent) 0 1px,transparent 1px 5px)}
+.c-proposed,.c-waiting{border-color:rgba(245,166,35,.5);color:#f5a623}
+.c-authorized,.c-completed{border-color:rgba(34,197,94,.5);color:#22c55e}
+.c-inprogress,.c-qc{border-color:rgba(59,130,246,.5);color:#3b82f6}
+.c-declined{border-color:rgba(239,68,68,.5);color:#ef4444}
+.c-cancelled{border-color:#3b3b41;color:#a1a1aa}
+.btn{display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 10px;font-size:12.8px;font-weight:500;border:1px solid transparent;white-space:nowrap;color:#f4f4f5;box-sizing:border-box}
+.btn svg{width:14px;height:14px}
+.btn-primary{background:#f97316;color:#0c0a09;font-weight:600}
+.btn-outline{border-color:#3b3b41;background:rgba(59,59,65,.3)}
+.btn-ghost{color:#a1a1aa}
+.btn-bad{border-color:rgba(239,68,68,.5);color:#ef4444}
+.btn-warn{border-color:rgba(245,166,35,.5);color:#f5a623}
+.quiet{display:inline-flex;align-items:center;gap:4px;border:1px solid #3b3b41;padding:2px 8px;font-size:10.5px;color:#6b6b74;white-space:nowrap}
+.quiet svg{width:12px;height:12px}
+.field{display:inline-flex;align-items:center;height:32px;border:1px solid #3b3b41;background:rgba(59,59,65,.3);padding:0 10px;font-size:14px;color:#f4f4f5;box-sizing:border-box}
+.field.ph{color:#a1a1aa}
+.sel{display:inline-flex;align-items:center;justify-content:space-between;gap:8px;height:28px;border:1px solid #3b3b41;padding:0 6px 0 8px;font-size:12px;color:#f4f4f5;box-sizing:border-box}
+.sel svg{width:12px;height:12px;color:#6b6b74;flex:none}
+.seg{display:inline-flex;border:1px solid #3b3b41}
+.seg span{padding:0 10px;height:30px;display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#6b6b74;box-sizing:border-box;white-space:nowrap}
+.seg span svg{width:12px;height:12px}
+.seg span+span{border-left:1px solid #3b3b41}
+.seg .on{background:rgba(249,115,22,.12);color:#f97316}
+.seg .yes{background:rgba(34,197,94,.15);color:#22c55e}
+.seg .no{background:rgba(239,68,68,.15);color:#ef4444}
+.seg.sm span{height:26px;padding:0 8px;font-size:11px}
+.phase+.phase{border-top:1px dashed #26262a}
+.ph-head{display:flex;align-items:baseline;gap:10px;padding:9px 20px 6px}
+.ph-title{font-size:12px;font-weight:500;color:#f4f4f5}
+.ph-sub{font-size:11px;color:#a1a1aa}
+.row{display:flex;align-items:center;gap:10px;padding:0 20px;min-height:40px;border-top:1px dashed #26262a}
+.chev{width:14px;height:14px;color:#6b6b74;flex:none}
+.title{font-size:13px;font-weight:500;flex:1;min-width:0}
+.detail{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:8px 20px 10px 44px;background:rgba(22,22,24,.5);border-top:1px dashed #26262a;font-size:11px;color:#a1a1aa}
+.fchip{display:inline-flex;border:1px solid #3b3b41;padding:0 6px;height:20px;align-items:center;font-size:11px;color:#a1a1aa;white-space:nowrap}
+.fchip.on{border-color:#9a4d10;background:rgba(249,115,22,.12);color:#f97316}
+.thumb{width:56px;height:44px;border:1px solid #26262a;background:#1c1c1f;display:inline-block;box-sizing:border-box}
+.thumb.add{width:auto;padding:0 8px;border:1px dashed #3b3b41;display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#6b6b74;background:transparent}
+.thumb.add svg{width:14px;height:14px}
+.foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 20px;border-top:1px dashed #26262a}
+.body{display:flex;flex-direction:column;gap:10px;padding:12px 20px;background:rgba(22,22,24,.4);border-top:1px dashed #26262a}
+.line{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.pt{width:100%;border-collapse:collapse;font-size:12px}
+.pt th{font-weight:400;color:#6b6b74;font-size:10.5px;text-align:left;padding:0 6px 4px;border-bottom:1px dashed #26262a}
+.pt td{padding:5px 6px;border-bottom:1px dashed #26262a;vertical-align:middle}
+.pt .r{text-align:right}
+.pcell{display:inline-flex;align-items:center;justify-content:flex-end;height:28px;width:112px;border:1px solid #3b3b41;background:rgba(59,59,65,.3);padding:0 8px;font-size:13px;box-sizing:border-box}
+.pcell.empty{border-style:dashed;border-color:rgba(245,166,35,.5);color:#f5a623;justify-content:flex-start;font-size:12px}
+.act{display:flex;align-items:center;gap:6px;padding-top:10px;border-top:1px dashed #26262a}
+.prov{font-size:11px;color:#6b6b74}
+.dlg{position:relative;width:540px;border:1px solid #3b3b41;background:#161618}
+.dlg-head{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px dashed #26262a}
+.dlg-body{display:flex;flex-direction:column;gap:12px;padding:14px 18px}
+.dlg-foot{display:flex;align-items:center;gap:8px;padding:12px 18px;border-top:1px dashed #26262a}
+.lab{font-size:11px;color:#6b6b74;width:104px;flex:none}
+.veil{position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(9,9,11,.74)}
+.center{position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center}
+.lrow{display:flex;align-items:center;gap:10px;padding:0 12px;min-height:40px;border-top:1px dashed #26262a}
+.menu{width:200px;border:1px solid #3b3b41;background:#161618;display:flex;flex-direction:column;padding:4px 0}
+.menu div{padding:6px 12px;font-size:12px;color:#f4f4f5;display:flex;align-items:center;gap:8px}
+.menu div svg{width:13px;height:13px;color:#6b6b74}
+.menu .sep{height:1px;background:#26262a;padding:0;margin:4px 0}
+.hint{font-size:10.5px;color:#6b6b74}
+.tile{position:relative;border:1px solid #26262a;background:#161618;padding:8px 10px 8px 14px;height:72px;box-sizing:border-box;margin:8px 16px 0;display:flex;flex-direction:column;gap:6px}
+.tile .sev{position:absolute;left:0;top:0;bottom:0;width:2px;background:#f5a623}
+.seg .amb{background:rgba(245,166,35,.15);color:#f5a623}
+.tthumb{width:36px;height:28px;border:1px solid #26262a;background:#1c1c1f;display:inline-block;flex:none}
+</style>
+</helmet>
+
+<div style="position:relative;width:1240px;height:600px;background:#09090b">
+  <section class="card" style="position:absolute;left:16px;top:16px;width:580px;box-sizing:border-box;padding-bottom:12px"><span class="tk tl"></span><span class="tk tr"></span><span class="tk bl"></span><span class="tk br"></span>
+    <div class="sec-head" style="height:38px;box-sizing:border-box;align-items:center;padding:0 20px"><span class="h3">Inspection</span></div>
+    <div class="ph-head" style="height:30px;box-sizing:border-box;align-items:center;padding:0 16px"><span class="ph-title">Damage findings</span><span class="ph-sub num">3</span></div>
+    <div class="tile"><span class="sev"></span>
+    <div style="display:flex;align-items:center;gap:8px"><span class="t12" style="font-weight:500;flex:1">Front-left door</span><span class="fchip">Left-side repaint</span></div>
+    <div style="display:flex;align-items:center;gap:8px"><span class="tthumb"></span><span style="display:flex;flex-direction:column;line-height:1.3"><span class="t12">รอยบุบกลางบาน</span><span class="t11 muted">dent · repair + repaint</span></span></div>
+  </div>
+    <div class="tile"><span class="sev"></span>
+    <div style="display:flex;align-items:center;gap:8px"><span class="t12" style="font-weight:500;flex:1">Rear-left door</span><span class="fchip">Left-side repaint</span></div>
+    <div style="display:flex;align-items:center;gap:8px"><span class="tthumb"></span><span style="display:flex;flex-direction:column;line-height:1.3"><span class="t12">รอยขีดยาว</span><span class="t11 muted">scratch · repaint</span></span></div>
+  </div>
+    <div class="tile"><span class="sev"></span>
+    <div style="display:flex;align-items:center;gap:8px"><span class="t12" style="font-weight:500;flex:1">Hood</span><span class="fchip">Hood</span></div>
+    <div style="display:flex;align-items:center;gap:8px"><span class="tthumb"></span><span style="display:flex;flex-direction:column;line-height:1.3"><span class="t12">บุบขอบหน้า</span><span class="t11 muted">dent · repaint</span></span></div>
+  </div>
+    <div class="ph-head" style="height:30px;box-sizing:border-box;align-items:center;padding:0 16px;margin-top:8px"><span class="ph-title">Service checklist</span></div>
+    <div class="row" style="height:40px;padding:0 16px;box-sizing:border-box"><span class="title">Brakes</span><span class="seg sm"><span class="">OK</span><span class="">Due soon</span><span class="amb">Needs work</span></span></div>
+    <div style="height:80px;box-sizing:border-box;padding:8px 16px 0 16px;display:flex;flex-direction:column;gap:12px;background:rgba(22,22,24,.5)">
+      <div class="line" style="height:26px"><span class="lab" style="width:36px">Fix</span><span class="seg sm"><span class="">Repair</span><span class="on">Replace</span><span class="">Service</span></span></div>
+      <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;height:28px"><span class="quiet">Discard</span><span class="btn btn-primary"><svg class="" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Accept</span></div>
+    </div>
+  </section>
+
+  <section class="card" style="position:absolute;left:660px;top:58px;width:564px;box-sizing:border-box"><span class="tk tl"></span><span class="tk tr"></span><span class="tk bl"></span><span class="tk br"></span>
+    <div class="sec-head" style="height:38px;box-sizing:border-box;align-items:center"><span class="h3">Jobs</span><span class="num t11 faint">2</span></div>
+    <div class="ph-head" style="height:30px;box-sizing:border-box;align-items:center"><span class="ph-title">Offer</span><span class="ph-sub">2 jobs · ฿12,000 proposed · <span class="warn">1 unpriced</span></span></div>
+    <div class="row" style="min-height:22px;border-top:0"><span style="width:14px;flex:none"></span><span class="t10 faint" style="flex:1">Job</span><span class="t10 faint" style="width:110px;flex:none">Payer</span><span class="t10 faint" style="width:112px;flex:none;text-align:right">Price</span></div>
+    <div class="row"><svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg><span class="title">Left-side repaint <span class="t11 faint" style="font-weight:400">· 2 findings</span></span><span class="t11 faint" style="width:110px;flex:none">Customer pays</span><span style="width:112px;flex:none;display:inline-flex;justify-content:flex-end"><span class="pcell num">12,000</span></span></div>
+    <div class="row"><svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg><span class="title">Hood</span><span class="t11 faint" style="width:110px;flex:none">Customer pays</span><span style="width:112px;flex:none;display:inline-flex;justify-content:flex-end"><span class="pcell empty">price</span></span></div>
+    <div class="row" style="height:40px"><svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg><span class="title faint" style="font-weight:400">Brakes</span><span style="width:110px;flex:none"></span><span class="pcell empty" style="border-color:#3b3b41;color:#6b6b74">price</span></div>
+    <div class="foot" style="height:48px;box-sizing:border-box"><span class="btn btn-outline"><svg class="" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>Add job</span><span class="t11 faint" style="margin-left:auto">Not sent</span><span class="btn btn-primary">Send quotation</span></div>
+  </section>
+
+  <svg style="position:absolute;left:0;top:0" width="1240" height="600" viewBox="0 0 1240 600" fill="none" aria-hidden="true">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b6b74"></path></marker>
+      <marker id="ahp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#f97316"></path></marker>
+    </defs>
+    <path d="M598,128 C630,128 628,168 658,168" stroke="#6b6b74" stroke-width="1.25" marker-end="url(#ah)"></path>
+    <path d="M598,208 C630,208 628,168 658,168" stroke="#6b6b74" stroke-width="1.25"></path>
+    <path d="M598,288 C630,288 628,208 658,208" stroke="#6b6b74" stroke-width="1.25" marker-end="url(#ah)"></path>
+    <path d="M598,462 C632,462 626,248 658,248" stroke="#f97316" stroke-width="1.25" stroke-dasharray="4 4" marker-end="url(#ahp)"></path>
+    <text x="628" y="176" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="#a1a1aa">merge</text>
+    <text x="616" y="285" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="#f97316">accept</text>
+  </svg>
+</div>
+</x-dc>
+</body>
+</html>

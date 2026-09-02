@@ -1,0 +1,144 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "title": "1 · Building the offer",
+      "x": 0,
+      "y": 0,
+      "w": 800,
+      "h": 360
+    },
+    {
+      "file": "AddJob.dc.html",
+      "title": "Add job",
+      "x": 900,
+      "y": 0,
+      "w": 800,
+      "h": 560
+    },
+    {
+      "file": "AwaitingAuth.dc.html",
+      "title": "2 · Awaiting authorization",
+      "x": 1800,
+      "y": 0,
+      "w": 800,
+      "h": 300
+    },
+    {
+      "file": "RecordResponse.dc.html",
+      "title": "Record response",
+      "x": 2700,
+      "y": 0,
+      "w": 800,
+      "h": 640
+    },
+    {
+      "file": "Work.dc.html",
+      "title": "3 · Work",
+      "x": 0,
+      "y": 840,
+      "w": 800,
+      "h": 480
+    },
+    {
+      "file": "WaitingQc.dc.html",
+      "title": "4 · Waiting and QC",
+      "x": 900,
+      "y": 840,
+      "w": 800,
+      "h": 720
+    },
+    {
+      "file": "Delivered.dc.html",
+      "title": "5 · Delivered",
+      "x": 1800,
+      "y": 840,
+      "w": 800,
+      "h": 300
+    },
+    {
+      "file": "Popups.dc.html",
+      "title": "Popups",
+      "x": 2700,
+      "y": 840,
+      "w": 800,
+      "h": 300
+    },
+    {
+      "file": "Collapsed.dc.html",
+      "title": "Collapsed · accept fills the offer",
+      "x": 0,
+      "y": 1720,
+      "w": 1240,
+      "h": 600
+    }
+  ],
+  "annotations": [
+    {
+      "id": "n-offer",
+      "x": 0,
+      "y": -170,
+      "w": 360,
+      "text": "1 · Building the offer. The Offer is the one part of the page that is a form: the price cell is live, everything else sits under the expanded row behind Edit. Only one phase has members, so no phase headings yet. The header's primary (Set prices) scrolls here and focuses the first empty cell."
+    },
+    {
+      "id": "n-addjob",
+      "x": 900,
+      "y": -170,
+      "w": 360,
+      "text": "Add job replaces the two source-named buttons. One dialog, three sources. 'From findings' shows only while ungrouped findings exist, and the header's 'Group into jobs' opens the dialog straight there. 'Add and another' keeps the multi-add rhythm."
+    },
+    {
+      "id": "n-await",
+      "x": 1800,
+      "y": -170,
+      "w": 360,
+      "text": "2 · Awaiting authorization. The foot of the Offer carries the set-level tooling: the quotation lineage and one primary action. The header's primary opens the same dialog. Mixed payers (not drawn): rows group by payer and a response records one payer at a time."
+    },
+    {
+      "id": "n-response",
+      "x": 2700,
+      "y": -170,
+      "w": 360,
+      "text": "Record response (D-20): channel, quotation and note once; a Yes/No on every job; one save. Yes rows move to Work, No rows to Done. An unpriced row can only be declined and says so."
+    },
+    {
+      "id": "n-work",
+      "x": 0,
+      "y": 690,
+      "w": 360,
+      "text": "3 · Work. Each card leads with exactly one primary next step. Technician is a live field (assigning is an everyday act, not an edit) and lights amber while unassigned. Corrections — cancel, revert — move into the ⋯ menu. Done shows the declined job as one line."
+    },
+    {
+      "id": "n-waiting",
+      "x": 900,
+      "y": 690,
+      "w": 360,
+      "text": "4 · Waiting and QC. A waiting card puts the blocker first, the parts table under it, and arrival stays one tap. QC pass is the Manager's primary; an advisor sees the hint and no pass button."
+    },
+    {
+      "id": "n-done",
+      "x": 1800,
+      "y": 690,
+      "w": 360,
+      "text": "5 · Delivered. One phase left, so no heading: the section reads as a closed record. Completed rows are receipts — fulfils, parts cost, photos, QC and authorization provenance."
+    },
+    {
+      "id": "n-collapsed",
+      "x": 0,
+      "y": 1590,
+      "w": 420,
+      "text": "Collapsed flow. Accept puts a line in the Offer. Merge joins panels into one job. Send quotation stamps the version."
+    },
+    {
+      "id": "n-popups",
+      "x": 2700,
+      "y": 690,
+      "w": 360,
+      "text": "The small popups: the ⋯ menu (Manager-only items shown faint), Set waiting, and QC fail. Cancel job has the same shape as QC fail with a required reason."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}
