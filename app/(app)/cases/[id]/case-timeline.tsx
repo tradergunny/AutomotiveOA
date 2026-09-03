@@ -15,6 +15,7 @@ import {
   FlagOff,
   Link2,
   Link2Off,
+  Merge,
   MessageCircle,
   PackageCheck,
   PhoneOutgoing,
@@ -87,6 +88,13 @@ export function CaseTimeline({
         return { ...base, icon: Wrench, tone: "text-muted-foreground", label: t("jobCreated", job(event)) };
       case "JOB_DELETED":
         return { ...base, icon: Trash2, tone: "text-muted-foreground", label: t("jobDeleted", job(event)) };
+      case "JOB_MERGED":
+        return {
+          ...base,
+          icon: Merge,
+          tone: "text-muted-foreground",
+          label: t("jobMerged", { ...job(event), survivor: event.subjectName ?? "—" }),
+        };
       case "JOB_AUTHORIZATION_RECORDED":
         if (event.toStatus === "AUTHORIZED") {
           return { ...base, icon: CircleCheck, tone: "text-ok", label: t("jobAuthorized", job(event)) };
@@ -170,15 +178,23 @@ export function CaseTimeline({
       case "LINE_UPDATE_SENT":
         return {
           ...base,
-          icon: SendHorizontal,
+          icon: event.lineUpdate?.quotation ? FileText : SendHorizontal,
           // Deliberately note-less: the message body belongs to the Customer
           // Timeline, not inlined into the operational feed.
           note: null,
           tone: "text-muted-foreground",
-          label: t("lineUpdateSent", {
-            name: event.subjectName ?? "—",
-            count: event.lineUpdate?._count.photos ?? 0,
-          }),
+          label: event.lineUpdate?.quotation
+            ? t("lineQuotationSent", {
+                name: event.subjectName ?? "—",
+                label: quotationLabel(
+                  event.lineUpdate.quotation.number,
+                  event.lineUpdate.quotation.version,
+                ),
+              })
+            : t("lineUpdateSent", {
+                name: event.subjectName ?? "—",
+                count: event.lineUpdate?._count.photos ?? 0,
+              }),
         };
       case "LINE_UPDATE_FAILED":
         return {

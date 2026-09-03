@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, ImageOff, MessageCircle, PhoneOutgoing, Send, TriangleAlert } from "lucide-react";
+import { Eye, FileText, ImageOff, MessageCircle, PhoneOutgoing, Send, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
@@ -57,6 +57,14 @@ export function CustomerTimeline({
   const format = useFormatter();
 
   const [updates, setUpdates] = useState(initialUpdates);
+  // Sends can come from elsewhere on the page (Send quotation, M7.7) and
+  // arrive here through the server re-render: take the fresh list whenever
+  // the props change, while the draft being typed stays untouched.
+  const [seenUpdates, setSeenUpdates] = useState(initialUpdates);
+  if (initialUpdates !== seenUpdates) {
+    setSeenUpdates(initialUpdates);
+    setUpdates(initialUpdates);
+  }
   const [body, setBody] = useState(draftBody);
   const [selected, setSelected] = useState<string[]>([]);
   const [showPreview, setShowPreview] = useState(false);
@@ -138,6 +146,12 @@ export function CustomerTimeline({
                   <span className="border border-ok/45 px-1.5 py-px text-ok">{t("sent")}</span>
                 )}
                 <span>{update.recipientName}</span>
+                {update.quotationLabel && (
+                  <span className="flex items-center gap-1 border border-primary-dim px-1.5 py-px font-mono text-[10px] text-primary">
+                    <FileText className="size-3" aria-hidden />
+                    {t("quotationLabel", { label: update.quotationLabel })}
+                  </span>
+                )}
                 <span className="num ml-auto">
                   {format.dateTime(new Date(update.sentAt), {
                     day: "numeric",

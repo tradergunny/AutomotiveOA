@@ -7,6 +7,8 @@
 // story, sent by a human through the Shop's own OA — ADR-002/003/004/005).
 // M7: Payment (append-only + one-way void) and FollowUp (the CRM worklist,
 // minted at delivery), plus the payment/follow-up CaseEvent surface.
+// M7.7: Quotation.publicToken (the document link), LineUpdate.quotationId
+// (an Update that carried a Quotation), and the JOB_MERGED event.
 // Every tenant-owned row carries shop_id (ADR-001); scoping is
 // enforced by the tenant guard in lib/tenant.ts, never by hand-written WHERE
 // clauses. Cross-model relations join on same-shop composite FKs so the
@@ -559,6 +561,11 @@ model Quotation {
   totalSatang     Int      @map("total_satang")
   issuedByStaffId String   @map("issued_by_staff_id")
   issuedAt        DateTime @default(now()) @map("issued_at")
+  /// M7.7 (D-25): the unguessable document link, minted the first time this
+  /// version is SENT to the customer — the published-photo idiom applied to
+  /// the document. NULL until then; the token is the whole authorization for
+  /// the public route (app/q/[token]), and nulling it revokes the link.
+  publicToken     String?  @unique @map("public_token")
 
   shop           Shop               @relation(fields: [shopId], references: [id])
   repairCase     RepairCase         @relation(fields: [shopId, caseId], references: [shopId, id])
@@ -566,6 +573,7 @@ model Quotation {
   lines          QuotationLine[]
   authorizations JobAuthorization[]
   events         CaseEvent[]
+  lineUpdates    LineUpdate[]
 
   @@unique([shopId, caseId, version])
   @@unique([shopId, id]) // target for the same-shop composite FKs
@@ -613,6 +621,10 @@ enum WaitingReason {
 enum CaseEventType {
   JOB_CREATED
   JOB_DELETED
+  /// M7.7 (D-24): a Proposed line absorbed into another by Merge — its own
+  /// event type because a merge is not a deletion, and the timeline should
+  /// say so. Written on the ABSORBED line, naming the survivor.
+  JOB_MERGED
   JOB_AUTHORIZATION_RECORDED
   JOB_STATUS_CHANGED
   JOB_WAITING_REASON_CHANGED
@@ -930,12 +942,17 @@ model LineUpdate {
   lineRequestId  String?            @map("line_request_id")
   errorCode      String?            @map("error_code")
   errorDetail    String?            @map("error_detail")
+  /// M7.7 (D-25): set when this Update carried a Quotation — Send quotation
+  /// pushes the Thai summary plus the document link. Same-shop composite FK;
+  /// quotations are immutable and never deleted, so a real FK is safe.
+  quotationId    String?            @map("quotation_id")
   sentByStaffId  String             @map("sent_by_staff_id")
   sentAt         DateTime           @default(now()) @map("sent_at")
 
   shop       Shop              @relation(fields: [shopId], references: [id])
   repairCase RepairCase        @relation(fields: [shopId, caseId], references: [shopId, id])
   customer   Customer          @relation(fields: [shopId, customerId], references: [shopId, id])
+  quotation  Quotation?        @relation(fields: [shopId, quotationId], references: [shopId, id])
   sentBy     Staff             @relation(fields: [shopId, sentByStaffId], references: [shopId, id])
   photos     LineUpdatePhoto[]
   events     CaseEvent[]

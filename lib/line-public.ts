@@ -2,9 +2,10 @@ import { prismaUnscoped } from "@/lib/db";
 import { forShop, type TenantDb } from "@/lib/tenant";
 
 /**
- * Tenant resolution for the app's only two unauthenticated routes (M6): the
- * LINE webhook and the published-photo route. Both are reached by LINE's
- * servers or by a customer's phone, so there is no session to scope by.
+ * Tenant resolution for the app's unauthenticated routes: the LINE webhook
+ * and the published-photo route (M6), and the published-quotation page
+ * (M7.7). All are reached by LINE's servers or by a customer's phone, so
+ * there is no session to scope by.
  *
  * The rule these two follow, and the reason they are in one small file where
  * it can be read at a glance: perform exactly ONE unscoped read to establish
@@ -54,4 +55,36 @@ export async function resolvePublishedPhoto(token: string): Promise<{
     select: { storageKey: true, contentType: true },
   });
   return photo ?? null;
+}
+
+/**
+ * A published Quotation, by its document token (M7.7, D-25) — the
+ * published-photo idiom applied to the document. The token is minted the
+ * first time the version is sent, so holding one proves a human pressed
+ * send; it is revocable by nulling the column, and an unknown or revoked
+ * token is indistinguishable from a wrong guess. Everything the always-light
+ * document renders comes back here, read through the guard.
+ */
+export async function resolvePublishedQuotation(token: string) {
+  if (!/^[0-9a-f]{32}$/.test(token)) return null;
+  const published = await prismaUnscoped.quotation.findUnique({
+    where: { publicToken: token },
+    select: { shopId: true, id: true },
+  });
+  if (!published) return null;
+
+  return forShop(published.shopId).quotation.findUnique({
+    where: { id: published.id },
+    include: {
+      lines: { orderBy: { sortOrder: "asc" } },
+      issuedBy: { select: { name: true } },
+      repairCase: {
+        include: {
+          vehicle: true,
+          contactCustomer: true,
+          shop: { select: { name: true } },
+        },
+      },
+    },
+  });
 }

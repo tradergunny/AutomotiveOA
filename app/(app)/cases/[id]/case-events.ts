@@ -9,7 +9,12 @@ export const CASE_EVENT_INCLUDE = {
   actorStaff: { select: { name: true } },
   subjectStaff: { select: { name: true } },
   quotation: { select: { number: true, version: true } },
-  lineUpdate: { select: { _count: { select: { photos: true } } } },
+  lineUpdate: {
+    select: {
+      _count: { select: { photos: true } },
+      quotation: { select: { number: true, version: true } },
+    },
+  },
   payment: { select: { method: true, payerType: true, insurerName: true } },
   followUp: { select: { checklistItem: true } },
 } as const satisfies Prisma.CaseEventInclude;

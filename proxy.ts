@@ -9,7 +9,9 @@ import { auth } from "@/auth";
 // phones, so no session can exist. They are not unprotected: the webhook
 // verifies an HMAC signature against the Shop's channel secret (ADR-005) and
 // the photo route requires an unguessable per-publication token minted only
-// when a human pressed send (M6 brief, decision 3).
+// when a human pressed send (M6 brief, decision 3). M7.7 adds /q/* on the
+// same terms: the quotation document a customer opens from LINE, reachable
+// only by the token minted when Send quotation pushed it (D-25).
 export const proxy = auth((req) => {
   const isLoggedIn = !!req.auth;
   const isLoginPage = req.nextUrl.pathname === "/login";
@@ -23,5 +25,5 @@ export const proxy = auth((req) => {
 });
 
 export const config = {
-  matcher: ["/((?!api/auth|api/line|_next/static|_next/image|favicon\\.ico).*)"],
+  matcher: ["/((?!api/auth|api/line|q/|_next/static|_next/image|favicon\\.ico).*)"],
 };

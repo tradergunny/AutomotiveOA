@@ -40,7 +40,7 @@ type Props = {
   caseId: string;
   bodyType: BodyType;
   initialFindings: FindingDto[];
-  /** Job id → title, for the "→ grouped into" chip (M4). */
+  /** Job id → title, for the "→ line" chip (M4; since M7.7 the line Accept made). */
   jobTitles: Record<string, string>;
   readOnly: boolean;
 };
@@ -224,8 +224,9 @@ export function InspectionScreen({
   /**
    * The accept step. Nothing is saved here — every field persisted as it was
    * tapped — so this only flips the Finding between "being captured" and
-   * "accepted as final", which is what decides whether it can be grouped
-   * into a Job. Reopening puts the zone back under the map cursor.
+   * "accepted as final" — and since M7.7 (D-24) accepting a Finding that
+   * proposes work puts its line in the Offer. Reopening puts the zone back
+   * under the map cursor.
    */
   async function handleConfirm(f: FindingDto, confirmed: boolean) {
     if (confirmed && !canConfirm(f)) return;
@@ -326,12 +327,15 @@ export function InspectionScreen({
   ) {
     const isMap = f.source === "DAMAGE_MAP";
     const confirmed = f.confirmedAt !== null;
-    // Once a Finding is on a Job it is the stated reason for work that may be
-    // priced and authorized, and the server refuses to edit, un-accept or
-    // delete it (assertUngrouped). Offering Edit and discard here would only
-    // raise errors — the way back in is deleting the Job, on the case page.
-    const grouped = f.jobId !== null;
-    const open = !confirmed && !grouped && openFindingId === f.id;
+    // Accepting put this Finding's line in the Offer (D-24); while that line
+    // is unpriced and unsent the Finding stays editable and its derived title
+    // follows. Once the line is priced or sent the Finding is frozen — it is
+    // the stated reason for an amount the payer may be looking at — and the
+    // server refuses to edit, un-accept or delete it. Offering Edit and
+    // discard here would only raise errors: the way back in is deleting the
+    // line, on the case page.
+    const frozen = f.frozen;
+    const open = !confirmed && !frozen && openFindingId === f.id;
     // The Job chip earns its place only when the Job is named something other
     // than the place itself: "Hood → Hood" is a coloured repeat of the word
     // sitting above it.
@@ -380,7 +384,7 @@ export function InspectionScreen({
     // are the two ways a finding form ends, and keeping it out of the bars lets
     // both bars run the full width and line up with each other.
     const hasMeta = Boolean((showCondition && f.condition) || jobChip);
-    const removeBtn = !readOnly && !grouped && (
+    const removeBtn = !readOnly && !frozen && (
       <button
         type="button"
         onClick={() => void handleRemove(f)}
@@ -461,7 +465,7 @@ export function InspectionScreen({
               )}
             </span>
             {jobChip}
-            {!readOnly && !grouped && (
+            {!readOnly && !frozen && (
               <button
                 type="button"
                 disabled={busy[f.id]}
@@ -841,7 +845,7 @@ export function InspectionScreen({
               // passing the gate — and "OK" deletes the Finding and its photos
               // outright, with none of the damage side's arm-then-confirm. The
               // Edit control on the record beneath is the way back in.
-              const locked = finding != null && (finding.confirmedAt != null || finding.jobId != null);
+              const locked = finding != null && (finding.confirmedAt != null || finding.frozen);
               const itemLabel = t(`checklist.${item}` as never);
               const options = [
                 {
@@ -867,8 +871,8 @@ export function InspectionScreen({
                     <span
                       className={cn("flex border", locked ? "border-border-strong" : "border-faint")}
                       title={
-                        finding?.jobId
-                          ? t("checklistGrouped")
+                        finding?.frozen
+                          ? t("checklistFrozen")
                           : locked
                             ? t("checklistLocked")
                             : undefined
