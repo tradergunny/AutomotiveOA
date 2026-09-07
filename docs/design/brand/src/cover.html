@@ -1,0 +1,63 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>AutomotiveOA — LINE OA cover</title>
+<style>
+__FONTCSS__
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#000}
+.canvas{position:relative;width:1080px;height:878px;overflow:hidden;
+  background:#09090b;font-family:"Plex","PlexThai",sans-serif}
+.veil{position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 70% 55% at 22% 14%, rgba(249,115,22,.20), rgba(249,115,22,0) 100%),
+    radial-gradient(ellipse 60% 50% at 88% 96%, rgba(154,77,16,.20), rgba(154,77,16,0) 100%);}
+.hatch{position:absolute;inset:0;
+  background:repeating-linear-gradient(45deg, rgba(244,244,245,.05) 0 1.5px, rgba(244,244,245,0) 1.5px 14px);
+  -webkit-mask-image:linear-gradient(160deg, #000 0%, rgba(0,0,0,.30) 46%, rgba(0,0,0,0) 72%);
+          mask-image:linear-gradient(160deg, #000 0%, rgba(0,0,0,.30) 46%, rgba(0,0,0,0) 72%);}
+.frame{position:absolute;left:56px;top:56px;right:56px;bottom:138px;border:1px solid #2b2b30}
+.tick{position:absolute;width:52px;height:52px;border:0 solid #f97316}
+.tl{left:-1px;top:-1px;border-left-width:4px;border-top-width:4px}
+.tr{right:-1px;top:-1px;border-right-width:4px;border-top-width:4px}
+.bl{left:-1px;bottom:-1px;border-left-width:4px;border-bottom-width:4px}
+.br{right:-1px;bottom:-1px;border-right-width:4px;border-bottom-width:4px}
+
+.stack{position:absolute;left:0;right:0;top:196px;display:flex;flex-direction:column;align-items:center}
+.eyebrow{font-family:"PlexMono",monospace;font-weight:500;font-size:20px;letter-spacing:.30em;
+  color:#a1a1aa;text-indent:.30em}
+.wordmark{margin-top:34px;font-weight:700;font-size:108px;line-height:1;letter-spacing:-.035em;
+  color:#f4f4f5;text-indent:-.035em}
+.wordmark em{font-style:normal;color:#f97316}
+.tagline{margin-top:28px;font-family:"PlexThai","Plex",sans-serif;font-weight:400;font-size:35px;
+  line-height:1.45;color:#a1a1aa;text-align:center}
+
+.spine{margin-top:74px;display:flex;align-items:center;width:812px}
+.node{display:flex;flex-direction:column;align-items:center;gap:16px;flex:0 0 auto}
+.sq{width:11px;height:11px;background:#f97316}
+.node span{font-family:"PlexThai","Plex",sans-serif;font-weight:400;font-size:23px;color:#a1a1aa;white-space:nowrap}
+.seg{flex:1 1 auto;height:0;border-top:1px dashed #3b3b41;margin-bottom:39px}
+</style>
+<div class="canvas">
+  <div class="veil"></div>
+  <div class="hatch"></div>
+  <div class="frame">
+    <span class="tick tl"></span><span class="tick tr"></span>
+    <span class="tick bl"></span><span class="tick br"></span>
+  </div>
+  <div class="stack">
+    <div class="eyebrow">WORKSHOP MANAGEMENT · CRM</div>
+    <div class="wordmark">Automotive<em>OA</em></div>
+    <div class="tagline">ระบบจัดการงานซ่อมและลูกค้าสัมพันธ์ สำหรับอู่ซ่อมรถ</div>
+    <div class="spine">
+      <div class="node"><i class="sq"></i><span>ประเมิน</span></div>
+      <div class="seg"></div>
+      <div class="node"><i class="sq"></i><span>อนุมัติ</span></div>
+      <div class="seg"></div>
+      <div class="node"><i class="sq"></i><span>ซ่อม</span></div>
+      <div class="seg"></div>
+      <div class="node"><i class="sq"></i><span>พร้อมรับ</span></div>
+      <div class="seg"></div>
+      <div class="node"><i class="sq"></i><span>ส่งมอบ</span></div>
+    </div>
+  </div>
+</div>
