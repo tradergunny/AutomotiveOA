@@ -189,7 +189,14 @@ export function ArrivalSettings({
                 </div>
                 {form.rotatedAt && (
                   <p className="num text-[11px] text-faint">
-                    {t("rotatedAt", { when: format.relativeTime(new Date(form.rotatedAt)) })}
+                    {t("rotatedAt", {
+                      when: format.dateTime(new Date(form.rotatedAt), {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }),
+                    })}
                   </p>
                 )}
               </div>

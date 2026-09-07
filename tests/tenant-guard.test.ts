@@ -485,6 +485,19 @@ describe("the Shop model itself is scoped", () => {
     ).toBeNull();
   });
 
+  it("a narrow select on the own shop still passes the ownership check", async () => {
+    // M7.8 found this: Settings reads only the form token, and the guard's
+    // post-check needs the id to compare — it must fetch it itself.
+    const own = await forShop(shopA.id).shop.findUniqueOrThrow({
+      where: { id: shopA.id },
+      select: { name: true },
+    });
+    expect(own).toEqual({ name: `${run} Shop A` });
+    expect(
+      await forShop(shopA.id).shop.findUnique({ where: { id: shopB.id }, select: { name: true } }),
+    ).toBeNull();
+  });
+
   it("a tenant client cannot create or delete shops", async () => {
     await expect(
       forShop(shopA.id).shop.create({ data: { name: `${run} rogue` } }),

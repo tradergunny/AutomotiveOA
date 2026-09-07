@@ -2,7 +2,7 @@
 
 import { Inbox, MessageCircle, X } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { CornerTicks } from "@/components/blocks/corner-ticks";
 import type { ArrivalQueueRow } from "@/lib/arrivals";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,14 @@ import { cn } from "@/lib/utils";
  * a row pulls the Arrival into the wizard. Not a board: an Arrival is not a
  * case, and the rows are never chips (D-8).
  */
+// Client-only clock in 30s buckets (the Topbar's DateChip idiom): the server
+// snapshot is 0 so hydration never mismatches, and "17 seconds ago" keeps
+// moving while the advisor sits on the page.
+const subscribeClock = (onChange: () => void) => {
+  const timer = setInterval(onChange, 30_000);
+  return () => clearInterval(timer);
+};
+
 export function ArrivalQueue({
   rows,
   selectedId,
@@ -29,6 +37,12 @@ export function ArrivalQueue({
   const t = useTranslations("checkin.arrivals");
   const format = useFormatter();
   const [dismissing, setDismissing] = useState<string | null>(null);
+  const bucket = useSyncExternalStore(
+    subscribeClock,
+    () => Math.floor(Date.now() / 30_000),
+    () => 0,
+  );
+  const now = bucket ? new Date(bucket * 30_000) : null;
 
   return (
     <section className="relative border bg-card" aria-label={t("title")}>
@@ -76,7 +90,7 @@ export function ArrivalQueue({
                   {firstLine || t("noNote")}
                 </span>
                 <span className="num flex-none text-[11px] text-faint">
-                  {format.relativeTime(new Date(row.submittedAt))}
+                  {now ? format.relativeTime(new Date(row.submittedAt), now) : ""}
                 </span>
               </button>
               <button

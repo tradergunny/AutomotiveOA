@@ -273,13 +273,19 @@ async function shopModelGuard(
   }
 
   if (UNIQUE_READ_OPS.has(operation)) {
-    const result = await query(args);
+    // The ownership post-check reads result.id, so a narrow `select` must
+    // still fetch it (injected here, stripped again before returning) —
+    // the same courtesy the tenant-model guard extends to shopId.
+    const selected = args?.select;
+    const injectId = selected != null && selected.id == null;
+    const result = await query(injectId ? { ...args, select: { ...selected, id: true } } : args);
     if (result != null && result.id !== shopId) {
       if (operation === "findUniqueOrThrow") {
         throw new TenantGuardError(`shop ${shopId} cannot read other shops`);
       }
       return null;
     }
+    if (injectId && result != null) delete result.id;
     return result;
   }
 
