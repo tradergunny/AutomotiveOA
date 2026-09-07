@@ -38,6 +38,11 @@ The ticket for one vehicle visit. Opened at check-in, closed at delivery. Human 
 
 Lifecycle: **Checked In → Ready → Delivered**. Everything in between is derived from its Jobs — summarized as the case's [[Stage]], with the per-status rollup ("2 In Progress · 1 Waiting Parts") as supporting detail — never set by hand. Ready flips when every authorized Job is Completed, and it is a managed state, not a moment: cars sit at the shop awaiting pickup, and the dashboard tracks them.
 
+### Arrival
+A Customer's own notice that they are at the Shop with a car, waiting for the advisor to check it in. Submitted by the customer on their phone — a QR at the counter, or the Shop's LINE OA — and **per visit**: it names the person and the car, and carries the visit in the customer's words (what's wrong, the odometer). A returning customer is recognized and just picks the car and describes the problem. Submitted inside LINE, an Arrival also carries the person's LINE identity.
+
+An Arrival is a candidate, never a record: it creates no Customer, Vehicle, or Repair Case on its own. Check-in **consumes** it — the advisor pulls it into the check-in, resolves it against what the Shop already knows (existing-vs-new by phone stays a human decision), shoots the walkaround, and opens the Repair Case. Lifecycle: **waiting → checked in** (consumed) or **dismissed** (duplicate, prank, customer left); an untouched Arrival goes stale and drops off the queue. Check-in never depends on one — a tow that arrived without its owner is checked in from nothing, exactly as today.
+
 ### Stage
 The single answer to "what does this Repair Case need from a human right now" — derived from the case and its Jobs, never stored, never set by hand, exactly one per case: **In assessment · Awaiting authorization · Waiting (with reason) · In progress · In QC · Ready · Delivered**, where a Delivered case still owed money reads as **Balance due** until settled. When several could apply, attention wins (a case with one Proposed and one In Progress Job needs a human for the authorization, so it files under Awaiting authorization); In assessment is the catch-all for a case whose work hasn't taken shape yet. The Case Board groups by Stage, the Repair Case page leads with it, and staff speech ("it's in QC", "waiting on parts") is Stage language.
 
@@ -95,7 +100,7 @@ A sent Update is an immutable snapshot of what the customer actually saw — bod
 Updates cover all Jobs on the visit regardless of Payer — an insurer footing the bill doesn't change who gets kept informed.
 
 ### LINE Contact
-A LINE identity seen on one Shop's OA — a `userId`, plus the display name and picture LINE reports. It arrives when the person adds the OA as a friend or messages it, and starts out **unlinked**: Staff match it to a Customer by hand, via the same phone lookup as check-in (ADR-005). A Customer with no linked LINE Contact simply can't be sent Updates yet — a normal state, not an error. userIds are per-OA, so the same person at two Shops is two Contacts.
+A LINE identity seen on one Shop's OA — a `userId`, plus the display name and picture LINE reports. It arrives when the person adds the OA as a friend or messages it, and starts out **unlinked**: Staff match it to a Customer by hand, via the same phone lookup as check-in (ADR-005), or the link is made for them when they confirm an [[Arrival]] the customer submitted inside LINE. A Customer with no linked LINE Contact simply can't be sent Updates yet — a normal state, not an error. userIds are per-OA, so the same person at two Shops is two Contacts.
 
 A published Photo — one a human attached to a sent Update — is reachable by an unguessable link, because LINE's servers fetch images themselves. Photos are never public before that.
 
