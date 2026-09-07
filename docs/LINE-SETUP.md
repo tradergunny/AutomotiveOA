@@ -98,6 +98,43 @@ If you got that message, the milestone's goal is met: *a customer's LINE receive
 
 ---
 
+## Part 6 — Let customers register from LINE (about 15 minutes, optional)
+
+Since M7.8 a customer can tell you they have arrived from their own phone: they fill in a short form (name, phone, plate, what is wrong) and it appears on your **Check-in** page, ready to pull into the check-in. The form itself needs nothing from LINE. Enable it in **Settings → Customer check-in form**, print the QR it gives you, and put the QR on the counter. That is the plain door, and it works on its own.
+
+This part opens the second door: the **same form inside LINE**. When a customer opens it from your Official Account, LINE tells the app who they are, so a returning customer just taps their car and describes the problem, and when your advisor confirms the arrival the customer's LINE is matched to their record automatically. No more matching by hand in the contacts inbox for those customers.
+
+You need two more things from the LINE Developers Console: a **LINE Login channel** and a **LIFF app** inside it.
+
+1. In the app, go to **Settings**, make sure the check-in form is **enabled**, and find the **Let customers register from LINE** panel. Leave it open: it shows the address you will paste in step 4.
+2. In the **[LINE Developers Console](https://developers.line.biz/console/)**, open your provider and press **Create a new channel** → **LINE Login**.
+   - **Create it under the SAME provider as your Official Account.** This is the one thing that cannot be fixed later: LINE gives a person the same id only within one provider. A Login channel under a different provider would report ids that never match the ones your OA already knows, and the automatic matching would silently never happen.
+   - Region Thailand, any name customers may see (the shop's name is fine), app type **Web app**.
+3. On the new channel's **LIFF** tab, press **Add**:
+   - **LIFF app name**: ลงทะเบียน (or anything short).
+   - **Size**: Full.
+   - **Endpoint URL**: the **LIFF endpoint URL** shown in the app's Settings panel. Copy it from there; it is your check-in form's address.
+   - **Scopes**: tick **profile** and **openid**. Both are needed: the second is what lets the app confirm the identity with LINE rather than trusting the phone.
+   - Leave the rest as is and press **Add**. LINE shows a **LIFF ID** like `1234567890-AbCdEfGh`.
+4. Back in the app's Settings panel, paste the **LIFF ID** into its field, and the Login channel's **Channel ID** (Basic settings tab of the Login channel, a plain number) into the second field. Press **Save**. The panel's badge reads **LINE door open**.
+5. Test it: on your phone, open the LIFF URL (`https://liff.line.me/<your LIFF ID>`) inside LINE. The form should greet you by your LINE name. Submit an arrival; it appears on the Check-in page with a LINE mark.
+
+Neither of these two values is a secret. Both are visible to every customer who opens the form, and neither can send a message as your account, so the app stores them as they are.
+
+---
+
+## Part 7 — The counter (about 10 minutes)
+
+What actually sits on the counter, so that LINE is the default door and the plain QR is the fallback:
+
+1. **Print the OA's add-friend QR** from OA Manager (**Home → Gain friends → QR code**) and put it on the poster. A customer who scans it adds your account and lands in the chat.
+2. **Add a rich menu button named ลงทะเบียน** in OA Manager (**Home → Rich menus → Create**). Make one of its areas a **Link** whose URL is your LIFF URL, `https://liff.line.me/<your LIFF ID>`. Set it to display by default. Rich menus are configured here by hand; the app does not build them.
+3. **Print the plain form QR** too, from **Settings → Customer check-in form → Print QR poster**, for customers who do not use LINE or do not want to add the account. It is the same form without the recognition.
+
+If you later press **Rotate link** in Settings, the plain QR stops working immediately and needs reprinting, and the LIFF app's endpoint URL must be updated to the new address in the Developers Console. Rotate it if a poster walks out of the shop.
+
+---
+
 ## Things worth knowing before you hand this to staff
 
 - **Nothing is ever sent automatically.** Not when a car is ready, not when a job finishes. Every message is written and sent by a person ([ADR-003](adr/ADR-003-no-auto-customer-notifications.md)). If updates stop going out, that is a staffing habit, not a system failure — and the planned fix is a reminder on the dashboard, not automatic messages.
@@ -116,3 +153,5 @@ If you got that message, the milestone's goal is met: *a customer's LINE receive
 | "That customer has not added the shop's LINE account" | They removed or blocked the account. They must add it again. |
 | "This LINE account has reached its message limit" | The free plan's monthly push allowance is used up. Check the plan section in OA Manager. |
 | Photos arrive broken | The app is not reachable from the internet at the address it is using — the usual cause is testing against a local dev server instead of the deployed one. |
+| The form opens inside LINE but never recognizes anyone | The Login channel is under a different provider than the OA (Part 6, step 2). Create it again under the OA's provider. |
+| "We could not confirm your LINE account" on the form | The Login channel ID in Settings does not match the channel the LIFF app belongs to, or the token expired. Check the two fields, then reopen the form from LINE. |

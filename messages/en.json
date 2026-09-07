@@ -124,11 +124,11 @@
         "notReady": "Only a Ready case can be delivered",
         "failed": "Something went wrong — try again"
       }
-    }
+    },
+    "checkedInFromArrival": "from the customer's Arrival"
   },
   "checkin": {
     "contactSection": "Who brought the car in?",
-    "lookup": "Look up",
     "looking": "Looking…",
     "foundCustomer": "Existing customer",
     "newCustomerHint": "New customer — enter their details",
@@ -158,9 +158,33 @@
       "bodyTypeRequired": "Choose the body type",
       "photoInvalid": "A selected file is not a supported image (JPEG/PNG/WebP)",
       "photoTooLarge": "A photo is too large (max 10MB after processing)",
-      "failed": "Check-in failed — nothing was saved, try again"
+      "failed": "Check-in failed — nothing was saved, try again",
+      "arrivalGone": "This Arrival was already handled. Nothing was saved.",
+      "lineIdentityConflict": "Choose who the LINE account belongs to first. Nothing was saved."
     },
-    "uploadingPhotos": "Uploading photos… {done}/{total}"
+    "uploadingPhotos": "Uploading photos… {done}/{total}",
+    "arrivals": {
+      "title": "Waiting at the counter",
+      "count": "{count, plural, one {# arrival} other {# arrivals}}",
+      "dismiss": "Dismiss",
+      "dismissing": "Dismissing…",
+      "pull": "Pull into check-in",
+      "lineMark": "LINE",
+      "noNote": "(no description)",
+      "selected": "Checking in from this Arrival",
+      "clear": "Start from nothing",
+      "customerWrote": "customer wrote: {value}",
+      "useName": "Use this name",
+      "updatingName": "Saving…",
+      "conflictTitle": "One LINE account, two people",
+      "conflictIntro": "This LINE account is already matched to {linked}. The phone number the customer typed belongs to {found}. Choose who is the contact for this visit. The LINE match will move to your choice.",
+      "conflictIntroNew": "This LINE account is already matched to {linked}, but the phone number the customer typed is not in the system. Choose who is the contact for this visit. The LINE match will move to your choice.",
+      "conflictKeepLinked": "{name} is the contact. Keep the LINE match as it is.",
+      "conflictUseFound": "{name} is the contact. Move the LINE match to them.",
+      "conflictUseNew": "A new customer from the typed details. Move the LINE match to them.",
+      "conflictUnresolved": "Choose who the LINE account belongs to before opening the case.",
+      "willLink": "Opening the case will match this LINE account to {name}."
+    }
   },
   "customers": {
     "searchPlaceholder": "Search name, phone, company, or plate…",
@@ -745,7 +769,8 @@
         "rateLimited": "LINE is rate-limiting us — try again shortly",
         "invalidRequest": "LINE rejected the request",
         "network": "Could not reach LINE — check the connection",
-        "serverError": "LINE is having trouble — try again shortly"
+        "serverError": "LINE is having trouble — try again shortly",
+        "invalidIdToken": "LINE did not accept the sign-in token"
       }
     }
   },
@@ -875,6 +900,99 @@
         "network": "Could not reach LINE — nothing was sent",
         "serverError": "LINE is having trouble — try again shortly"
       }
+    }
+  },
+  "arrivalSettings": {
+    "title": "Customer check-in form",
+    "intro": "Customers announce their visit from their own phone: a QR at the counter, or a button in your LINE account. The form creates nothing on its own. The advisor pulls each Arrival into check-in.",
+    "enabled": "ENABLED",
+    "disabledState": "The form is off. No public address exists for this shop.",
+    "disabledReadOnly": "The form is off. A Manager can enable it.",
+    "enable": "Enable the form",
+    "enabling": "Enabling…",
+    "urlTitle": "Form address",
+    "qrHint": "Print the QR for the counter. Anyone with the link can submit an Arrival; nothing about your customers is shown back.",
+    "printQr": "Print QR poster",
+    "rotate": "Rotate link",
+    "rotateConfirm": "Confirm. The old link stops working",
+    "rotateHint": "Mints a new address. Reprint the poster.",
+    "rotatedAt": "Link rotated {when}",
+    "disable": "Disable",
+    "disableConfirm": "Confirm. Turn the form off",
+    "disableHint": "Arrivals already received stay.",
+    "liffTitle": "Let customers register from LINE",
+    "liffIntro": "Customers who open the form from your LINE account are recognized and can pick their car. Needs a LINE Login channel and a LIFF app under the same provider as the OA (LINE-SETUP, Part 6).",
+    "liffNeedsChannel": "Connect the LINE Official Account above first.",
+    "liffNeedsForm": "Enable the form first so the LIFF app has an address to point at.",
+    "liffId": "LIFF ID",
+    "loginChannelId": "Login channel ID",
+    "liffEndpoint": "LIFF endpoint URL",
+    "liffEndpointHint": "Paste this as the endpoint URL of the LIFF app.",
+    "liffSave": "Save",
+    "liffSaved": "Saved",
+    "liffOff": "The LINE door is closed. The plain form works on its own.",
+    "liffOn": "LINE door open",
+    "liffClear": "Remove",
+    "checklist": {
+      "provider": "In the LINE Developers console, create a LINE Login channel under the SAME provider as the OA. LINE gives a person the same id only within one provider.",
+      "liffApp": "In that channel, add a LIFF app. Endpoint URL: the address above. Scopes: profile and openid.",
+      "copyIds": "Copy the LIFF ID and the Login channel's Channel ID into the two fields here.",
+      "richMenu": "In OA Manager, add a rich-menu button named ลงทะเบียน that opens the LIFF URL."
+    },
+    "errors": {
+      "forbidden": "Only a Manager can do that",
+      "notConnected": "Connect the LINE Official Account first",
+      "notEnabled": "Enable the form first",
+      "liffIdInvalid": "That does not look like a LIFF ID (e.g. 1234567890-AbCdEfGh)",
+      "loginChannelIdInvalid": "The Login channel ID is a number",
+      "loginChannelRequired": "The Login channel ID is needed to verify sign-ins",
+      "failed": "Something went wrong. Try again"
+    },
+    "copied": "Copied"
+  },
+  "arrivalForm": {
+    "pageTitle": "Check-in",
+    "heading": "Let us know you are here",
+    "lead": "A few details, then wait to be called at the counter.",
+    "lineConnecting": "Connecting to LINE…",
+    "lineAs": "Submitting as {name}",
+    "lineRecognized": "Your cars on record",
+    "yourCars": "Which car",
+    "anotherCar": "Another car",
+    "name": "Name",
+    "namePlaceholder": "What we should call you",
+    "phone": "Phone",
+    "phonePlaceholder": "08x xxx xxxx",
+    "plate": "License plate",
+    "platePlaceholder": "กข 1234",
+    "bodyType": "Body type",
+    "sedan": "Sedan",
+    "pickup": "Pickup",
+    "note": "What is wrong",
+    "notePlaceholder": "e.g. brakes squeal, reversed into a post",
+    "odometer": "Odometer",
+    "optional": "optional",
+    "km": "km",
+    "submit": "Send",
+    "submitting": "Sending…",
+    "doneTitle": "Received",
+    "doneLead": "Please see the front desk. Staff will call you in turn.",
+    "doneEcho": "What you sent",
+    "again": "Another car",
+    "devIdentity": "LINE identity (dev)",
+    "devIdentityHint": "dev:U followed by 32 hex characters",
+    "devApply": "Apply",
+    "errors": {
+      "nameRequired": "Enter your name",
+      "phoneInvalid": "Phone must be 9 to 10 digits",
+      "plateRequired": "Enter the license plate",
+      "bodyTypeRequired": "Choose the body type",
+      "noteRequired": "Say briefly what is wrong",
+      "vehicleRequired": "Choose a car",
+      "queueFull": "The queue is full right now. Please see the front desk directly.",
+      "identityRejected": "We could not confirm your LINE account. Open the form from LINE again, or see the front desk.",
+      "rateLimited": "Too many attempts. Wait a moment and try again.",
+      "failed": "Could not send. Try again, or see the front desk."
     }
   }
 }

@@ -11,7 +11,10 @@ import { auth } from "@/auth";
 // the photo route requires an unguessable per-publication token minted only
 // when a human pressed send (M6 brief, decision 3). M7.7 adds /q/* on the
 // same terms: the quotation document a customer opens from LINE, reachable
-// only by the token minted when Send quotation pushed it (D-25).
+// only by the token minted when Send quotation pushed it (D-25). M7.8 adds
+// /a/*: the customer's Arrival form, reachable only by the Shop's rotatable
+// form token (ADR-006) — the app's second public write path, rate-limited
+// and capped, and write-only: it never answers whether a phone is known.
 export const proxy = auth((req) => {
   const isLoggedIn = !!req.auth;
   const isLoginPage = req.nextUrl.pathname === "/login";
@@ -25,5 +28,5 @@ export const proxy = auth((req) => {
 });
 
 export const config = {
-  matcher: ["/((?!api/auth|api/line|q/|_next/static|_next/image|favicon\\.ico).*)"],
+  matcher: ["/((?!api/auth|api/line|q/|a/|_next/static|_next/image|favicon\\.ico).*)"],
 };

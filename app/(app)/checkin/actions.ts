@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { ArrivalConsumeError, consumeArrival } from "@/lib/arrivals";
 import { allocateCaseReference } from "@/lib/case-reference";
 import { isUniqueViolation } from "@/lib/db-errors";
 import type { BodyType } from "@/lib/generated/prisma/enums";
@@ -12,6 +13,12 @@ import { newPhotoKey, photoStore } from "@/lib/storage";
 // at the desk; vehicle by plate; ownership kept or re-linked; one atomic
 // transaction opens the Repair Case. Lookups return only what the wizard
 // renders — never raw rows.
+//
+// M7.8 (ADR-006) makes performCheckin the GATEWAY for Arrivals: an optional
+// arrivalId rides along, and inside the same transaction the Arrival flips
+// to CHECKED_IN and a verified LINE identity is linked to the contact
+// Customer (lib/arrivals.ts consumeArrival). Check-in never depends on one —
+// a tow that arrives without its owner is checked in from nothing.
 //
 // Walkaround photos upload AFTER the case commits, one request each via
 // addCasePhoto (the M3 finding-photo pattern) — a whole walkaround in one
@@ -95,6 +102,8 @@ export type CheckinState = {
     | "bodyTypeRequired"
     | "photoInvalid"
     | "photoTooLarge"
+    | "arrivalGone"
+    | "lineIdentityConflict"
     | "failed";
 };
 
@@ -140,7 +149,13 @@ export async function performCheckin(
   const odometerRaw = text("odometer").replace(/\D/g, "");
   const odometerKm = /^\d{1,7}$/.test(odometerRaw) ? Number(odometerRaw) : null;
 
+  // The Arrival being consumed, and — when its LINE identity is linked to
+  // someone other than the contact — the advisor's explicit choice (M7.8 §6).
+  const arrivalId = text("arrivalId") || null;
+  const identityDecision = text("lineIdentityDecision") || null;
+
   let caseId: string;
+  let linkedCaseIds: string[] = [];
   try {
     // All-or-nothing: customer, vehicle, ownership, reference, and case
     // commit together — a failure saves nothing. Photos follow one-by-one
@@ -148,6 +163,7 @@ export async function performCheckin(
     caseId = await db.$transaction(
       async (tx) => {
         let contactId = contactCustomerId;
+        const contactCreated = !contactId;
         if (!contactId) {
           const created = await tx.customer.create({
             data: { shopId: session.shopId, ...newContact },
@@ -204,12 +220,28 @@ export async function performCheckin(
           select: { id: true },
         });
 
+        // Consume the Arrival in the SAME transaction (M7.8 §6): the row
+        // flips to CHECKED_IN, and a verified identity is linked through the
+        // shared path — or the hard stop refuses and nothing above commits.
+        if (arrivalId) {
+          const consumed = await consumeArrival(tx, {
+            shopId: session.shopId,
+            arrivalId,
+            caseId: repairCase.id,
+            contact: { id: contactId, created: contactCreated },
+            staffId: session.staffId,
+            identityDecision,
+          });
+          linkedCaseIds = consumed.linkedCaseIds;
+        }
+
         return repairCase.id;
       },
       { timeout: 15_000 },
     );
   } catch (error) {
     if (error instanceof CheckinInputError) return { error: error.code };
+    if (error instanceof ArrivalConsumeError) return { error: error.code };
     // Advisor typed a phone/plate that exists instead of using the lookup.
     if (isUniqueViolation(error, "phone")) return { error: "phoneTaken" };
     if (isUniqueViolation(error, "plate")) return { error: "plateTaken" };
@@ -219,7 +251,64 @@ export async function performCheckin(
 
   revalidatePath("/");
   revalidatePath("/customers");
+  if (arrivalId) {
+    revalidatePath("/checkin");
+    revalidatePath("/settings");
+    for (const id of linkedCaseIds) revalidatePath(`/cases/${id}`);
+  }
   return { caseId };
+}
+
+/**
+ * Dismiss a waiting Arrival (M7.8 §4): duplicate, prank, customer left.
+ * Records who and when; the row stays. Refuses anything not WAITING.
+ */
+export async function dismissArrival(
+  arrivalId: string,
+): Promise<{ ok: true } | { ok: false; error: "arrivalGone" | "failed" }> {
+  try {
+    const { session, db } = await tenantContext();
+    const updated = await db.arrival.updateMany({
+      where: { id: arrivalId, status: "WAITING" },
+      data: { status: "DISMISSED", handledByStaffId: session.staffId, handledAt: new Date() },
+    });
+    if (updated.count === 0) return { ok: false, error: "arrivalGone" };
+    revalidatePath("/checkin");
+    return { ok: true };
+  } catch (error) {
+    console.error("[checkin] dismiss failed:", error);
+    return { ok: false, error: "failed" };
+  }
+}
+
+/**
+ * The one-tap name update (M7.8 §6): the customer wrote a name that differs
+ * from their record, and the advisor takes the customer's word. The name is
+ * read from the Arrival row, never from the client, and the Customer stays
+ * the same person — this is the only Customer edit the flow offers.
+ */
+export async function applyArrivalName(
+  arrivalId: string,
+  customerId: string,
+): Promise<{ ok: true; customer: LookupCustomer } | { ok: false; error: "arrivalGone" | "failed" }> {
+  try {
+    const { db } = await tenantContext();
+    const arrival = await db.arrival.findUnique({
+      where: { id: arrivalId },
+      select: { name: true, status: true },
+    });
+    if (!arrival || arrival.status !== "WAITING") return { ok: false, error: "arrivalGone" };
+    const customer = await db.customer.update({
+      where: { id: customerId },
+      data: { name: arrival.name },
+      select: { id: true, name: true, phone: true, company: true },
+    });
+    revalidatePath(`/customers/${customerId}`);
+    return { ok: true, customer };
+  } catch (error) {
+    console.error("[checkin] name update failed:", error);
+    return { ok: false, error: "failed" };
+  }
 }
 
 /**

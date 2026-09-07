@@ -48,6 +48,8 @@ export type CaseHeaderProps = {
   contact: { id: string; name: string; phone: string; company: string | null };
   /** First check-in walkaround photo (D-9) — body-type icon when none yet. */
   photoId: string | null;
+  /** The case was opened by consuming the customer's own Arrival (M7.8). */
+  fromArrival: boolean;
   stage: Stage;
   move: NextMove;
   blocker: WaitingBlocker;
@@ -65,6 +67,7 @@ export function CaseHeader({
   vehicle,
   contact,
   photoId,
+  fromArrival,
   stage,
   move,
   blocker,
@@ -269,6 +272,7 @@ export function CaseHeader({
             })}
             {repairCase.odometerKm != null &&
               ` · ${t("odometerValue", { km: format.number(repairCase.odometerKm) })}`}
+            {fromArrival && ` · ${t("checkedInFromArrival")}`}
           </p>
         </div>
       </div>

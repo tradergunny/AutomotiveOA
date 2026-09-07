@@ -56,6 +56,9 @@ export default async function CasePage({
       contactCustomer: true,
       openedByStaff: true,
       deliveredBy: { select: { name: true } },
+      // Provenance (M7.8, decision 5): the Arrival row pointing here IS the
+      // record that this case was checked in from the customer's own notice.
+      arrival: { select: { id: true } },
       photos: { where: { findingId: null, jobId: null }, orderBy: { capturedAt: "asc" } },
       findings: {
         select: {
@@ -237,6 +240,7 @@ export default async function CasePage({
           company: contactCustomer.company,
         }}
         photoId={photos[0]?.id ?? null}
+        fromArrival={repairCase.arrival != null}
         stage={stage}
         move={move}
         blocker={blocker}

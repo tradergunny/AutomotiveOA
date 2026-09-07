@@ -38,6 +38,18 @@ export type LineProfile = {
 };
 
 /**
+ * What a verified LINE Login ID token says about the person holding it
+ * (M7.8, ADR-006): the userId (`sub`) and the profile claims. This is the
+ * ONLY way a userId reaches an Arrival — the client never sends one and the
+ * server never trusts one (brief, decision 1).
+ */
+export type LineIdentity = {
+  userId: string;
+  displayName: string | null;
+  pictureUrl: string | null;
+};
+
+/**
  * Every failure staff can actually hit, named. The composer maps each to its
  * own bilingual sentence — never a stack trace, never "something went wrong".
  */
@@ -48,7 +60,9 @@ export type LineErrorCode =
   | "rateLimited"
   | "invalidRequest"
   | "network"
-  | "serverError";
+  | "serverError"
+  /** The ID token did not verify: expired, forged, or for another channel. */
+  | "invalidIdToken";
 
 export type LineCallResult<T> =
   | { ok: true; value: T; requestId: string | null }
@@ -63,6 +77,12 @@ export interface LineTransport {
     to: string,
     messages: LineMessage[],
   ): Promise<LineCallResult<null>>;
+  /**
+   * Verify a LINE Login ID token against the Shop's Login channel and return
+   * the identity it carries (M7.8). `loginChannelId` is the audience the
+   * token must have been issued for — a token from another channel fails.
+   */
+  verifyIdToken(idToken: string, loginChannelId: string): Promise<LineCallResult<LineIdentity>>;
 }
 
 /**
@@ -180,6 +200,52 @@ export function createLiveLineTransport(): LineTransport {
       if (!res.ok) return res;
       return { ok: true, value: null, requestId: res.requestId };
     },
+    async verifyIdToken(idToken, loginChannelId) {
+      // Not a bearer call: the verify endpoint takes the token and the
+      // channel id as a form body and answers with the decoded claims.
+      let response: Response;
+      try {
+        response = await fetch(`${API_BASE}/oauth2/v2.1/verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ id_token: idToken, client_id: loginChannelId }),
+          cache: "no-store",
+        });
+      } catch (error) {
+        return {
+          ok: false,
+          code: "network",
+          detail: error instanceof Error ? error.message : "fetch failed",
+          requestId: null,
+        };
+      }
+      const requestId = response.headers.get("x-line-request-id");
+      const text = await response.text();
+      if (!response.ok) {
+        // 400 here means the token itself was refused (expired, bad
+        // signature, wrong audience) — its own code, so the form can say so.
+        const code = response.status === 400 ? "invalidIdToken" : classify(response.status, text);
+        return { ok: false, code, detail: text.slice(0, 500), requestId };
+      }
+      let claims: { sub?: unknown; name?: unknown; picture?: unknown };
+      try {
+        claims = JSON.parse(text);
+      } catch {
+        return { ok: false, code: "invalidIdToken", detail: "unparseable claims", requestId };
+      }
+      if (typeof claims.sub !== "string" || !claims.sub) {
+        return { ok: false, code: "invalidIdToken", detail: "no sub claim", requestId };
+      }
+      return {
+        ok: true,
+        requestId,
+        value: {
+          userId: claims.sub,
+          displayName: typeof claims.name === "string" ? claims.name : null,
+          pictureUrl: typeof claims.picture === "string" ? claims.picture : null,
+        },
+      };
+    },
   };
 }
 
@@ -187,8 +253,20 @@ export function createLiveLineTransport(): LineTransport {
  * Dev/test driver. Access tokens starting with "dev-" are treated as a valid
  * connection to a stand-in OA; anything else is refused exactly the way LINE
  * refuses a bad token, so BOTH paths are demonstrable without an account.
+ *
+ * ID tokens follow the same convention (M7.8, decision 4): "dev:U…" verifies
+ * as that userId with a stand-in name, so the whole LINE door of the Arrival
+ * form is walkable with no LINE Login channel, no tunnel, and no fees.
  */
 const FAKE_TOKEN_PREFIX = "dev-";
+const FAKE_ID_TOKEN_PREFIX = "dev:";
+/** LINE user ids are "U" + 32 hex characters. */
+const LINE_USER_ID = /^U[0-9a-f]{32}$/;
+
+/** The fake ID token that stands for a given userId (`dev:U…`). */
+export function fakeIdTokenFor(lineUserId: string): string {
+  return `${FAKE_ID_TOKEN_PREFIX}${lineUserId}`;
+}
 
 export function createFakeLineTransport(outboxPath: string): LineTransport {
   async function record(kind: string, payload: unknown) {
@@ -238,6 +316,31 @@ export function createFakeLineTransport(outboxPath: string): LineTransport {
       // The literal wire payload — this file IS the verification surface.
       await record("push", { to, messages });
       return { ok: true, value: null, requestId: `fake-${randomUUID()}` };
+    },
+    async verifyIdToken(idToken) {
+      // The channel id is not checked here — dev shops rarely have one — but
+      // the token must still be well-formed, so a body that merely LOOKS
+      // like a userId is refused exactly as LINE would refuse a forged token.
+      const userId = idToken.startsWith(FAKE_ID_TOKEN_PREFIX)
+        ? idToken.slice(FAKE_ID_TOKEN_PREFIX.length)
+        : null;
+      if (!userId || !LINE_USER_ID.test(userId)) {
+        return {
+          ok: false,
+          code: "invalidIdToken",
+          detail: `fake transport: ID token is not "${FAKE_ID_TOKEN_PREFIX}U…"`,
+          requestId: null,
+        };
+      }
+      return {
+        ok: true,
+        requestId: `fake-${randomUUID()}`,
+        value: {
+          userId,
+          displayName: `LINE user ${userId.slice(-4)} (dev)`,
+          pictureUrl: null,
+        },
+      };
     },
   };
 }

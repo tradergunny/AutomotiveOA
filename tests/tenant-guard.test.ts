@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prismaUnscoped } from "@/lib/db";
+import { resolveArrivalShop } from "@/lib/line-public";
 import { forShop, TenantGuardError } from "@/lib/tenant";
 
 /**
@@ -36,10 +37,19 @@ let lineContactA: { id: string };
 let lineUpdateA: { id: string };
 let paymentA: { id: string };
 let followUpA: { id: string };
+let arrivalA: { id: string };
+let arrivalB: { id: string };
+/** M7.8: each shop's public form token. */
+const ARRIVAL_TOKEN_A = `${run}AAAAAAAAAAAAAAAAAA`.slice(0, 22).padEnd(22, "a");
+const ARRIVAL_TOKEN_B = `${run}BBBBBBBBBBBBBBBBBB`.slice(0, 22).padEnd(22, "b");
 
 beforeAll(async () => {
-  shopA = await prismaUnscoped.shop.create({ data: { name: `${run} Shop A` } });
-  shopB = await prismaUnscoped.shop.create({ data: { name: `${run} Shop B` } });
+  shopA = await prismaUnscoped.shop.create({
+    data: { name: `${run} Shop A`, arrivalToken: ARRIVAL_TOKEN_A },
+  });
+  shopB = await prismaUnscoped.shop.create({
+    data: { name: `${run} Shop B`, arrivalToken: ARRIVAL_TOKEN_B },
+  });
   staffA = await prismaUnscoped.staff.create({
     data: { shopId: shopA.id, name: `${run} Staff A`, position: "advisor" },
   });
@@ -308,10 +318,36 @@ beforeAll(async () => {
       quotedPriceSatang: 500_000,
     },
   });
+  // M7.8 domain rows: one Arrival per shop, the SAME LINE userId on both
+  // (per-OA ids, as with the LineContacts above), A's pointing at A's car.
+  arrivalA = await prismaUnscoped.arrival.create({
+    data: {
+      shopId: shopA.id,
+      name: `${run} Arrival A`,
+      phone: "0810000001",
+      plate: `${run}ก1`,
+      note: "x",
+      locale: "th",
+      vehicleId: vehicleA.id,
+      lineUserId: SHARED_LINE_USER_ID,
+    },
+  });
+  arrivalB = await prismaUnscoped.arrival.create({
+    data: {
+      shopId: shopB.id,
+      name: `${run} Arrival B`,
+      phone: "0810000001",
+      plate: `${run}ก1`,
+      note: "x",
+      locale: "en",
+      lineUserId: SHARED_LINE_USER_ID,
+    },
+  });
 });
 
 afterAll(async () => {
   const shopIds = [shopA.id, shopB.id];
+  await prismaUnscoped.arrival.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.caseEvent.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.followUp.deleteMany({ where: { shopId: { in: shopIds } } });
   await prismaUnscoped.payment.deleteMany({ where: { shopId: { in: shopIds } } });
@@ -1342,5 +1378,43 @@ describe("M7.7 — the quotation document link and the Update that carried it", 
     expect(published?.id).toBe(quotationA.id);
     expect(published?.repairCase.shop.name).toBe(`${run} Shop A`);
     expect(await resolvePublishedQuotation(token.replace(/0/g, "1"))).toBeNull();
+  });
+});
+
+describe("M7.8 model is scoped (Arrival) and its public key resolves to one shop", () => {
+  it("two shops' Arrivals never cross, even sharing a phone, plate and LINE userId", async () => {
+    const a = await forShop(shopA.id).arrival.findMany({ where: { lineUserId: SHARED_LINE_USER_ID } });
+    expect(a.map((row) => row.id)).toEqual([arrivalA.id]);
+    expect(await forShop(shopA.id).arrival.findUnique({ where: { id: arrivalB.id } })).toBeNull();
+    await expect(
+      forShop(shopA.id).arrival.update({ where: { id: arrivalB.id }, data: { status: "DISMISSED" } }),
+    ).rejects.toThrow(TenantGuardError);
+    expect((await prismaUnscoped.arrival.findUnique({ where: { id: arrivalB.id } }))?.status).toBe("WAITING");
+  });
+
+  it("the composite FKs reject a cross-shop vehicle, case, or staff on an Arrival", async () => {
+    const base = { name: "evil", phone: "0810000009", plate: "EVIL", note: "x", locale: "th" as const };
+    await expect(
+      prismaUnscoped.arrival.create({ data: { ...base, shopId: shopA.id, vehicleId: vehicleB.id } }),
+    ).rejects.toThrow();
+    await expect(
+      prismaUnscoped.arrival.create({ data: { ...base, shopId: shopA.id, caseId: caseB.id } }),
+    ).rejects.toThrow();
+    await expect(
+      prismaUnscoped.arrival.create({
+        data: { ...base, shopId: shopA.id, handledByStaffId: staffB.id, status: "DISMISSED" },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("a form token resolves to exactly its own shop, and a tenant client cannot read another's token", async () => {
+    expect((await resolveArrivalShop(ARRIVAL_TOKEN_A))?.shopId).toBe(shopA.id);
+    expect((await resolveArrivalShop(ARRIVAL_TOKEN_B))?.shopId).toBe(shopB.id);
+    expect(await resolveArrivalShop(`${run}CCCCCCCCCCCCCCCCCC`.slice(0, 22).padEnd(22, "c"))).toBeNull();
+    // The resolved client is scoped: A's client sees only A's Arrivals.
+    const resolved = await resolveArrivalShop(ARRIVAL_TOKEN_A);
+    const rows = await resolved!.db.arrival.findMany({ where: { name: { startsWith: run } } });
+    expect(rows.map((row) => row.shopId)).toEqual([shopA.id]);
+    expect(await forShop(shopA.id).shop.findUnique({ where: { arrivalToken: ARRIVAL_TOKEN_B } })).toBeNull();
   });
 });

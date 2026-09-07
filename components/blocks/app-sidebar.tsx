@@ -17,10 +17,13 @@ export async function AppSidebar({
   shopName,
   userName,
   role,
+  checkinCount,
 }: {
   shopName: string;
   userName: string;
   role: UserRole;
+  /** Waiting Arrivals (M7.8) — shown on the Check-in item. */
+  checkinCount: number;
 }) {
   const t = await getTranslations("common");
 
@@ -33,7 +36,7 @@ export async function AppSidebar({
         </div>
         <div className="eyebrow mt-0.5">{t("tagline")}</div>
       </div>
-      <NavList />
+      <NavList counts={{ checkin: checkinCount }} />
       <div className="mt-auto flex flex-col gap-2 border-t border-dashed pt-3.5">
         <div className="flex items-center gap-2 border bg-surface-2 px-2 py-1.5">
           <span className="grid size-7 flex-none place-items-center border border-border-strong font-mono text-[11px] text-primary">
