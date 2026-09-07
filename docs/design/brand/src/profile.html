@@ -1,0 +1,48 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>AutomotiveOA — LINE OA profile</title>
+<style>
+__FONTCSS__
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#000}
+.canvas{
+  position:relative;width:640px;height:640px;overflow:hidden;
+  background:#09090b;
+  font-family:"Plex","PlexThai",sans-serif;
+}
+.veil{position:absolute;inset:0;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(249,115,22,.22), rgba(249,115,22,0) 55%),
+    radial-gradient(circle at 74% 82%, rgba(154,77,16,.16), rgba(154,77,16,0) 52%);
+}
+.hatch{position:absolute;inset:0;
+  background:repeating-linear-gradient(45deg, rgba(244,244,245,.045) 0 1.5px, rgba(244,244,245,0) 1.5px 13px);
+  -webkit-mask-image:radial-gradient(circle at 50% 50%, #000 18%, rgba(0,0,0,.35) 62%, rgba(0,0,0,0) 82%);
+          mask-image:radial-gradient(circle at 50% 50%, #000 18%, rgba(0,0,0,.35) 62%, rgba(0,0,0,0) 82%);
+}
+.frame{position:absolute;left:118px;top:118px;width:404px;height:404px;
+  border:1px solid #2b2b30;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px}
+.tick{position:absolute;width:58px;height:58px;border:0 solid #f97316}
+.tl{left:-1px;top:-1px;border-left-width:4px;border-top-width:4px}
+.tr{right:-1px;top:-1px;border-right-width:4px;border-top-width:4px}
+.bl{left:-1px;bottom:-1px;border-left-width:4px;border-bottom-width:4px}
+.br{right:-1px;bottom:-1px;border-right-width:4px;border-bottom-width:4px}
+.rule{width:212px;height:0;border-top:1px dashed #33333a}
+.mark{
+  font-weight:700;font-size:194px;line-height:.78;letter-spacing:-.055em;
+  color:#f4f4f5;text-indent:-.055em;
+}
+.mark em{font-style:normal;color:#f97316}
+</style>
+<div class="canvas">
+  <div class="veil"></div>
+  <div class="hatch"></div>
+  <div class="frame">
+    <span class="tick tl"></span><span class="tick tr"></span>
+    <span class="tick bl"></span><span class="tick br"></span>
+    <div class="rule"></div>
+    <div class="mark">A<em>O</em></div>
+    <div class="rule"></div>
+  </div>
+</div>
