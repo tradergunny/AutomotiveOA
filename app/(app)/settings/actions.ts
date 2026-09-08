@@ -8,6 +8,11 @@ import {
   openCredential,
   sealCredential,
 } from "@/lib/line-credentials";
+import {
+  linkLineContactToCustomer,
+  revalidateIdentityPaths,
+  unlinkLineContactFromCustomer,
+} from "@/lib/line-identity";
 import { normalizePhone } from "@/lib/normalize";
 import { can } from "@/lib/permissions";
 import { tenantContext } from "@/lib/session";
@@ -237,39 +242,6 @@ export async function lookupCustomerForLink(
   }
 }
 
-/**
- * Record the link (or its removal) on the internal timeline of every case
- * this Customer is still the contact for — M5's rule that every operational
- * event becomes a CaseEvent, and the answer to "who connected this, and
- * when?". Delivered cases are closed for writes and are left alone.
- */
-async function logIdentityEvent(
-  db: TenantDb,
-  input: {
-    shopId: string;
-    customerId: string;
-    actorStaffId: string;
-    type: "LINE_CUSTOMER_LINKED" | "LINE_CUSTOMER_UNLINKED";
-    subjectName: string | null;
-  },
-) {
-  const cases = await db.repairCase.findMany({
-    where: { contactCustomerId: input.customerId, status: { not: "DELIVERED" } },
-    select: { id: true },
-  });
-  if (cases.length === 0) return;
-  await db.caseEvent.createMany({
-    data: cases.map((row) => ({
-      shopId: input.shopId,
-      caseId: row.id,
-      type: input.type,
-      subjectName: input.subjectName,
-      actorStaffId: input.actorStaffId,
-    })),
-  });
-  for (const row of cases) revalidatePath(`/cases/${row.id}`);
-}
-
 export async function linkLineContact(
   contactId: string,
   customerId: string,
@@ -284,41 +256,25 @@ export async function linkLineContact(
     if (!contact) return { ok: false, error: "contactMissing" };
     if (!customer) return { ok: false, error: "customerMissing" };
 
-    // One linked contact per Customer (schema-enforced): relinking replaces,
-    // and the replacement is recorded like any other change.
-    const previous = await db.lineContact.findFirst({
-      where: { customerId, NOT: { id: contactId } },
-    });
-    if (previous) {
-      await db.lineContact.update({
-        where: { id: previous.id },
-        data: { customerId: null, linkedByStaffId: null, linkedAt: null },
-      });
-      await logIdentityEvent(db, {
+    // The shared link path (lib/line-identity.ts): one linked contact per
+    // Customer, relinking replaces and is recorded, every open case of the
+    // Customer gets its event. Check-in's Arrival consumption walks the same
+    // function (M7.8), so the two ways a link is made cannot drift apart.
+    const touched = await db.$transaction((tx) =>
+      linkLineContactToCustomer(tx, {
         shopId: session.shopId,
+        contactId,
         customerId,
         actorStaffId: session.staffId,
-        type: "LINE_CUSTOMER_UNLINKED",
-        subjectName: previous.displayName,
-      });
-    }
+      }),
+    );
+    revalidateIdentityPaths(customerId, touched.touchedCaseIds);
+    if (touched.formerCustomerId) revalidatePath(`/customers/${touched.formerCustomerId}`);
 
-    const updated = await db.lineContact.update({
+    const updated = await db.lineContact.findUniqueOrThrow({
       where: { id: contactId },
-      data: { customerId, linkedByStaffId: session.staffId, linkedAt: new Date() },
       include: CONTACT_INCLUDE,
     });
-
-    await logIdentityEvent(db, {
-      shopId: session.shopId,
-      customerId,
-      actorStaffId: session.staffId,
-      type: "LINE_CUSTOMER_LINKED",
-      subjectName: updated.displayName,
-    });
-
-    revalidatePath("/settings");
-    revalidatePath(`/customers/${customerId}`);
     return { ok: true, value: toContactDto(updated) };
   } catch (error) {
     console.error("[line-settings] link failed:", error);
@@ -334,23 +290,24 @@ export async function unlinkLineContact(
     const contact = await db.lineContact.findUnique({ where: { id: contactId } });
     if (!contact) return { ok: false, error: "contactMissing" };
 
-    const updated = await db.lineContact.update({
-      where: { id: contactId },
-      data: { customerId: null, linkedByStaffId: null, linkedAt: null },
-      include: CONTACT_INCLUDE,
-    });
-
     if (contact.customerId) {
-      await logIdentityEvent(db, {
-        shopId: session.shopId,
-        customerId: contact.customerId,
-        actorStaffId: session.staffId,
-        type: "LINE_CUSTOMER_UNLINKED",
-        subjectName: contact.displayName,
-      });
-      revalidatePath(`/customers/${contact.customerId}`);
+      const customerId = contact.customerId;
+      const touched = await db.$transaction((tx) =>
+        unlinkLineContactFromCustomer(tx, {
+          shopId: session.shopId,
+          contactId,
+          customerId,
+          displayName: contact.displayName,
+          actorStaffId: session.staffId,
+        }),
+      );
+      revalidateIdentityPaths(customerId, touched);
     }
 
+    const updated = await db.lineContact.findUniqueOrThrow({
+      where: { id: contactId },
+      include: CONTACT_INCLUDE,
+    });
     revalidatePath("/settings");
     return { ok: true, value: toContactDto(updated) };
   } catch (error) {

@@ -3,11 +3,11 @@ import { forShop, type TenantDb } from "@/lib/tenant";
 
 /**
  * Tenant resolution for the app's unauthenticated routes: the LINE webhook
- * and the published-photo route (M6), and the published-quotation page
- * (M7.7). All are reached by LINE's servers or by a customer's phone, so
- * there is no session to scope by.
+ * and the published-photo route (M6), the published-quotation page (M7.7),
+ * and the public Arrival form (M7.8). All are reached by LINE's servers or
+ * by a customer's phone, so there is no session to scope by.
  *
- * The rule these two follow, and the reason they are in one small file where
+ * The rule they all follow, and the reason they are in one small file where
  * it can be read at a glance: perform exactly ONE unscoped read to establish
  * which Shop the request belongs to, then hand back a normal forShop() client
  * and do everything else through the guard (ADR-001).
@@ -87,4 +87,41 @@ export async function resolvePublishedQuotation(token: string) {
       },
     },
   });
+}
+
+/**
+ * The Shop behind a public Arrival form (M7.8, ADR-006), by its rotatable
+ * form token — the published-quotation idiom applied to the app's second
+ * public WRITE path. The token is minted from Settings, replaced by Rotate
+ * (the old poster dies at once), nulled by Disable; an unknown or rotated
+ * token is a plain 404, indistinguishable from a wrong guess. Nothing about
+ * the Shop crosses beyond its name, which the form prints. The LINE door's
+ * two plain values ride along so the page knows whether to load LIFF.
+ */
+export async function resolveArrivalShop(token: string): Promise<{
+  shopId: string;
+  shopName: string;
+  liffId: string | null;
+  loginChannelId: string | null;
+  db: TenantDb;
+} | null> {
+  if (!/^[A-Za-z0-9_-]{22}$/.test(token)) return null;
+  const shop = await prismaUnscoped.shop.findUnique({
+    where: { arrivalToken: token },
+    select: { id: true, name: true },
+  });
+  if (!shop) return null;
+
+  const db = forShop(shop.id);
+  const channel = await db.shopLineChannel.findUnique({
+    where: { shopId: shop.id },
+    select: { liffId: true, loginChannelId: true },
+  });
+  return {
+    shopId: shop.id,
+    shopName: shop.name,
+    liffId: channel?.liffId ?? null,
+    loginChannelId: channel?.loginChannelId ?? null,
+    db,
+  };
 }

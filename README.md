@@ -10,6 +10,8 @@ Built first with a pilot shop, sold to other garages (see [ADR-001](docs/adr/ADR
 
 The build so far: check-in opens a Repair Case (M2), an inspection turns the car into Findings (M3), Findings are grouped into priced, per-Job-authorized work with versioned Quotations (M4), that work moves through Waiting / In Progress / QC to Delivered on an attention-grouped board with a staff-only internal timeline (M5), the customer gets their curated half through the Shop's own LINE OA (M6), and Payments, per-payer balances, the Customer/Vehicle history split, and a Follow-up worklist close the money-and-relationships loop (M7).
 
+**M7.8** adds the customer's own voice to check-in: an **Arrival** ([CONTEXT.md](CONTEXT.md), [ADR-006](docs/adr/ADR-006-customer-self-service-arrival.md)) is the notice a customer submits from their phone at the counter, through a QR page or the Shop's LINE account. It creates nothing on its own; the advisor pulls it into the check-in wizard, which stays the only place a Customer, Vehicle or Repair Case is made, and an Arrival that came through LINE links the customer's LINE identity when the case opens.
+
 **M7.5** made all of that legible. A Repair Case now has exactly one derived **Stage** ([CONTEXT.md](CONTEXT.md)) — In assessment · Awaiting authorization · Waiting · In progress · In QC · Ready · Delivered / Balance due — computed once in [lib/case-flow.ts](lib/case-flow.ts) and shared by the board and the case page, so both speak the same vocabulary. The page leads with a stage spine and a derived next action, wears the car's own check-in photo, renders Job cards as records with an explicit Edit toggle, and keeps a fixed section order that shrinks around the current Stage (D-6 – D-10 in [docs/design/DESIGN.md](docs/design/DESIGN.md)).
 
 Each Shop connects its **own** LINE Official Account in `/settings` (ADR-002) — credentials verified against LINE, then stored encrypted (ADR-004) — and the OA's webhook captures the LINE identities staff match to Customers by hand (ADR-005). On a case, the **Customer timeline** sits beside the internal one: a Thai draft is pre-filled from the case's real Jobs in customer-safe wording, staff edit it, attach up to four case photos, preview exactly what will go out, and press send. Every send is an immutable record of what the customer actually saw, and appears on the internal timeline as an event. Nothing is ever sent automatically (ADR-003). Setting up an Official Account is walked through step by step in [docs/LINE-SETUP.md](docs/LINE-SETUP.md).
@@ -53,7 +55,7 @@ Tests (`npm test`) need the dev database running.
 
 ### Staged cases for a Stage walkthrough
 
-`npm run cases:stage` fills the pilot shop with one Repair Case per **Stage** (twelve cases): fresh assessment, findings still being keyed in, an unpriced line, a priced Offer not yet sent, a sent Offer (Quotation + LINE Update with the document link), a recorded Response (Work and Done phases), waiting on parts, in progress with a cancelled job, in QC, ready, delivered-with-balance, and delivered-settled — each with generated walkaround photos so the board's car thumbnails (D-9) are real.
+`npm run cases:stage` fills the pilot shop with one Repair Case per **Stage** (twelve cases): fresh assessment, findings still being keyed in, an unpriced line, a priced Offer not yet sent, a sent Offer (Quotation + LINE Update with the document link), a recorded Response (Work and Done phases), waiting on parts, in progress with a cancelled job, in QC, ready, delivered-with-balance, and delivered-settled — each with generated walkaround photos so the board's car thumbnails (D-9) are real. Since M7.8 it also stages three **Arrivals**: a plain one from a seeded customer (spelled differently from their record, so the wizard's "customer wrote" shows), one carrying a LINE identity already matched to a different customer (the hard stop), and one stale enough to be off the queue.
 
 ```bash
 npm run cases:stage
@@ -74,6 +76,8 @@ npm run line:simulate -- follow
 ```
 
 `follow`, `message`, and `unfollow` are all supported (`-- follow --user U…` picks a specific id). The script signs the body with the connected Shop's real channel secret, so the encryption and signature paths are exercised too. No tunnel, no account, no fees.
+
+The customer's **Arrival form** (M7.8) has a LINE door too: inside LINE it carries a LINE Login ID token, which the server verifies before taking the userId from it. The stand-in transport verifies tokens of the form `dev:U…` (`dev:` followed by a LINE userId) and returns that userId with a stand-in name, so the whole path is walkable without a LINE Login channel: in development the form shows a small **LINE identity (dev)** field where you paste such a token, and `npm run cases:stage` prints the one its conflicting Arrival would have carried. Enable the form in `/settings` first; the URL it mints is the one to open.
 
 Note that a real OA needs a publicly reachable HTTPS app for both webhooks and photo delivery, so the live pass belongs on the deployed staging URL, not `localhost`.
 

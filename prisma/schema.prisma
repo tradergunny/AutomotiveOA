@@ -9,6 +9,9 @@
 // minted at delivery), plus the payment/follow-up CaseEvent surface.
 // M7.7: Quotation.publicToken (the document link), LineUpdate.quotationId
 // (an Update that carried a Quotation), and the JOB_MERGED event.
+// M7.8: Arrival (the customer's own notice of a visit — a candidate check-in
+// consumes, never a record — ADR-006), Shop.arrivalToken (the rotatable
+// public form key) and ShopLineChannel.liffId/loginChannelId (the LINE door).
 // Every tenant-owned row carries shop_id (ADR-001); scoping is
 // enforced by the tenant guard in lib/tenant.ts, never by hand-written WHERE
 // clauses. Cross-model relations join on same-shop composite FKs so the
@@ -30,13 +33,19 @@ datasource db {
 
 /// The tenant: a garage business using the platform.
 model Shop {
-  id        String   @id @default(cuid())
-  name      String
+  id                    String    @id @default(cuid())
+  name                  String
   /// Last issued Repair Case number, atomically incremented per check-in
   /// (M2 brief §2). Starts at 1000 so the first case is RC-1001.
-  caseSeq   Int      @default(1000) @map("case_seq")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  caseSeq               Int       @default(1000) @map("case_seq")
+  /// M7.8 (ADR-006): the public Arrival form's key — 128 random bits,
+  /// base64url — the whole authorization for /a/[token]. NULL means the Shop
+  /// has not enabled the form (the seed leaves it null). Rotating mints a new
+  /// value and the old poster dies at once; disabling nulls it.
+  arrivalToken          String?   @unique @map("arrival_token")
+  arrivalTokenRotatedAt DateTime? @map("arrival_token_rotated_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
 
   staff            Staff[]
   users            User[]
@@ -58,6 +67,7 @@ model Shop {
   lineUpdatePhotos LineUpdatePhoto[]
   payments         Payment[]
   followUps        FollowUp[]
+  arrivals         Arrival[]
 
   @@map("shops")
 }
@@ -91,9 +101,10 @@ model Staff {
   connectedLineChannels  ShopLineChannel[]
   linkedLineContacts     LineContact[]
   sentLineUpdates        LineUpdate[]
-  recordedPayments       Payment[]         @relation("PaymentRecordedBy")
-  voidedPayments         Payment[]         @relation("PaymentVoidedBy")
+  recordedPayments       Payment[]          @relation("PaymentRecordedBy")
+  voidedPayments         Payment[]          @relation("PaymentVoidedBy")
   followUpActions        FollowUp[]
+  handledArrivals        Arrival[]
 
   @@unique([shopId, id]) // target for the same-shop composite FKs (users, cases, photos, findings)
   @@index([shopId])
@@ -193,6 +204,7 @@ model Vehicle {
   shop            Shop         @relation(fields: [shopId], references: [id])
   primaryCustomer Customer     @relation("VehiclePrimaryCustomer", fields: [shopId, primaryCustomerId], references: [shopId, id])
   cases           RepairCase[]
+  arrivals        Arrival[]
 
   @@unique([shopId, plate])
   @@unique([shopId, id]) // target for the same-shop composite FKs
@@ -247,6 +259,7 @@ model RepairCase {
   lineUpdates     LineUpdate[]
   payments        Payment[]
   followUps       FollowUp[]
+  arrival         Arrival?
 
   @@unique([shopId, reference])
   @@unique([shopId, id]) // target for the same-shop composite FKs
@@ -760,11 +773,11 @@ model Payment {
   voidedByStaffId   String?       @map("voided_by_staff_id")
   voidReason        String?       @map("void_reason")
 
-  shop       Shop       @relation(fields: [shopId], references: [id])
-  repairCase RepairCase @relation(fields: [shopId, caseId], references: [shopId, id])
-  customer   Customer?  @relation(fields: [shopId, customerId], references: [shopId, id])
-  recordedBy Staff      @relation("PaymentRecordedBy", fields: [shopId, recordedByStaffId], references: [shopId, id])
-  voidedBy   Staff?     @relation("PaymentVoidedBy", fields: [shopId, voidedByStaffId], references: [shopId, id])
+  shop       Shop        @relation(fields: [shopId], references: [id])
+  repairCase RepairCase  @relation(fields: [shopId, caseId], references: [shopId, id])
+  customer   Customer?   @relation(fields: [shopId, customerId], references: [shopId, id])
+  recordedBy Staff       @relation("PaymentRecordedBy", fields: [shopId, recordedByStaffId], references: [shopId, id])
+  voidedBy   Staff?      @relation("PaymentVoidedBy", fields: [shopId, voidedByStaffId], references: [shopId, id])
   events     CaseEvent[]
 
   @@unique([shopId, id]) // target for CaseEvent's same-shop composite FK
@@ -819,12 +832,12 @@ model FollowUp {
   createdAt           DateTime          @default(now()) @map("created_at")
   updatedAt           DateTime          @updatedAt @map("updated_at")
 
-  shop         Shop       @relation(fields: [shopId], references: [id])
-  repairCase   RepairCase @relation(fields: [shopId, caseId], references: [shopId, id])
-  customer     Customer   @relation(fields: [shopId, customerId], references: [shopId, id])
-  job          Job?       @relation(fields: [shopId, caseId, jobId], references: [shopId, caseId, id])
-  finding      Finding?   @relation(fields: [shopId, caseId, findingId], references: [shopId, caseId, id])
-  lastActionBy Staff?     @relation(fields: [shopId, lastActionByStaffId], references: [shopId, id])
+  shop         Shop        @relation(fields: [shopId], references: [id])
+  repairCase   RepairCase  @relation(fields: [shopId, caseId], references: [shopId, id])
+  customer     Customer    @relation(fields: [shopId, customerId], references: [shopId, id])
+  job          Job?        @relation(fields: [shopId, caseId, jobId], references: [shopId, caseId, id])
+  finding      Finding?    @relation(fields: [shopId, caseId, findingId], references: [shopId, caseId, id])
+  lastActionBy Staff?      @relation(fields: [shopId, lastActionByStaffId], references: [shopId, id])
   events       CaseEvent[]
 
   // One FollowUp per source, so the delivery mint and the backfill are
@@ -858,6 +871,14 @@ model ShopLineChannel {
   botDisplayName        String?   @map("bot_display_name")
   botPictureUrl         String?   @map("bot_picture_url")
   verifiedAt            DateTime? @map("verified_at")
+  /// M7.8 (ADR-006): the LINE door. The LIFF app that serves the Arrival form
+  /// inside LINE, and the LINE Login channel whose ID tokens the server
+  /// verifies. Neither is a secret — both appear in the customer's own LIFF
+  /// URL and token — so they are stored plain; ADR-004's encryption is for the
+  /// two values that can send as the Shop, and these cannot. NULL liffId
+  /// means the LINE door is simply closed; the plain form works alone.
+  liffId                String?   @map("liff_id")
+  loginChannelId        String?   @map("login_channel_id")
   connectedByStaffId    String    @map("connected_by_staff_id")
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt @map("updated_at")
@@ -983,4 +1004,67 @@ model LineUpdatePhoto {
 
   @@index([shopId, lineUpdateId])
   @@map("line_update_photos")
+}
+
+/// Where an Arrival stands (CONTEXT.md: waiting → checked in, or dismissed).
+/// Stale is DERIVED on read from submittedAt (the Follow-up snooze idiom) —
+/// never stored, never swept: a stale row opened from a direct link may still
+/// be consumed, because the 24 hours is about the queue, not about validity.
+enum ArrivalStatus {
+  WAITING
+  CHECKED_IN
+  DISMISSED
+}
+
+/// A Customer's own notice that they are at the Shop with a car (CONTEXT.md:
+/// Arrival; ADR-006). Submitted from the customer's phone — the plain QR page
+/// or the same page inside LINE — and per visit. A CANDIDATE, never a record:
+/// no Customer, Vehicle, or Repair Case is created by the submission; the
+/// check-in wizard consumes it, in the same transaction that opens the case.
+/// What the customer typed is stored normalized the way check-in normalizes
+/// it; on the recognized LINE path name/phone/plate are filled server-side
+/// from the linked Customer and the tapped Vehicle. The identity columns are
+/// written ONLY from a server-verified LINE ID token (brief, decision 1) —
+/// never from the request body. Rows are never edited by the customer after
+/// submit and never deleted by the app.
+model Arrival {
+  id               String        @id @default(cuid())
+  shopId           String        @map("shop_id")
+  status           ArrivalStatus @default(WAITING)
+  name             String
+  /// Digits only (lib/normalize.ts) — the wizard's phone lookup key.
+  phone            String
+  /// Normalized (lib/normalize.ts) — the wizard's plate lookup key.
+  plate            String
+  bodyType         BodyType?     @map("body_type")
+  /// What's wrong, in the customer's words — visit data, authoritative.
+  note             String
+  odometerKm       Int?          @map("odometer_km")
+  /// The form's language at submit — the customer's choice, not the staff's.
+  locale           Locale
+  /// The recognized path's choice: one of the linked Customer's own cars.
+  vehicleId        String?       @map("vehicle_id")
+  /// Verified LINE identity (decision 1), with the token's profile claims.
+  lineUserId       String?       @map("line_user_id")
+  lineDisplayName  String?       @map("line_display_name")
+  linePictureUrl   String?       @map("line_picture_url")
+  submittedAt      DateTime      @default(now()) @map("submitted_at")
+  /// Resolution: the case it became (CHECKED_IN), and who handled it, when
+  /// (CHECKED_IN or DISMISSED).
+  caseId           String?       @map("case_id")
+  handledByStaffId String?       @map("handled_by_staff_id")
+  handledAt        DateTime?     @map("handled_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  shop       Shop        @relation(fields: [shopId], references: [id])
+  vehicle    Vehicle?    @relation(fields: [shopId, vehicleId], references: [shopId, id])
+  repairCase RepairCase? @relation(fields: [shopId, caseId], references: [shopId, id])
+  handledBy  Staff?      @relation(fields: [shopId, handledByStaffId], references: [shopId, id])
+
+  @@unique([shopId, id])
+  // One Arrival per case: consumption is the only thing that sets caseId.
+  @@unique([shopId, caseId])
+  @@index([shopId, status, submittedAt])
+  @@map("arrivals")
 }

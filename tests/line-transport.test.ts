@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   createFakeLineTransport,
+  fakeIdTokenFor,
   isLineImageContentType,
   LINE_MAX_PHOTOS_PER_UPDATE,
   type LineTransport,
@@ -68,6 +69,33 @@ describe("fake LINE transport", () => {
     const before = (await readFile(outbox, "utf8")).length;
     await transport.push("nope", "U123", [{ type: "text", text: "x" }]);
     expect((await readFile(outbox, "utf8")).length).toBe(before);
+  });
+});
+
+describe("fake ID-token verifier (M7.8, decision 4)", () => {
+  const userId = "U0123456789abcdef0123456789abcdef";
+
+  it("verifies a dev:U… token as that userId with a stand-in name", async () => {
+    const res = await transport.verifyIdToken(fakeIdTokenFor(userId), "");
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.value.userId).toBe(userId);
+      expect(res.value.displayName).toContain("cdef");
+      expect(res.value.pictureUrl).toBeNull();
+    }
+  });
+
+  it("refuses a bare userId — the body never gets to name one", async () => {
+    const res = await transport.verifyIdToken(userId, "");
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.code).toBe("invalidIdToken");
+  });
+
+  it("refuses a dev token whose payload is not a LINE userId", async () => {
+    for (const bad of ["dev:", "dev:Ushort", "dev:X0123456789abcdef0123456789abcdef", "eyJhbGciOi"]) {
+      const res = await transport.verifyIdToken(bad, "");
+      expect(res.ok).toBe(false);
+    }
   });
 });
 

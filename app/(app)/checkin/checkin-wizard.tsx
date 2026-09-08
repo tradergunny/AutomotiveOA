@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, Car, Phone, Search, Truck, User, X } from "lucide-react";
+import { Camera, Car, MessageCircle, Phone, Truck, User, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
@@ -9,7 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { formatPhone } from "@/lib/normalize";
+import type { ArrivalQueueRow } from "@/lib/arrivals";
+import type { BodyType } from "@/lib/generated/prisma/enums";
+import { formatPhone, isValidPhone, normalizePhone } from "@/lib/normalize";
+import { cn } from "@/lib/utils";
 import {
   addCasePhoto,
   type CheckinState,
@@ -18,8 +21,25 @@ import {
   lookupCheckinCustomer,
   lookupCheckinVehicle,
   performCheckin,
+  applyArrivalName,
 } from "./actions";
 import { downscalePhoto } from "@/lib/downscale";
+
+/**
+ * The check-in wizard (M2 brief §4), the gateway for Arrivals since M7.8
+ * (ADR-006). Two things changed:
+ *
+ * - Phone and plate look themselves up when the advisor pauses typing, and on
+ *   blur; Enter still works; the two Look up buttons are gone (§7).
+ * - An Arrival pulled from the queue fills the phone and plate, runs the
+ *   lookups, and prefills sections 01–03 from the result (§4, §6). Visit
+ *   fields are authoritative (note and odometer land as typed); identity
+ *   fields are advisory — an existing record wins and the customer's words
+ *   show beside it as "customer wrote: …", with a one-tap name update. The
+ *   one hard stop: the Arrival's LINE identity is already matched to someone
+ *   other than the phone found, and the advisor must choose before the case
+ *   can open. performCheckin re-checks that choice server-side.
+ */
 
 type ContactState =
   | { mode: "idle" }
@@ -33,10 +53,16 @@ type VehicleState =
 
 type PendingPhoto = { id: string; blob: Blob; url: string };
 
+/** Who the advisor chose when one LINE account met two people (§6). */
+type ConflictDecision = "linked" | "found" | "new";
+
 const BODY_TYPES = [
   { value: "SEDAN", icon: Car },
   { value: "PICKUP", icon: Truck },
 ] as const;
+
+/** How long the advisor pauses before a field looks itself up (§7). */
+const LOOKUP_DEBOUNCE_MS = 450;
 
 function SectionHeader({ index, icon: Icon, label }: { index: string; icon: typeof Car; label: string }) {
   return (
@@ -48,23 +74,44 @@ function SectionHeader({ index, icon: Icon, label }: { index: string; icon: type
   );
 }
 
-export function CheckinWizard() {
+export function CheckinWizard({
+  arrival,
+  onClearArrival,
+}: {
+  /** The Arrival being consumed, or null for a check-in from nothing. */
+  arrival: ArrivalQueueRow | null;
+  onClearArrival: () => void;
+}) {
   const t = useTranslations("checkin");
   const tCust = useTranslations("customers");
   const tVeh = useTranslations("vehicles");
 
   const [contact, setContact] = useState<ContactState>({ mode: "idle" });
+  // What the phone lookup itself answered — kept apart from `contact`
+  // because the conflict choice can point `contact` somewhere else.
+  const [phoneResult, setPhoneResult] = useState<LookupCustomer | null | undefined>(undefined);
+  const [decision, setDecision] = useState<ConflictDecision | null>(null);
   const [vehicle, setVehicle] = useState<VehicleState>({ mode: "idle" });
-  const [contactName, setContactName] = useState("");
+  // Prefilled from the Arrival (§6): the parent keys this component by the
+  // Arrival's id, so pulling one in mounts a fresh wizard with these values.
+  const [contactName, setContactName] = useState(arrival?.name ?? "");
+  const [bodyType, setBodyType] = useState<BodyType | null>(arrival?.bodyType ?? null);
+  const [note, setNote] = useState(arrival?.note ?? "");
+  const [odometer, setOdometer] = useState(
+    arrival?.odometerKm != null ? String(arrival.odometerKm) : "",
+  );
   const [phoneLooking, setPhoneLooking] = useState(false);
   const [plateLooking, setPlateLooking] = useState(false);
+  const [renaming, setRenaming] = useState(false);
   const [photos, setPhotos] = useState<PendingPhoto[]>([]);
   const [processing, setProcessing] = useState(false);
-  const [localError, setLocalError] = useState<CheckinState["error"]>();
+  const [localError, setLocalError] = useState<CheckinState["error"] | "conflictUnresolved">();
 
   const phoneRef = useRef<HTMLInputElement>(null);
   const plateRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const phoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const plateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const uploadStarted = useRef(false);
   const router = useRouter();
   const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
@@ -94,12 +141,17 @@ export function CheckinWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, on the success transition
   }, [state.caseId]);
 
+  /* ---------- lookups (§7: on pause, on blur, on Enter) ---------- */
+
   async function lookupPhone() {
+    if (phoneTimer.current) clearTimeout(phoneTimer.current);
     const raw = phoneRef.current?.value.trim() ?? "";
     if (!raw) return;
     setPhoneLooking(true);
     try {
       const { customer } = await lookupCheckinCustomer(raw);
+      setPhoneResult(customer);
+      setDecision(null);
       setContact(customer ? { mode: "found", customer } : { mode: "new" });
       setLocalError(undefined);
     } finally {
@@ -108,6 +160,7 @@ export function CheckinWizard() {
   }
 
   async function lookupPlate() {
+    if (plateTimer.current) clearTimeout(plateTimer.current);
     const raw = plateRef.current?.value.trim() ?? "";
     if (!raw) return;
     setPlateLooking(true);
@@ -119,6 +172,86 @@ export function CheckinWizard() {
       setPlateLooking(false);
     }
   }
+
+  function onPhoneChange(value: string) {
+    if (contact.mode !== "idle") setContact({ mode: "idle" });
+    setPhoneResult(undefined);
+    setDecision(null);
+    if (phoneTimer.current) clearTimeout(phoneTimer.current);
+    // Only a number that could exist is worth a round trip.
+    if (isValidPhone(normalizePhone(value))) {
+      phoneTimer.current = setTimeout(() => void lookupPhone(), LOOKUP_DEBOUNCE_MS);
+    }
+  }
+
+  function onPlateChange(value: string) {
+    if (vehicle.mode !== "idle") setVehicle({ mode: "idle" });
+    if (plateTimer.current) clearTimeout(plateTimer.current);
+    if (value.trim()) {
+      plateTimer.current = setTimeout(() => void lookupPlate(), LOOKUP_DEBOUNCE_MS);
+    }
+  }
+
+  useEffect(
+    () => () => {
+      if (phoneTimer.current) clearTimeout(phoneTimer.current);
+      if (plateTimer.current) clearTimeout(plateTimer.current);
+    },
+    [],
+  );
+
+  /* ---------- pulling an Arrival in (§4, §6) ---------- */
+
+  // The phone and plate arrive as the inputs' defaultValue; on mount they
+  // look themselves up exactly as if the advisor had typed them (§7).
+  useEffect(() => {
+    if (!arrival) return;
+    void lookupPhone();
+    void lookupPlate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount for this Arrival
+  }, []);
+
+  async function adoptArrivalName() {
+    if (!arrival || contact.mode !== "found" || renaming) return;
+    setRenaming(true);
+    try {
+      const res = await applyArrivalName(arrival.id, contact.customer.id);
+      if (res.ok) {
+        setContact({ mode: "found", customer: res.customer });
+        if (phoneResult?.id === res.customer.id) setPhoneResult(res.customer);
+      } else {
+        setLocalError(res.error);
+      }
+    } finally {
+      setRenaming(false);
+    }
+  }
+
+  // The hard stop (§6): the Arrival's LINE identity is matched to a Customer
+  // other than the one the phone found — or the phone found nobody.
+  const linked = arrival?.linkedCustomer ?? null;
+  const conflict =
+    linked != null && phoneResult !== undefined && phoneResult?.id !== linked.id;
+
+  function choose(next: ConflictDecision) {
+    if (!linked) return;
+    setDecision(next);
+    setLocalError(undefined);
+    if (next === "linked") setContact({ mode: "found", customer: linked });
+    else if (next === "found" && phoneResult) setContact({ mode: "found", customer: phoneResult });
+    else setContact({ mode: "new" });
+  }
+
+  const decisionValue =
+    decision === "linked" && linked
+      ? linked.id
+      : decision === "found" && phoneResult
+        ? phoneResult.id
+        : decision === "new"
+          ? "new"
+          : "";
+
+  /* ---------- photos ---------- */
 
   async function addFiles(list: FileList | null) {
     if (!list?.length) return;
@@ -144,6 +277,8 @@ export function CheckinWizard() {
     });
   }
 
+  /* ---------- submit ---------- */
+
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (contact.mode === "idle") {
@@ -152,6 +287,10 @@ export function CheckinWizard() {
     }
     if (vehicle.mode === "idle") {
       setLocalError("vehicleRequired");
+      return;
+    }
+    if (conflict && decision === null) {
+      setLocalError("conflictUnresolved");
       return;
     }
     setLocalError(undefined);
@@ -167,14 +306,56 @@ export function CheckinWizard() {
       (contact.mode === "found" &&
         contact.customer.id !== vehicle.vehicle.primaryCustomer.id));
   const error = localError ?? state.error;
+  const wroteName =
+    arrival && contact.mode === "found" && arrival.name.trim() !== contact.customer.name.trim()
+      ? arrival.name
+      : null;
+  const wroteBodyType =
+    arrival?.bodyType && vehicle.mode === "found" && arrival.bodyType !== vehicle.vehicle.bodyType
+      ? arrival.bodyType
+      : null;
+  // The link consumption will make, said plainly (no conflict, identity present).
+  const willLink =
+    arrival?.line && contact.mode === "found" && !conflict && linked?.id !== contact.customer.id
+      ? contact.customer.name
+      : arrival?.line && contact.mode === "new" && !conflict
+        ? contactName || null
+        : null;
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      {arrival && (
+        <>
+          <input type="hidden" name="arrivalId" value={arrival.id} />
+          <input type="hidden" name="lineIdentityDecision" value={decisionValue} />
+          <div className="flex flex-wrap items-center gap-2.5 border border-primary-dim bg-primary-soft px-3 py-2 text-xs">
+            <span className="font-medium text-primary">{t("arrivals.selected")}</span>
+            <span className="font-medium">{arrival.name}</span>
+            <span className="border border-border-strong px-1.5 py-px font-mono text-[12px]">
+              {arrival.plate}
+            </span>
+            {arrival.line && (
+              <span className="flex items-center gap-1 border border-ok/45 px-1.5 py-px text-[10.5px] text-ok">
+                <MessageCircle className="size-3" aria-hidden />
+                {t("arrivals.lineMark")}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={onClearArrival}
+              className="ml-auto text-muted-foreground hover:text-foreground"
+            >
+              {t("arrivals.clear")}
+            </button>
+          </div>
+        </>
+      )}
+
       {/* 01 — contact */}
       <section className="relative border bg-card p-4">
         <CornerTicks />
         <SectionHeader index="01" icon={User} label={t("contactSection")} />
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex items-center gap-2">
           <div className="relative w-full max-w-60">
             <Phone className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-faint" aria-hidden />
             <Input
@@ -184,8 +365,10 @@ export function CheckinWizard() {
               inputMode="tel"
               className="num pl-8"
               placeholder={tCust("phone")}
+              defaultValue={arrival ? formatPhone(arrival.phone) : ""}
               required={contact.mode !== "found"}
-              onChange={() => contact.mode !== "idle" && setContact({ mode: "idle" })}
+              onChange={(e) => onPhoneChange(e.target.value)}
+              onBlur={() => contact.mode === "idle" && void lookupPhone()}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
@@ -194,14 +377,11 @@ export function CheckinWizard() {
               }}
             />
           </div>
-          <Button type="button" variant="outline" onClick={() => void lookupPhone()} disabled={phoneLooking}>
-            <Search data-icon="inline-start" />
-            {phoneLooking ? t("looking") : t("lookup")}
-          </Button>
+          {phoneLooking && <span className="text-xs text-faint">{t("looking")}</span>}
         </div>
 
         {contact.mode === "found" && (
-          <div className="mt-3 flex items-center gap-2.5 border border-ok/40 bg-ok/5 px-3 py-2">
+          <div className="mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 border border-ok/40 bg-ok/5 px-3 py-2">
             <input type="hidden" name="contactCustomerId" value={contact.customer.id} />
             <span className="eyebrow text-ok">{t("foundCustomer")}</span>
             <span className="text-sm font-medium">{contact.customer.name}</span>
@@ -213,11 +393,28 @@ export function CheckinWizard() {
             </span>
             <button
               type="button"
-              onClick={() => setContact({ mode: "idle" })}
+              onClick={() => {
+                setContact({ mode: "idle" });
+                setPhoneResult(undefined);
+                setDecision(null);
+              }}
               className="ml-auto text-xs text-muted-foreground hover:text-foreground"
             >
               {t("change")}
             </button>
+            {wroteName && (
+              <p className="flex w-full flex-wrap items-center gap-2 border-t border-dashed border-ok/30 pt-1.5 text-xs text-warn">
+                {t("arrivals.customerWrote", { value: wroteName })}
+                <button
+                  type="button"
+                  disabled={renaming}
+                  onClick={() => void adoptArrivalName()}
+                  className="border border-warn/50 px-1.5 py-px text-[11px] font-semibold text-warn hover:bg-warn/10 disabled:opacity-50"
+                >
+                  {renaming ? t("arrivals.updatingName") : t("arrivals.useName")}
+                </button>
+              </p>
+            )}
           </div>
         )}
 
@@ -231,7 +428,8 @@ export function CheckinWizard() {
                   id="checkin-name"
                   name="name"
                   required
-                  autoFocus
+                  autoFocus={!arrival}
+                  value={contactName}
                   onChange={(e) => setContactName(e.target.value)}
                 />
               </div>
@@ -242,19 +440,75 @@ export function CheckinWizard() {
             </div>
           </div>
         )}
+
+        {conflict && linked && (
+          <fieldset className="mt-3 flex flex-col gap-2 border border-bad/50 p-3">
+            <legend className="eyebrow px-1 text-bad">{t("arrivals.conflictTitle")}</legend>
+            <p className="text-xs text-muted-foreground">
+              {phoneResult
+                ? t("arrivals.conflictIntro", { linked: linked.name, found: phoneResult.name })
+                : t("arrivals.conflictIntroNew", { linked: linked.name })}
+            </p>
+            <label className="flex cursor-pointer items-start gap-2 text-sm">
+              <input
+                type="radio"
+                name="conflictChoice"
+                checked={decision === "linked"}
+                onChange={() => choose("linked")}
+                className="mt-1 accent-primary"
+              />
+              <span>
+                <span className="font-medium">{linked.name}</span>
+                <span className="num ml-2 text-xs text-muted-foreground">{formatPhone(linked.phone)}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {t("arrivals.conflictKeepLinked", { name: linked.name })}
+                </span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-2 text-sm">
+              <input
+                type="radio"
+                name="conflictChoice"
+                checked={decision === (phoneResult ? "found" : "new")}
+                onChange={() => choose(phoneResult ? "found" : "new")}
+                className="mt-1 accent-primary"
+              />
+              <span>
+                <span className="font-medium">{phoneResult ? phoneResult.name : arrival?.name}</span>
+                <span className="num ml-2 text-xs text-muted-foreground">
+                  {formatPhone(phoneResult ? phoneResult.phone : arrival?.phone ?? "")}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {phoneResult
+                    ? t("arrivals.conflictUseFound", { name: phoneResult.name })
+                    : t("arrivals.conflictUseNew")}
+                </span>
+              </span>
+            </label>
+          </fieldset>
+        )}
+
+        {willLink && (
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <MessageCircle className="size-3.5 text-ok" aria-hidden />
+            {t("arrivals.willLink", { name: willLink })}
+          </p>
+        )}
       </section>
 
       {/* 02 — vehicle */}
       <section className="relative border bg-card p-4">
         <SectionHeader index="02" icon={Car} label={t("vehicleSection")} />
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex items-center gap-2">
           <Input
             ref={plateRef}
             name="plate"
             className="w-full max-w-60 font-mono"
             placeholder={tVeh("plate")}
+            defaultValue={arrival?.plate ?? ""}
             required={vehicle.mode !== "found"}
-            onChange={() => vehicle.mode !== "idle" && setVehicle({ mode: "idle" })}
+            onChange={(e) => onPlateChange(e.target.value)}
+            onBlur={() => vehicle.mode === "idle" && void lookupPlate()}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -262,14 +516,11 @@ export function CheckinWizard() {
               }
             }}
           />
-          <Button type="button" variant="outline" onClick={() => void lookupPlate()} disabled={plateLooking}>
-            <Search data-icon="inline-start" />
-            {plateLooking ? t("looking") : t("lookup")}
-          </Button>
+          {plateLooking && <span className="text-xs text-faint">{t("looking")}</span>}
         </div>
 
         {vehicle.mode === "found" && (
-          <div className="mt-3 flex flex-wrap items-center gap-2.5 border border-ok/40 bg-ok/5 px-3 py-2">
+          <div className="mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 border border-ok/40 bg-ok/5 px-3 py-2">
             <input type="hidden" name="vehicleId" value={vehicle.vehicle.id} />
             <span className="eyebrow text-ok">{t("foundVehicle")}</span>
             <span className="border border-border-strong px-1.5 py-px font-mono text-[13px]">
@@ -292,6 +543,11 @@ export function CheckinWizard() {
             >
               {t("change")}
             </button>
+            {wroteBodyType && (
+              <p className="w-full border-t border-dashed border-ok/30 pt-1.5 text-xs text-warn">
+                {t("arrivals.customerWrote", { value: tVeh(`bodyTypes.${wroteBodyType}`) })}
+              </p>
+            )}
           </div>
         )}
 
@@ -311,7 +567,15 @@ export function CheckinWizard() {
                       key={value}
                       className="flex h-8 cursor-pointer items-center justify-center gap-1.5 border text-sm text-muted-foreground transition-colors hover:bg-surface-2 has-checked:border-primary has-checked:bg-primary-soft has-checked:text-foreground"
                     >
-                      <input type="radio" name="bodyType" value={value} required className="sr-only" />
+                      <input
+                        type="radio"
+                        name="bodyType"
+                        value={value}
+                        required
+                        checked={bodyType === value}
+                        onChange={() => setBodyType(value)}
+                        className="sr-only"
+                      />
                       <Icon className="size-4" aria-hidden />
                       {tVeh(`bodyTypes.${value}`)}
                     </label>
@@ -351,7 +615,13 @@ export function CheckinWizard() {
         <div className="mt-3 flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="checkin-note">{t("noteLabel")}</Label>
-            <Textarea id="checkin-note" name="note" rows={3} />
+            <Textarea
+              id="checkin-note"
+              name="note"
+              rows={3}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="checkin-odometer">{t("odometerLabel")}</Label>
@@ -360,6 +630,8 @@ export function CheckinWizard() {
               name="odometer"
               inputMode="numeric"
               className="num max-w-40"
+              value={odometer}
+              onChange={(e) => setOdometer(e.target.value)}
             />
           </div>
         </div>
@@ -410,8 +682,8 @@ export function CheckinWizard() {
       </section>
 
       {error && (
-        <p role="alert" className="border border-bad/40 px-3 py-2 text-xs text-bad">
-          {t(`errors.${error}`)}
+        <p role="alert" className={cn("border border-bad/40 px-3 py-2 text-xs text-bad")}>
+          {error === "conflictUnresolved" ? t("arrivals.conflictUnresolved") : t(`errors.${error}`)}
         </p>
       )}
 

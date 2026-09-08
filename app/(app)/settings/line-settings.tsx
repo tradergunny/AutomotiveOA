@@ -99,7 +99,7 @@ export function LineSettings({
   const unlinked = contacts.filter((c) => !c.customer);
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+    <>
       {/* ---------------------------------------------------------------- */}
       {/* The channel (ADR-002)                                            */}
       {/* ---------------------------------------------------------------- */}
@@ -375,8 +375,7 @@ export function LineSettings({
           </form>
         )}
       </section>
-
-    </div>
+    </>
   );
 }
 

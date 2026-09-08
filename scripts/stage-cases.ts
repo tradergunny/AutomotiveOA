@@ -4,6 +4,7 @@ import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { deflateSync } from "node:zlib";
 import { prismaUnscoped } from "../lib/db";
+import { fakeIdTokenFor } from "../lib/line";
 import { buildQuotationBody } from "../lib/line-draft";
 import type {
   DamageType,
@@ -24,6 +25,13 @@ import { newPhotoKey, photoStore } from "../lib/storage";
  * waiting on parts, in progress (with a cancelled job), in QC, ready,
  * delivered-with-balance, delivered-settled. DEV ONLY — direct writes, not
  * the flows; performing the flows remains each milestone's gate.
+ *
+ * M7.8 adds three waiting Arrivals on the pilot shop: one plain (a seeded
+ * customer, with a spelling that differs from their record), one carrying a
+ * fake-verified LINE identity that is already linked to a DIFFERENT
+ * customer (the hard stop), and one stale (off the queue). The identity
+ * token the second one would have carried is `dev:U…` — the fake driver's
+ * convention (lib/line.ts).
  *
  * Idempotent via .data/staged-cases.json: a re-run deletes what the last
  * run created, then stages afresh. Usage: npx tsx scripts/stage-cases.ts
@@ -143,13 +151,25 @@ async function main() {
 
   /* -------- tear down the previous staging run -------- */
   let previous: string[] = [];
+  let previousArrivals: string[] = [];
   try {
-    previous = JSON.parse(await readFile(STATE_FILE, "utf8")) as string[];
+    const state = JSON.parse(await readFile(STATE_FILE, "utf8")) as
+      | string[]
+      | { cases: string[]; arrivals: string[] };
+    if (Array.isArray(state)) previous = state;
+    else {
+      previous = state.cases;
+      previousArrivals = state.arrivals;
+    }
   } catch {
     // first run
   }
-  if (previous.length > 0) {
+  if (previous.length > 0 || previousArrivals.length > 0) {
     await prismaUnscoped.$transaction([
+      // Arrivals first: a consumed one points at its case (M7.8).
+      prismaUnscoped.arrival.deleteMany({
+        where: { OR: [{ id: { in: previousArrivals } }, { caseId: { in: previous } }] },
+      }),
       prismaUnscoped.followUp.deleteMany({ where: { caseId: { in: previous } } }),
       prismaUnscoped.caseEvent.deleteMany({ where: { caseId: { in: previous } } }),
       prismaUnscoped.payment.deleteMany({ where: { caseId: { in: previous } } }),
@@ -863,8 +883,85 @@ async function main() {
     payments: [{ payerType: "CUSTOMER", amountBaht: 1_200, method: "TRANSFER", daysAgo: 5 }],
   });
 
-  await writeFile(STATE_FILE, JSON.stringify(stagedIds, null, 2));
-  console.log(`\nstaged ${stagedIds.length} cases — state in ${STATE_FILE}`);
+  /* -------- waiting Arrivals (M7.8 §12) -------- */
+
+  const stagedArrivalIds: string[] = [];
+  const customerByPhone = async (phone: string) => {
+    const customer = await prismaUnscoped.customer.findUnique({
+      where: { shopId_phone: { shopId, phone } },
+      include: { primaryVehicles: true },
+    });
+    if (!customer) throw new Error(`customer missing: ${phone} — run db:seed`);
+    return customer;
+  };
+
+  // 1 · Plain: a seeded customer, spelled slightly differently → "customer
+  //     wrote: …" beside the found record, one-tap name update; the found
+  //     vehicle's body type differs from what they tapped.
+  const prayut = await customerByPhone("0819876543");
+  const plain = await prismaUnscoped.arrival.create({
+    data: {
+      shopId,
+      name: prayut.name.replace("ประยุทธ์", "ประยุทธ"),
+      phone: prayut.phone,
+      plate: prayut.primaryVehicles[0]!.plate,
+      bodyType: "PICKUP",
+      note: "เบรกมีเสียงเวลาเบรกแรง ๆ และมีกลิ่นไหม้นิด ๆ",
+      odometerKm: 45_310,
+      locale: "th",
+      submittedAt: new Date(Date.now() - 12 * 60_000),
+    },
+  });
+  stagedArrivalIds.push(plain.id);
+  console.log(`staged arrival (plain) — ${plain.plate}`);
+
+  // 2 · The hard stop: a fake-verified LINE identity that the sent-Offer
+  //     staging linked to นภัสสร, arriving with มาลี's phone and car. The
+  //     wizard must show both people and refuse until the advisor picks.
+  const malee = await customerByPhone("0865551234");
+  const conflictUserId = `${STAGED_LINE_USER_PREFIX}1`;
+  const conflicting = await prismaUnscoped.arrival.create({
+    data: {
+      shopId,
+      name: "มาลี",
+      phone: malee.phone,
+      plate: malee.primaryVehicles[0]!.plate,
+      bodyType: malee.primaryVehicles[0]!.bodyType,
+      note: "ไฟเตือนเครื่องยนต์ขึ้น ขอเช็กด่วน",
+      odometerKm: 152_900,
+      locale: "th",
+      lineUserId: conflictUserId,
+      lineDisplayName: "LINE user (staged)",
+      submittedAt: new Date(Date.now() - 4 * 60_000),
+    },
+  });
+  stagedArrivalIds.push(conflicting.id);
+  console.log(
+    `staged arrival (LINE, conflicting) — ${conflicting.plate} · identity token ${fakeIdTokenFor(conflictUserId)}`,
+  );
+
+  // 3 · Stale: submitted yesterday, so it is absent from the strip and the
+  //     nav count while the row itself stays in place.
+  const stale = await prismaUnscoped.arrival.create({
+    data: {
+      shopId,
+      name: "ลูกค้าเมื่อวาน",
+      phone: "0811110000",
+      plate: "1กก1111",
+      bodyType: "SEDAN",
+      note: "แอร์ไม่เย็น",
+      locale: "th",
+      submittedAt: hoursAgo(30),
+    },
+  });
+  stagedArrivalIds.push(stale.id);
+  console.log(`staged arrival (stale, off the queue) — ${stale.plate}`);
+
+  await writeFile(
+    STATE_FILE,
+    JSON.stringify({ cases: stagedIds, arrivals: stagedArrivalIds }, null, 2),
+  );
+  console.log(`\nstaged ${stagedIds.length} cases and ${stagedArrivalIds.length} arrivals — state in ${STATE_FILE}`);
 }
 
 main()

@@ -124,11 +124,11 @@
         "notReady": "ส่งมอบได้เฉพาะเคสที่พร้อมส่งมอบ",
         "failed": "เกิดข้อผิดพลาด — ลองอีกครั้ง"
       }
-    }
+    },
+    "checkedInFromArrival": "จากการแจ้งรับรถของลูกค้า"
   },
   "checkin": {
     "contactSection": "ผู้ที่นำรถเข้ามา",
-    "lookup": "ค้นหา",
     "looking": "กำลังค้นหา…",
     "foundCustomer": "ลูกค้าเดิม",
     "newCustomerHint": "ลูกค้าใหม่ — กรอกข้อมูลด้านล่าง",
@@ -158,9 +158,33 @@
       "bodyTypeRequired": "กรุณาเลือกประเภทตัวถัง",
       "photoInvalid": "มีไฟล์ที่ไม่ใช่รูปภาพที่รองรับ (JPEG/PNG/WebP)",
       "photoTooLarge": "มีรูปขนาดใหญ่เกินไป (สูงสุด 10MB)",
-      "failed": "เปิดเคสไม่สำเร็จ — ยังไม่มีการบันทึก กรุณาลองใหม่"
+      "failed": "เปิดเคสไม่สำเร็จ — ยังไม่มีการบันทึก กรุณาลองใหม่",
+      "arrivalGone": "การแจ้งนี้ถูกจัดการไปแล้ว ยังไม่มีการบันทึก",
+      "lineIdentityConflict": "เลือกก่อนว่าบัญชี LINE นี้เป็นของใคร ยังไม่มีการบันทึก"
     },
-    "uploadingPhotos": "กำลังอัปโหลดรูป… {done}/{total}"
+    "uploadingPhotos": "กำลังอัปโหลดรูป… {done}/{total}",
+    "arrivals": {
+      "title": "รอที่เคาน์เตอร์",
+      "count": "{count} รายการ",
+      "dismiss": "ปัดออก",
+      "dismissing": "กำลังปัดออก…",
+      "pull": "ดึงเข้ารับรถ",
+      "lineMark": "LINE",
+      "noNote": "(ไม่ได้ระบุอาการ)",
+      "selected": "รับรถจากการแจ้งของลูกค้ารายนี้",
+      "clear": "เริ่มใหม่โดยไม่ใช้",
+      "customerWrote": "ลูกค้ากรอก: {value}",
+      "useName": "ใช้ชื่อนี้",
+      "updatingName": "กำลังบันทึก…",
+      "conflictTitle": "บัญชี LINE เดียว แต่มีสองคน",
+      "conflictIntro": "บัญชี LINE นี้จับคู่กับ {linked} อยู่แล้ว แต่เบอร์โทรที่ลูกค้ากรอกเป็นของ {found} เลือกว่าใครคือผู้ติดต่อของครั้งนี้ การจับคู่ LINE จะย้ายตามที่เลือก",
+      "conflictIntroNew": "บัญชี LINE นี้จับคู่กับ {linked} อยู่แล้ว แต่เบอร์โทรที่ลูกค้ากรอกไม่มีในระบบ เลือกว่าใครคือผู้ติดต่อของครั้งนี้ การจับคู่ LINE จะย้ายตามที่เลือก",
+      "conflictKeepLinked": "{name} เป็นผู้ติดต่อ คงการจับคู่ LINE ไว้ตามเดิม",
+      "conflictUseFound": "{name} เป็นผู้ติดต่อ ย้ายการจับคู่ LINE มาที่คนนี้",
+      "conflictUseNew": "ลูกค้าใหม่จากข้อมูลที่กรอก ย้ายการจับคู่ LINE มาที่คนนี้",
+      "conflictUnresolved": "เลือกก่อนว่าบัญชี LINE นี้เป็นของใคร แล้วจึงเปิดเคส",
+      "willLink": "เมื่อเปิดเคส บัญชี LINE นี้จะถูกจับคู่กับ {name}"
+    }
   },
   "customers": {
     "searchPlaceholder": "ค้นหาชื่อ เบอร์โทร บริษัท หรือทะเบียนรถ…",
@@ -745,7 +769,8 @@
         "rateLimited": "LINE จำกัดอัตราการเรียก — ลองใหม่อีกครั้ง",
         "invalidRequest": "LINE ปฏิเสธคำขอ",
         "network": "ติดต่อ LINE ไม่ได้ — ตรวจสอบการเชื่อมต่อ",
-        "serverError": "ระบบ LINE ขัดข้อง — ลองใหม่อีกครั้ง"
+        "serverError": "ระบบ LINE ขัดข้อง — ลองใหม่อีกครั้ง",
+        "invalidIdToken": "LINE ไม่ยอมรับโทเค็นการเข้าสู่ระบบ"
       }
     }
   },
@@ -875,6 +900,99 @@
         "network": "ติดต่อ LINE ไม่ได้ — ยังไม่ได้ส่ง",
         "serverError": "ระบบ LINE ขัดข้อง — ลองใหม่อีกครั้ง"
       }
+    }
+  },
+  "arrivalSettings": {
+    "title": "ฟอร์มแจ้งรับรถสำหรับลูกค้า",
+    "intro": "ลูกค้าแจ้งว่ามาถึงอู่จากมือถือของตัวเอง ผ่าน QR ที่เคาน์เตอร์หรือปุ่มในบัญชี LINE ของอู่ ฟอร์มนี้ไม่สร้างข้อมูลใดเอง ที่ปรึกษาบริการดึงแต่ละรายการเข้าขั้นตอนรับรถ",
+    "enabled": "เปิดใช้อยู่",
+    "disabledState": "ฟอร์มปิดอยู่ ยังไม่มีที่อยู่สาธารณะสำหรับอู่นี้",
+    "disabledReadOnly": "ฟอร์มปิดอยู่ ผู้จัดการเป็นผู้เปิดใช้ได้",
+    "enable": "เปิดใช้ฟอร์ม",
+    "enabling": "กำลังเปิดใช้…",
+    "urlTitle": "ที่อยู่ฟอร์ม",
+    "qrHint": "พิมพ์ QR ไว้ที่เคาน์เตอร์ ใครที่มีลิงก์ก็ส่งการแจ้งได้ แต่ระบบจะไม่แสดงข้อมูลลูกค้าของคุณกลับไป",
+    "printQr": "พิมพ์โปสเตอร์ QR",
+    "rotate": "เปลี่ยนลิงก์",
+    "rotateConfirm": "ยืนยัน ลิงก์เดิมจะใช้ไม่ได้",
+    "rotateHint": "สร้างที่อยู่ใหม่ แล้วพิมพ์โปสเตอร์ใหม่",
+    "rotatedAt": "เปลี่ยนลิงก์ {when}",
+    "disable": "ปิดใช้",
+    "disableConfirm": "ยืนยัน ปิดฟอร์ม",
+    "disableHint": "การแจ้งที่รับไว้แล้วยังคงอยู่",
+    "liffTitle": "ให้ลูกค้าลงทะเบียนจาก LINE",
+    "liffIntro": "ลูกค้าที่เปิดฟอร์มจากบัญชี LINE ของอู่จะได้รับการจดจำและเลือกรถของตนได้ ต้องมี LINE Login channel และ LIFF app ภายใต้ provider เดียวกับ OA (LINE-SETUP ตอนที่ 6)",
+    "liffNeedsChannel": "เชื่อมต่อบัญชีทางการ LINE ด้านบนก่อน",
+    "liffNeedsForm": "เปิดใช้ฟอร์มก่อน เพื่อให้ LIFF app มีที่อยู่ให้ชี้ไป",
+    "liffId": "LIFF ID",
+    "loginChannelId": "Login channel ID",
+    "liffEndpoint": "LIFF endpoint URL",
+    "liffEndpointHint": "วางค่านี้เป็น endpoint URL ของ LIFF app",
+    "liffSave": "บันทึก",
+    "liffSaved": "บันทึกแล้ว",
+    "liffOff": "ประตู LINE ปิดอยู่ ฟอร์มธรรมดาใช้งานได้ตามปกติ",
+    "liffOn": "ประตู LINE เปิดแล้ว",
+    "liffClear": "ลบ",
+    "checklist": {
+      "provider": "ใน LINE Developers console สร้าง LINE Login channel ภายใต้ provider เดียวกับ OA เพราะ LINE ให้ id เดียวกันกับคนเดียวกันเฉพาะภายใน provider เดียว",
+      "liffApp": "ใน channel นั้น เพิ่ม LIFF app ใช้ endpoint URL ตามด้านบน และเลือก scope profile กับ openid",
+      "copyIds": "คัดลอก LIFF ID และ Channel ID ของ Login channel มาใส่ในสองช่องนี้",
+      "richMenu": "ใน OA Manager เพิ่มปุ่มริชเมนูชื่อ ลงทะเบียน ที่เปิด LIFF URL"
+    },
+    "errors": {
+      "forbidden": "เฉพาะผู้จัดการเท่านั้น",
+      "notConnected": "เชื่อมต่อบัญชีทางการ LINE ก่อน",
+      "notEnabled": "เปิดใช้ฟอร์มก่อน",
+      "liffIdInvalid": "รูปแบบ LIFF ID ไม่ถูกต้อง (เช่น 1234567890-AbCdEfGh)",
+      "loginChannelIdInvalid": "Login channel ID ต้องเป็นตัวเลข",
+      "loginChannelRequired": "ต้องมี Login channel ID เพื่อตรวจสอบการเข้าสู่ระบบ",
+      "failed": "เกิดข้อผิดพลาด ลองใหม่อีกครั้ง"
+    },
+    "copied": "คัดลอกแล้ว"
+  },
+  "arrivalForm": {
+    "pageTitle": "แจ้งรับรถ",
+    "heading": "แจ้งว่ามาถึงแล้ว",
+    "lead": "กรอกข้อมูลสั้น ๆ แล้วรอเรียกที่เคาน์เตอร์",
+    "lineConnecting": "กำลังเชื่อมต่อ LINE…",
+    "lineAs": "ส่งในชื่อ {name}",
+    "lineRecognized": "รถของคุณที่เคยเข้าอู่",
+    "yourCars": "รถคันไหน",
+    "anotherCar": "คันอื่น",
+    "name": "ชื่อ",
+    "namePlaceholder": "ชื่อที่ให้ช่างเรียก",
+    "phone": "เบอร์โทร",
+    "phonePlaceholder": "08x xxx xxxx",
+    "plate": "ทะเบียนรถ",
+    "platePlaceholder": "กข 1234",
+    "bodyType": "ประเภทรถ",
+    "sedan": "รถเก๋ง",
+    "pickup": "กระบะ",
+    "note": "รถเป็นอะไร",
+    "notePlaceholder": "เช่น เบรกมีเสียง ถอยชนเสา",
+    "odometer": "เลขไมล์",
+    "optional": "ไม่บังคับ",
+    "km": "กม.",
+    "submit": "ส่งข้อมูล",
+    "submitting": "กำลังส่ง…",
+    "doneTitle": "ได้รับข้อมูลแล้ว",
+    "doneLead": "กรุณาแจ้งที่เคาน์เตอร์ พนักงานจะเรียกตามคิว",
+    "doneEcho": "สิ่งที่คุณส่ง",
+    "again": "แจ้งอีกคัน",
+    "devIdentity": "LINE identity (dev)",
+    "devIdentityHint": "dev:U ตามด้วยเลขฐานสิบหก 32 ตัว",
+    "devApply": "ใช้",
+    "errors": {
+      "nameRequired": "กรุณากรอกชื่อ",
+      "phoneInvalid": "เบอร์โทรต้องเป็นเลข 9 ถึง 10 หลัก",
+      "plateRequired": "กรุณากรอกทะเบียนรถ",
+      "bodyTypeRequired": "กรุณาเลือกประเภทรถ",
+      "noteRequired": "กรุณาบอกสั้น ๆ ว่ารถเป็นอะไร",
+      "vehicleRequired": "กรุณาเลือกรถ",
+      "queueFull": "ตอนนี้มีคิวเต็มแล้ว กรุณาแจ้งที่เคาน์เตอร์โดยตรง",
+      "identityRejected": "ยืนยันบัญชี LINE ไม่ได้ กรุณาเปิดจาก LINE อีกครั้ง หรือแจ้งที่เคาน์เตอร์",
+      "rateLimited": "ส่งถี่เกินไป กรุณารอสักครู่แล้วลองใหม่",
+      "failed": "ส่งไม่สำเร็จ กรุณาลองใหม่ หรือแจ้งที่เคาน์เตอร์"
     }
   }
 }
