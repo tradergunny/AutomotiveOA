@@ -18,7 +18,7 @@ import { AgeLabel, Pill } from "./board-pill";
  */
 
 const ROW_GRID =
-  "grid-cols-[40px_minmax(0,1fr)_minmax(110px,150px)_minmax(150px,200px)_40px_16px]";
+  "grid-cols-[40px_minmax(180px,1fr)_minmax(100px,150px)_minmax(140px,200px)_40px_16px]";
 
 function groupMoney(group: BoardGroup, rows: BoardCase[]): { key: string; amount: number } | null {
   switch (group) {
