@@ -91,7 +91,7 @@ export function BoardPane({ row }: { row: BoardCase }) {
     );
 
   return (
-    <aside className="rounded-[14px] border bg-card lift">
+    <aside className="rounded-[14px] border bg-card lift xl:sticky xl:top-[76px]">
       <div className="p-5 pb-0">
         <div className="relative grid h-[170px] place-items-center overflow-hidden rounded-[12px] bg-surface-2 text-faint">
           {photoId ? (
