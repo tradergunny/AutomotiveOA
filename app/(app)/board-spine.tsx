@@ -65,7 +65,7 @@ export function BoardSpine({
 
   return (
     <div
-      className="grid overflow-hidden rounded-2xl border bg-card lift"
+      className="grid overflow-hidden rounded-[14px] border bg-card lift"
       style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}
       role="tablist"
       aria-label={t("label")}
@@ -87,7 +87,7 @@ export function BoardSpine({
               s.hot && "border-l-[3px] border-l-primary first:border-l-[3px]",
             )}
           >
-            <span className="text-[13px] leading-tight text-muted-foreground">{t(s.segment)}</span>
+            <span className="col-start-1 text-[13px] leading-tight text-muted-foreground">{t(s.segment)}</span>
             <span
               className={cn(
                 "row-span-3 hidden size-10 place-items-center rounded-full lg:grid",
@@ -96,11 +96,11 @@ export function BoardSpine({
             >
               <Icon className="size-[18px]" aria-hidden />
             </span>
-            <span className="num text-[28px] leading-[1.15] font-semibold tracking-[-0.02em]">{s.count}</span>
+            <span className="num col-start-1 text-[28px] leading-[1.15] font-semibold tracking-[-0.02em]">{s.count}</span>
             {sub && (
               <span
                 className={cn(
-                  "line-clamp-2 text-xs text-muted-foreground xl:line-clamp-1",
+                  "col-start-1 line-clamp-2 text-xs text-muted-foreground xl:line-clamp-1",
                   sub.tone === "warn" && "text-warn",
                   sub.tone === "bad" && "text-bad",
                 )}

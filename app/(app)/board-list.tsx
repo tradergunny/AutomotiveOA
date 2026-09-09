@@ -78,7 +78,7 @@ export function BoardList({
                   onClick={() => onSelect(row.id)}
                   aria-pressed={selected}
                   className={cn(
-                    "mb-1.5 grid w-full items-center gap-3.5 rounded-xl border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                    "mb-1.5 grid w-full items-center gap-3.5 rounded-[12px] border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                     ROW_GRID,
                     selected
                       ? "border-primary bg-primary/8 ring-3 ring-primary/15"

@@ -108,10 +108,10 @@ export default async function BoardPage() {
 
   if (rows.length === 0) {
     return (
-      <div className="mx-auto mt-16 max-w-md rounded-2xl border bg-card p-10 text-center lift">
+      <div className="mx-auto mt-16 max-w-md rounded-[14px] border bg-card p-10 text-center lift">
         <CarFront className="mx-auto size-6 text-faint" aria-hidden />
         <p className="mt-4 text-sm text-muted-foreground">{t("empty")}</p>
-        <Button asChild className="mt-5 rounded-xl font-semibold">
+        <Button asChild className="mt-5 rounded-[12px] font-semibold">
           <Link href="/checkin">
             <Plus data-icon="inline-start" />
             {t("newCheckin")}

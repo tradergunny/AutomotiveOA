@@ -77,7 +77,7 @@ export function BoardView({ rows, now }: { rows: BoardCase[]; now: string }) {
       <BoardSpine summary={summary} active={segment} onSelect={setSegment} />
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_400px]">
-        <section className="rounded-2xl border bg-card lift">
+        <section className="rounded-[14px] border bg-card lift">
           <header className="flex items-center gap-3 border-b px-5 py-3.5">
             <h2 className="text-base font-semibold">{t("title")}</h2>
             <span className="text-xs text-muted-foreground">{t("carsInShop", { count: rows.length })}</span>

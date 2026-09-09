@@ -3,6 +3,7 @@
 import { ArrowRight, CarFront, Check, Clock, Truck, User } from "lucide-react";
 import Link from "next/link";
 import { useFormatter, useTranslations } from "next-intl";
+import { useState } from "react";
 import type { BoardCase, LedgerLine } from "@/lib/board";
 import { SPINE_STEPS, spineStepFor, type StageAction } from "@/lib/case-flow";
 import { formatBaht } from "@/lib/money";
@@ -50,6 +51,9 @@ export function BoardPane({ row }: { row: BoardCase }) {
   };
 
   const BodyIcon = row.bodyType === "PICKUP" ? Truck : CarFront;
+  // A photo whose file is gone (old staging runs) falls back to the icon.
+  const [brokenPhotoId, setBrokenPhotoId] = useState<string | null>(null);
+  const photoId = row.photoId && row.photoId !== brokenPhotoId ? row.photoId : null;
   const currentStep = SPINE_STEPS.indexOf(spineStepFor(row.stage));
   const shortDate = (iso: string) => format.dateTime(new Date(iso), { day: "numeric", month: "short" });
 
@@ -87,14 +91,15 @@ export function BoardPane({ row }: { row: BoardCase }) {
     );
 
   return (
-    <aside className="rounded-2xl border bg-card lift">
+    <aside className="rounded-[14px] border bg-card lift">
       <div className="p-5 pb-0">
-        <div className="relative grid h-[170px] place-items-center overflow-hidden rounded-xl bg-surface-2 text-faint">
-          {row.photoId ? (
+        <div className="relative grid h-[170px] place-items-center overflow-hidden rounded-[12px] bg-surface-2 text-faint">
+          {photoId ? (
             // eslint-disable-next-line @next/next/no-img-element -- authenticated route
             <img
-              src={`/api/photos/${row.photoId}`}
+              src={`/api/photos/${photoId}`}
               alt={tc("carPhotoAlt", { plate: row.plate })}
+              onError={() => setBrokenPhotoId(photoId)}
               className="absolute inset-0 size-full object-cover"
             />
           ) : (
@@ -102,7 +107,7 @@ export function BoardPane({ row }: { row: BoardCase }) {
           )}
           <span className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/45 to-transparent" aria-hidden />
           <span className="absolute bottom-2.5 left-3 text-[11px] text-white/85">
-            {row.photoId ? t("walkaround") : t("noPhoto")}
+            {photoId ? t("walkaround") : t("noPhoto")}
           </span>
         </div>
       </div>
@@ -130,14 +135,14 @@ export function BoardPane({ row }: { row: BoardCase }) {
         </Fact>
       </div>
 
-      <div className="mx-5 mt-4 rounded-xl border bg-surface-2/60 p-3.5">
+      <div className="mx-5 mt-4 rounded-[12px] border bg-surface-2/60 p-3.5">
         <div className="mb-2.5 flex justify-between text-[12.5px] font-semibold">
           {t("progress")}
           <span className="text-primary">{tc(`spine.${SPINE_STEPS[currentStep]}`)}</span>
         </div>
-        <div className="relative mx-2 mb-3 h-1 rounded-sm bg-border">
+        <div className="relative mx-2 mb-3 h-1 rounded-[2px] bg-border">
           <span
-            className="absolute inset-y-0 left-0 rounded-sm bg-primary"
+            className="absolute inset-y-0 left-0 rounded-[2px] bg-primary"
             style={{ width: `${((currentStep + 0.5) / SPINE_STEPS.length) * 100}%` }}
           />
         </div>
@@ -203,7 +208,7 @@ function Fact({
   return (
     <div className="min-w-0">
       <span className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-        <span className="grid size-[22px] place-items-center rounded-md bg-primary/12 text-primary">
+        <span className="grid size-[22px] place-items-center rounded-[6px] bg-primary/12 text-primary">
           <Icon className="size-3" aria-hidden />
         </span>
         {label}
