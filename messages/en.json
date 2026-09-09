@@ -48,7 +48,15 @@
   "board": {
     "empty": "No open repair cases — start with a check-in",
     "newCheckin": "New check-in",
-    "openCount": "{count, plural, one {# open case} other {# open cases}}",
+    "title": "Cases",
+    "carsInShop": "{count, plural, one {# car in the shop} other {# cars in the shop}}",
+    "needsMe": "Needs me",
+    "all": "All",
+    "oldestFirst": "Oldest first",
+    "search": "Plate, customer, or case",
+    "emptyNeedsMe": "Nothing needs you right now — the shop is working",
+    "emptySegment": "No cases at this stage",
+    "noMatch": "No case matches “{query}”",
     "groups": {
       "IN_ASSESSMENT": "In assessment",
       "AWAITING_AUTH": "Awaiting authorization",
@@ -58,10 +66,72 @@
       "READY": "Ready for pickup",
       "BALANCE_DUE": "Balance due"
     },
-    "partsProgress": "Parts {arrived}/{total}",
-    "partsEta": "ETA {date}",
-    "balanceTotal": "{amount} outstanding",
-    "deliveredAgo": "delivered {when}"
+    "groupMoney": {
+      "offered": "{amount} offered",
+      "collect": "{amount} to collect",
+      "outstanding": "{amount} outstanding"
+    },
+    "spine": {
+      "label": "Pipeline",
+      "ASSESSMENT": "Assessment",
+      "AUTHORIZATION": "Authorization",
+      "WORK": "Work",
+      "READY": "Ready",
+      "OWED": "Delivered, owed"
+    },
+    "spineSub": {
+      "empty": "none",
+      "waitingOnYou": "waiting on you · {days}d",
+      "offered": "{amount} offered",
+      "unpriced": "{count} unpriced",
+      "oldest": "oldest {days}d",
+      "waiting": "{count} waiting",
+      "inQc": "{count} in QC",
+      "working": "in work",
+      "collect": "{amount} to collect",
+      "uncollected": "{count} uncollected",
+      "readyToGo": "ready to hand over",
+      "outstanding": "{amount} · {days}d"
+    },
+    "pill": {
+      "INSPECT": "Inspect",
+      "NO_WORK": "No work proposed",
+      "UNPRICED": "{count, plural, one {# line unpriced} other {# lines unpriced}}",
+      "NOT_SENT": "{amount} not sent",
+      "UNANSWERED": "Quote unanswered {days}d",
+      "RESPONSE": "Record response",
+      "WAITING_PARTS": "Parts {arrived}/{total}",
+      "WAITING_PARTS_ETA": "Parts {arrived}/{total} · {date}",
+      "WAITING": "Waiting — {reason}",
+      "IN_PROGRESS": "{count, plural, one {# job} other {# jobs}} in progress",
+      "QC": "{count, plural, one {# job} other {# jobs}} in QC",
+      "NOT_COLLECTED": "Not collected {days}d",
+      "COLLECT": "Collect {amount}",
+      "DELIVER": "Hand over",
+      "OWED": "{payer} owes {amount}"
+    },
+    "age": {
+      "minutes": "{n}m",
+      "hours": "{n}h",
+      "days": "{n}d"
+    },
+    "pane": {
+      "nextStep": "Next step",
+      "none": "Nothing to do",
+      "quoteSent": "Quote sent",
+      "readySince": "Ready since",
+      "delivered": "Delivered",
+      "checkedIn": "Checked in",
+      "contact": "Contact",
+      "progress": "Progress",
+      "offer": "Offer",
+      "work": "Work",
+      "done": "Done",
+      "unpriced": "unpriced",
+      "openCase": "Open case",
+      "walkaround": "Walkaround photo",
+      "noPhoto": "No walkaround photo yet"
+    }
   },
   "caseStatus": {
     "CHECKED_IN": "Checked in",

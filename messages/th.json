@@ -48,7 +48,15 @@
   "board": {
     "empty": "ยังไม่มีเคสซ่อมที่เปิดอยู่ — เริ่มจากการรับรถเข้าอู่",
     "newCheckin": "รับรถเข้าอู่",
-    "openCount": "เคสที่เปิดอยู่ {count} เคส",
+    "title": "เคสซ่อม",
+    "carsInShop": "รถในอู่ {count} คัน",
+    "needsMe": "รอฉัน",
+    "all": "ทั้งหมด",
+    "oldestFirst": "เก่าสุดก่อน",
+    "search": "ทะเบียน ลูกค้า หรือเลขเคส",
+    "emptyNeedsMe": "ตอนนี้ไม่มีเคสที่รอคุณ — ช่างกำลังทำงาน",
+    "emptySegment": "ไม่มีเคสในขั้นนี้",
+    "noMatch": "ไม่พบเคสที่ตรงกับ “{query}”",
     "groups": {
       "IN_ASSESSMENT": "กำลังตรวจประเมิน",
       "AWAITING_AUTH": "รอลูกค้าอนุมัติ",
@@ -58,10 +66,72 @@
       "READY": "พร้อมส่งมอบ",
       "BALANCE_DUE": "ค้างชำระ"
     },
-    "partsProgress": "อะไหล่ {arrived}/{total}",
-    "partsEta": "ถึง {date}",
-    "balanceTotal": "ค้างรวม {amount}",
-    "deliveredAgo": "ส่งมอบ{when}"
+    "groupMoney": {
+      "offered": "เสนอราคา {amount}",
+      "collect": "เก็บเงิน {amount}",
+      "outstanding": "ค้างชำระ {amount}"
+    },
+    "spine": {
+      "label": "ขั้นตอน",
+      "ASSESSMENT": "ตรวจประเมิน",
+      "AUTHORIZATION": "รออนุมัติ",
+      "WORK": "กำลังซ่อม",
+      "READY": "พร้อมส่งมอบ",
+      "OWED": "ส่งมอบแล้ว ค้างชำระ"
+    },
+    "spineSub": {
+      "empty": "ไม่มี",
+      "waitingOnYou": "รอคุณ · {days} วัน",
+      "offered": "เสนอราคา {amount}",
+      "unpriced": "ยังไม่ตั้งราคา {count}",
+      "oldest": "นานสุด {days} วัน",
+      "waiting": "รอ {count}",
+      "inQc": "ตรวจ QC {count}",
+      "working": "กำลังซ่อม",
+      "collect": "เก็บเงิน {amount}",
+      "uncollected": "ยังไม่มารับ {count}",
+      "readyToGo": "พร้อมส่งมอบ",
+      "outstanding": "{amount} · {days} วัน"
+    },
+    "pill": {
+      "INSPECT": "ตรวจรถ",
+      "NO_WORK": "ยังไม่มีงานเสนอ",
+      "UNPRICED": "ยังไม่ตั้งราคา {count} รายการ",
+      "NOT_SENT": "{amount} ยังไม่ส่ง",
+      "UNANSWERED": "ใบเสนอราคายังไม่ตอบ {days} วัน",
+      "RESPONSE": "บันทึกคำตอบ",
+      "WAITING_PARTS": "อะไหล่ {arrived}/{total}",
+      "WAITING_PARTS_ETA": "อะไหล่ {arrived}/{total} · {date}",
+      "WAITING": "รอ — {reason}",
+      "IN_PROGRESS": "กำลังซ่อม {count} งาน",
+      "QC": "ตรวจ QC {count} งาน",
+      "NOT_COLLECTED": "ยังไม่มารับ {days} วัน",
+      "COLLECT": "เก็บเงิน {amount}",
+      "DELIVER": "ส่งมอบ",
+      "OWED": "{payer}ค้าง {amount}"
+    },
+    "age": {
+      "minutes": "{n} นาที",
+      "hours": "{n} ชม.",
+      "days": "{n} วัน"
+    },
+    "pane": {
+      "nextStep": "ขั้นต่อไป",
+      "none": "ไม่มีสิ่งที่ต้องทำ",
+      "quoteSent": "ส่งใบเสนอราคา",
+      "readySince": "พร้อมตั้งแต่",
+      "delivered": "ส่งมอบ",
+      "checkedIn": "รับรถ",
+      "contact": "ผู้ติดต่อ",
+      "progress": "ความคืบหน้า",
+      "offer": "ข้อเสนอ",
+      "work": "งานซ่อม",
+      "done": "เสร็จแล้ว",
+      "unpriced": "ยังไม่ตั้งราคา",
+      "openCase": "เปิดเคส",
+      "walkaround": "รูปตอนรับรถ",
+      "noPhoto": "ยังไม่มีรูปตอนรับรถ"
+    }
   },
   "caseStatus": {
     "CHECKED_IN": "รับรถแล้ว",
