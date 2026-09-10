@@ -8,8 +8,7 @@ Deliberate deferrals, so MVP scope stays honest. Each entry was consciously excl
 - **Rich LINE messages (Flex), rich menus, message templates:** MVP sends plain text + image messages only.
 - **Server-side image conversion for LINE:** LINE accepts JPEG/PNG only, so other formats are filtered out of the Update photo picker rather than converted.
 - **Short-lived LINE channel tokens:** MVP stores a pasted long-lived access token (ADR-004); issuing and refreshing tokens ourselves is additive.
-- **Automatic customer pings** (e.g. "car is Ready"): forbidden by ADR-003 until that ADR is explicitly revisited.
-- **Dashboard update-nudges** ("no LINE update sent in 3 days") — the ADR-003-compatible way to keep comms flowing.
+- **Silence guard for LINE Updates** ("Level 3", ruled 2026-09-10): an active case that has gone 3 days without any Update gets a per-Job status summary. Needs the system's first scheduler (a cron route) and a new class of unattended send; decided after Level 2 (CONTEXT.md **Progress notice**) has run at the pilot and shown where the gaps are. Supersedes the earlier "dashboard update-nudge" idea, which was the ADR-003-era substitute for sending.
 - **Branches/Locations:** one Shop = one location for now; a real multi-branch pilot customer reopens this.
 - **Insurer integration:** all insurer coordination happens outside the system in MVP; the Claim record only mirrors outcomes.
 - **Inventory/stock management:** Part Lines on Jobs only; no stock, no purchasing module.

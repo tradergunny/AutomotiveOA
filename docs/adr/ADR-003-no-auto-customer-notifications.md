@@ -1,6 +1,8 @@
 # ADR-003: No automatic customer notifications
 
-**Status:** Accepted — 2026-08-19
+**Status:** Superseded by [ADR-007](ADR-007-system-sent-customer-updates.md) — 2026-09-10 (originally Accepted — 2026-08-19)
+
+> The reasoning below still governs the events that never reach the customer — QC bounces, reverts, cancellations, price changes, shop-internal waits. What ADR-007 changes is that a closed, named set of status changes now sends without a human press. Its final consequence — "must revisit this ADR explicitly" — is what ADR-007 does.
 
 ## Context
 
