@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { lineTransport, type LineErrorCode, type LineMessage } from "@/lib/line";
 import { lineCryptoAvailable, openCredential } from "@/lib/line-credentials";
 import type { FlowTx } from "@/lib/case-flow";
+import type { LineDeliveryStatus, LineUpdateKind } from "@/lib/generated/prisma/enums";
 import type { TenantDb } from "@/lib/tenant";
 
 /**
@@ -10,8 +11,9 @@ import type { TenantDb } from "@/lib/tenant";
  * ADR-003), factored out of the composer's action in M7.7 so that Send
  * quotation (D-25) walks exactly the same path: the same gate, the same
  * push-first-record-second order, the same LineUpdate row and CaseEvent.
- * Both callers are server actions a human pressed; nothing here is ever
- * reached by a status change, a cron, or an event.
+ * M6 and M7.7 reached it only from a human press; M7.10 (ADR-007) adds the
+ * system-sent Milestone messages and Progress notices through one more caller
+ * (lib/line-updates.ts), each carrying its kind. Never a cron.
  *
  * Order is deliberate and its risk is accepted (M6 brief, decision 4): a
  * LINE push cannot be rolled back, so we push FIRST and record SECOND, in one
@@ -62,7 +64,9 @@ export async function lineGateFor(
 export type SentUpdateDto = {
   id: string;
   bodyText: string;
-  deliveryStatus: "SENT" | "FAILED";
+  deliveryStatus: LineDeliveryStatus;
+  /** What this Update is (M7.10) — the log renders by kind. */
+  kind: LineUpdateKind;
   errorCode: string | null;
   recipientName: string;
   sentByName: string;
@@ -78,6 +82,10 @@ export type DeliverInput = {
   caseId: string;
   customer: { id: string; name: string };
   gate: LineGate;
+  /** What this Update is — stored on the row, never inferred from the text (ADR-007). */
+  kind: LineUpdateKind;
+  /** The Job a JOB_COMPLETED notice names; same shop AND case as the Update. */
+  jobId?: string | null;
   bodyText: string;
   /** Photo ids in send order, each with its freshly minted token. */
   photos: { photoId: string; token: string }[];
@@ -114,6 +122,8 @@ export async function deliverLineUpdate(input: DeliverInput): Promise<DeliverRes
         errorCode: push.ok ? null : push.code,
         errorDetail: push.ok ? null : push.detail.slice(0, 500),
         quotationId: input.quotation?.id ?? null,
+        kind: input.kind,
+        jobId: input.jobId ?? null,
         sentByStaffId: actor.staffId,
         photos: {
           // shopId comes from the parent LineUpdate via the composite FK.
@@ -152,6 +162,7 @@ export async function deliverLineUpdate(input: DeliverInput): Promise<DeliverRes
       id: update.id,
       bodyText: update.bodyText,
       deliveryStatus: update.deliveryStatus,
+      kind: update.kind,
       errorCode: update.errorCode,
       recipientName: update.recipientName,
       sentByName: update.sentBy.name,

@@ -475,6 +475,7 @@ async function main() {
               totalSatang: covered.reduce((sum, job) => sum + (job.priceSatang ?? 0), 0),
               documentUrl: `http://localhost:3000/q/${quotation.publicToken}`,
             }),
+            kind: "QUOTATION",
             deliveryStatus: "SENT",
             lineRequestId: "staged",
             quotationId: quotation.id,

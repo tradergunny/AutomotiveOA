@@ -314,6 +314,7 @@ export default async function CasePage({
           id: update.id,
           bodyText: update.bodyText,
           deliveryStatus: update.deliveryStatus,
+          kind: update.kind,
           errorCode: update.errorCode,
           recipientName: update.recipientName,
           sentByName: update.sentBy.name,

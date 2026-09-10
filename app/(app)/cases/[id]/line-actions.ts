@@ -130,6 +130,7 @@ export async function sendLineUpdate(
       caseId,
       customer: repairCase.contactCustomer,
       gate: gate.value,
+      kind: "FREEFORM",
       bodyText,
       photos: ordered,
       quotation: null,

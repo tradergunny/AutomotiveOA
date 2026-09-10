@@ -126,6 +126,7 @@ export async function sendQuotation(
       caseId,
       customer: repairCase.contactCustomer,
       gate: gate.value,
+      kind: "QUOTATION",
       bodyText,
       photos: [],
       quotation: { id: quotationId, label },

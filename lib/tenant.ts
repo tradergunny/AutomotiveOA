@@ -40,7 +40,9 @@ import { Prisma } from "@/lib/generated/prisma/client";
  * Staff}, FollowUp→{Job, Finding} (same shop AND case), and
  * CaseEvent→{Payment, FollowUp} in M7; LineUpdate→Quotation in M7.7 (an
  * Update that carried a Quotation, D-25); Arrival→{Vehicle, RepairCase,
- * Staff} in M7.8 (the customer's own notice of a visit, ADR-006) — so
+ * Staff} in M7.8 (the customer's own notice of a visit, ADR-006);
+ * LineUpdate→Job (same shop AND case) in M7.10 (a JOB_COMPLETED notice
+ * naming its Job, ADR-007) — so
  * the database rejects any cross-shop link a nested write could attempt. (Two deliberate exceptions,
  * same reason: QuotationLine→Job and CaseEvent→Job are single-column soft
  * links so ON DELETE SET NULL works — see the schema comments; each row's
