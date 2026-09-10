@@ -12,7 +12,7 @@ import {
   type JobFlowAction,
 } from "@/lib/case-flow";
 import { mintFollowUpsForCase } from "@/lib/followups";
-import { sendNoticesForAct, snapshotCase } from "@/lib/line-updates";
+import { sendNoticesForAct, sendSystemUpdate, snapshotCase } from "@/lib/line-updates";
 import type { JobDto } from "@/lib/jobs";
 import { can } from "@/lib/permissions";
 import { tenantContext } from "@/lib/session";
@@ -328,9 +328,12 @@ export async function markCaseReady(
  * Delivery is also the FollowUp mint point (M7 ruling 4): it freezes the
  * work record, so the candidate set — declined Jobs, never-actioned wear
  * Findings — is final, and the rows are created in the same transaction.
+ * And it is a Milestone message (M7.10): the thank-you, with the dialog's
+ * optional note and never a money line, after the transaction commits.
  */
 export async function markCaseDelivered(
   caseId: string,
+  input: { note?: string } = {},
 ): Promise<FlowResult<{ status: string }>> {
   try {
     const { session, db } = await tenantContext();
@@ -360,6 +363,13 @@ export async function markCaseDelivered(
         },
       });
       await mintFollowUpsForCase(tx, session.shopId, caseId, repairCase.contactCustomerId);
+    });
+
+    await sendSystemUpdate(db, {
+      actor: { shopId: session.shopId, staffId: session.staffId },
+      caseId,
+      kind: "DELIVERED",
+      note: cleanNote(input.note),
     });
 
     revalidateCase(caseId);

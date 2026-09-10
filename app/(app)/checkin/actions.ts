@@ -5,6 +5,8 @@ import { ArrivalConsumeError, consumeArrival } from "@/lib/arrivals";
 import { allocateCaseReference } from "@/lib/case-reference";
 import { isUniqueViolation } from "@/lib/db-errors";
 import type { BodyType } from "@/lib/generated/prisma/enums";
+import { NOTE_MAX_LENGTH } from "@/lib/line-draft";
+import { sendSystemUpdate } from "@/lib/line-updates";
 import { isValidPhone, normalizePhone, normalizePlate } from "@/lib/normalize";
 import { tenantContext } from "@/lib/session";
 import { newPhotoKey, photoStore } from "@/lib/storage";
@@ -19,6 +21,14 @@ import { newPhotoKey, photoStore } from "@/lib/storage";
 // to CHECKED_IN and a verified LINE identity is linked to the contact
 // Customer (lib/arrivals.ts consumeArrival). Check-in never depends on one —
 // a tow that arrives without its owner is checked in from nothing.
+//
+// M7.10 (ADR-007): Check-in is a Milestone message. After the transaction
+// commits, the customer is told "we have your car, we'll inspect it and send
+// a quotation" — with the wizard's optional note — through the one system
+// seam. A check-in that consumed a LINE Arrival is reachable at once; one
+// from nothing is usually recorded as not-sent, and linking the customer
+// later sends the catch-up (Settings). The link made inside THIS transaction
+// sends no catch-up: the check-in message is the first contact.
 //
 // Walkaround photos upload AFTER the case commits, one request each via
 // addCasePhoto (the M3 finding-photo pattern) — a whole walkaround in one
@@ -146,6 +156,7 @@ export async function performCheckin(
   }
 
   const note = text("note") || null;
+  const customerNote = text("customerNote").slice(0, NOTE_MAX_LENGTH) || null;
   const odometerRaw = text("odometer").replace(/\D/g, "");
   const odometerKm = /^\d{1,7}$/.test(odometerRaw) ? Number(odometerRaw) : null;
 
@@ -248,6 +259,14 @@ export async function performCheckin(
     console.error("[checkin] failed:", error);
     return { error: "failed" };
   }
+
+  // ---- committed; now the customer (ADR-007) — never fails the check-in ----
+  await sendSystemUpdate(db, {
+    actor: { shopId: session.shopId, staffId: session.staffId },
+    caseId,
+    kind: "CHECKIN",
+    note: customerNote,
+  });
 
   revalidatePath("/");
   revalidatePath("/customers");

@@ -381,3 +381,26 @@ export async function sendNoticesForAct(
   }
   return sent;
 }
+
+/* ------------------------------------------------------------------ */
+/* The catch-up on linking (step 6).                                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A LINE Contact was just linked to a Customer: send each of their open
+ * cases one catch-up — the case as it stands now, in place of everything
+ * missed while unreachable, never a replay (CONTEXT.md Milestone message).
+ * Called AFTER the link's transaction committed; never throws. The
+ * check-in path does not call this: there the CHECKIN message is the first
+ * contact, and a catch-up beside it would be a duplicate.
+ */
+export async function sendCatchUps(
+  db: TenantDb,
+  input: { actor: { shopId: string; staffId: string }; caseIds: string[] },
+): Promise<SystemUpdateResult[]> {
+  const results: SystemUpdateResult[] = [];
+  for (const caseId of input.caseIds) {
+    results.push(await sendSystemUpdate(db, { actor: input.actor, caseId, kind: "CATCH_UP" }));
+  }
+  return results;
+}

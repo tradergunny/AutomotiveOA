@@ -16,12 +16,14 @@ import { markCaseDelivered, markCaseReady, type FlowError, type FlowResult } fro
  * explicit, ruling 4b). Renders bare inline buttons — the strip owns the
  * layout.
  *
- * M7.10: Ready is a Milestone message (ADR-007), so Mark ready opens a small
+ * M7.10: both are Milestone messages (ADR-007), so each opens one small
  * dialog in D-23's shape asking the one thing the server can use — an
- * optional note to the customer, appended to the Ready message — and names
- * who receives it. Mark delivered keeps M4's arm idiom until step 6 gives it
- * the same dialog.
+ * optional note to the customer, appended to the message — and naming who
+ * receives it. M4's arm-then-confirm idiom retires here: the dialog is the
+ * confirmation.
  */
+type Act = "ready" | "deliver";
+
 export function CaseFlowPanel({
   caseId,
   canMarkReady,
@@ -40,43 +42,34 @@ export function CaseFlowPanel({
   const t = useTranslations("cases.flow");
   const tc = useTranslations("common");
   const [busy, setBusy] = useState(false);
-  const [armed, setArmed] = useState<"deliver" | null>(null);
-  const [dialog, setDialog] = useState<"ready" | null>(null);
+  const [dialog, setDialog] = useState<Act | null>(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState<FlowError | null>(null);
 
   if (!canMarkReady && !canDeliver) return null;
 
-  async function run(action: () => Promise<FlowResult<{ status: string }>>): Promise<boolean> {
-    if (busy) return false;
+  function close() {
+    setDialog(null);
+    setNote("");
+    setError(null);
+  }
+
+  async function confirm(act: Act) {
+    if (busy) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await action();
+      const res: FlowResult<{ status: string }> =
+        act === "ready" ? await markCaseReady(caseId, { note }) : await markCaseDelivered(caseId, { note });
       if (!res.ok) setError(res.error);
-      return res.ok;
+      else close();
     } finally {
       setBusy(false);
     }
   }
 
-  function arm(kind: "deliver", go: () => void) {
-    if (armed !== kind) {
-      setArmed(kind);
-      setTimeout(() => setArmed((cur) => (cur === kind ? null : cur)), 4000);
-      return;
-    }
-    setArmed(null);
-    go();
-  }
-
-  async function confirmReady() {
-    const ok = await run(() => markCaseReady(caseId, { note }));
-    if (ok) {
-      setDialog(null);
-      setNote("");
-    }
-  }
+  const copy = dialog === "deliver" ? "deliverDialog" : "readyDialog";
+  const Icon = dialog === "deliver" ? PackageCheck : Flag;
 
   return (
     <>
@@ -84,18 +77,16 @@ export function CaseFlowPanel({
         <button
           type="button"
           disabled={busy}
-          onClick={() => arm("deliver", () => void run(() => markCaseDelivered(caseId)))}
+          onClick={() => setDialog("deliver")}
           className={cn(
             "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold",
-            armed === "deliver"
-              ? "border border-primary bg-primary-soft text-primary"
-              : deliverPrimary
-                ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                : "border border-primary-dim text-primary hover:bg-primary-soft",
+            deliverPrimary
+              ? "bg-primary text-primary-foreground hover:bg-primary/90"
+              : "border border-primary-dim text-primary hover:bg-primary-soft",
           )}
         >
           <PackageCheck className="size-3.5" aria-hidden />
-          {armed === "deliver" ? t("markDeliveredConfirm") : t("markDelivered")}
+          {t("markDelivered")}
         </button>
       )}
       {canMarkReady && (
@@ -109,35 +100,21 @@ export function CaseFlowPanel({
           {t("markReady")}
         </button>
       )}
-      {error && dialog === null && (
-        <span role="alert" className="border border-bad/45 px-2 py-0.5 text-[11px] text-bad">
-          {t(`errors.${error}`)}
-        </span>
-      )}
 
-      <Dialog
-        open={dialog === "ready"}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDialog(null);
-            setNote("");
-            setError(null);
-          }
-        }}
-      >
-        {dialog === "ready" && (
-          <DialogContent width="sm" title={t("readyDialog.title")} description={t("readyDialog.question")}>
+      <Dialog open={dialog !== null} onOpenChange={(open) => !open && close()}>
+        {dialog && (
+          <DialogContent width="sm" title={t(`${copy}.title`)} description={t(`${copy}.question`)}>
             <DialogBody>
-              <p className="text-[12px]">{t("readyDialog.question")}</p>
+              <p className="text-[12px]">{t(`${copy}.question`)}</p>
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.currentTarget.value.slice(0, NOTE_MAX_LENGTH))}
-                placeholder={t("readyDialog.notePlaceholder")}
+                placeholder={t(`${copy}.notePlaceholder`)}
                 rows={2}
                 maxLength={NOTE_MAX_LENGTH}
                 className="w-full resize-y border bg-background px-2.5 py-2 text-[13px] leading-relaxed placeholder:text-faint focus:border-primary focus:outline-none"
               />
-              <p className="text-[10.5px] text-faint">{t("readyDialog.noteHint", { name: recipientName })}</p>
+              <p className="text-[10.5px] text-faint">{t(`${copy}.noteHint`, { name: recipientName })}</p>
               {error && (
                 <p role="alert" className="border border-bad/45 px-2 py-1 text-[11px] text-bad">
                   {t(`errors.${error}`)}
@@ -150,12 +127,12 @@ export function CaseFlowPanel({
                 size="sm"
                 disabled={busy}
                 className="h-8 font-semibold"
-                onClick={() => void confirmReady()}
+                onClick={() => void confirm(dialog)}
               >
-                <Flag data-icon="inline-start" />
-                {busy ? t("readyDialog.working") : t("readyDialog.confirm")}
+                <Icon data-icon="inline-start" />
+                {busy ? t(`${copy}.working`) : t(`${copy}.confirm`)}
               </Button>
-              <Button type="button" size="sm" variant="ghost" className="h-8" onClick={() => setDialog(null)}>
+              <Button type="button" size="sm" variant="ghost" className="h-8" onClick={close}>
                 {tc("cancel")}
               </Button>
             </DialogFooter>

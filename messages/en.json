@@ -186,6 +186,14 @@
       "markReadyConfirm": "Confirm — nothing left to do?",
       "markDelivered": "Mark delivered",
       "markDeliveredConfirm": "Confirm handover — closes editing",
+      "deliverDialog": {
+        "title": "Mark delivered",
+        "question": "Hand over the car? This closes editing and thanks the customer on LINE.",
+        "notePlaceholder": "Note to the customer (optional) — e.g. see you at the next service",
+        "noteHint": "Sent on LINE to {name} as the last line of the thank-you.",
+        "confirm": "Mark delivered",
+        "working": "Marking…"
+      },
       "readyDialog": {
         "title": "Mark ready for pickup",
         "question": "Nothing left to do? The customer is told the car is ready.",
@@ -219,6 +227,9 @@
     "ownershipRelink": "Car changed hands — make {name} the primary customer",
     "detailsSection": "Visit details",
     "noteLabel": "Customer-reported issues / notes",
+    "customerNoteLabel": "Note to the customer (optional)",
+    "customerNotePlaceholder": "e.g. we'll call you once the inspection is done",
+    "customerNoteHint": "Added to the LINE message that tells the customer their car is checked in.",
     "odometerLabel": "Odometer (km)",
     "photosSection": "Walkaround photos",
     "addPhotos": "Add photos",
