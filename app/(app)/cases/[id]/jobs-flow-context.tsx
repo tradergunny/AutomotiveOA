@@ -20,8 +20,20 @@ type JobsFlow = {
 
 const JobsFlowContext = createContext<JobsFlow | null>(null);
 
-export function JobsFlowProvider({ children }: { children: React.ReactNode }) {
-  const [request, setRequest] = useState<JobsFlowRequest | null>(null);
+/**
+ * `initialAction` is the board's deep link (M7.9 §5, `?action=`): the page
+ * arrives already asking, so the dialog opens on mount.
+ */
+export function JobsFlowProvider({
+  children,
+  initialAction = null,
+}: {
+  children: React.ReactNode;
+  initialAction?: StageAction | null;
+}) {
+  const [request, setRequest] = useState<JobsFlowRequest | null>(
+    initialAction ? { action: initialAction, nonce: 1 } : null,
+  );
   const ask = useCallback((action: StageAction) => {
     setRequest((current) => ({ action, nonce: (current?.nonce ?? 0) + 1 }));
   }, []);

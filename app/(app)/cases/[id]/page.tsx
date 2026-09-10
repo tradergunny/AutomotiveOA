@@ -171,6 +171,13 @@ export default async function CasePage({
   /* ---------- follow-up deep link (M7 §6) ---------- */
 
   const followUpParam = query["followup"];
+  // The board's deep link (M7.9 §5): only the three actions with a dialog.
+  const actionParam = query["action"];
+  const DEEP_LINK_ACTIONS = ["SET_PRICES", "SEND_QUOTATION", "RECORD_RESPONSE"] as const;
+  const initialAction =
+    typeof actionParam === "string" && (DEEP_LINK_ACTIONS as readonly string[]).includes(actionParam)
+      ? (actionParam as (typeof DEEP_LINK_ACTIONS)[number])
+      : null;
   const followUpId = Array.isArray(followUpParam) ? followUpParam[0] : followUpParam;
   const followUpRow = followUpId
     ? await db.followUp.findUnique({
@@ -204,7 +211,7 @@ export default async function CasePage({
         : null;
 
   return (
-    <JobsFlowProvider>
+    <JobsFlowProvider initialAction={initialAction}>
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <Link
         href="/"

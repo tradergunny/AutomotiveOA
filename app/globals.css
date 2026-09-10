@@ -167,6 +167,12 @@
   );
 }
 
+
+/* D-27: the one lift — a low, offset shadow on cards that need to sit above the ground. */
+@utility lift {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
 /* Tracked-uppercase micro label (mockup .eyebrow / .sub). */
 @utility eyebrow {
   font-size: 10px;
