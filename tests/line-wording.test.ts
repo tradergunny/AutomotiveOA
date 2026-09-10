@@ -10,6 +10,7 @@ import {
   buildReadyBody,
   buildWaitingPartsBody,
   buildWorkStartedBody,
+  extractNote,
   formatThaiDate,
   NOTE_MAX_LENGTH,
 } from "@/lib/line-draft";
@@ -221,5 +222,29 @@ describe("the untouched builders", () => {
     expect(body.split("\n")[0]).toBe("สวัสดีค่ะ คุณประยุทธ์");
     expect(body).toContain("· งาน — กำลังดำเนินการ");
     expect(body.split("\n").at(-1)).toBe(base.shopName);
+  });
+});
+
+describe("extractNote — what the log shows as 'with a note'", () => {
+  const facts = { ...base, note: "ล้างรถให้แล้วนะคะ" };
+  it.each([
+    ["CHECKIN", buildCheckinBody(facts), buildCheckinBody(base)],
+    ["READY", buildReadyBody({ ...facts, customerOwedSatang: 150_000 }), buildReadyBody({ ...base, customerOwedSatang: 150_000 })],
+    ["READY", buildReadyBody({ ...facts, customerOwedSatang: 0 }), buildReadyBody({ ...base, customerOwedSatang: 0 })],
+    ["DELIVERED", buildDeliveredBody(facts), buildDeliveredBody(base)],
+    ["WORK_STARTED", buildWorkStartedBody(facts), buildWorkStartedBody(base)],
+    ["WAITING_PARTS", buildWaitingPartsBody({ ...facts, etaDate: null }), buildWaitingPartsBody({ ...base, etaDate: null })],
+    ["PARTS_ARRIVED", buildPartsArrivedBody(facts), buildPartsArrivedBody(base)],
+    ["JOB_COMPLETED", buildJobCompletedBody({ ...facts, jobTitle: "งาน" }), buildJobCompletedBody({ ...base, jobTitle: "งาน" })],
+    ["IN_QC", buildInQcBody(facts), buildInQcBody(base)],
+    ["CATCH_UP", buildCatchUpBody({ ...facts, jobs: [], caseStatus: "READY" }), buildCatchUpBody({ ...base, jobs: [], caseStatus: "CHECKED_IN" })],
+  ] as const)("%s: finds the note when present and nothing when absent", (kind, withNote, without) => {
+    expect(extractNote(kind, withNote)).toBe("ล้างรถให้แล้วนะคะ");
+    expect(extractNote(kind, without)).toBeNull();
+  });
+
+  it("never reads a note out of a human-written or quotation message", () => {
+    expect(extractNote("FREEFORM", "สวัสดี\n\nข้อความ\n\nอู่")).toBeNull();
+    expect(extractNote("QUOTATION", "สวัสดี\n\nข้อความ\n\nอู่")).toBeNull();
   });
 });
