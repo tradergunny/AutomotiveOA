@@ -12,6 +12,7 @@ import {
   type JobFlowAction,
 } from "@/lib/case-flow";
 import { mintFollowUpsForCase } from "@/lib/followups";
+import { sendNoticesForAct, snapshotCase } from "@/lib/line-updates";
 import type { JobDto } from "@/lib/jobs";
 import { can } from "@/lib/permissions";
 import { tenantContext } from "@/lib/session";
@@ -23,6 +24,12 @@ import { JOB_INCLUDE, toJobDto } from "./job-dto";
 // Mark delivered. Every mutation writes its CaseEvent(s) in the SAME
 // transaction (ruling 1) and re-derives READY where a Job left or rejoined
 // the active set (ruling 4a). No free status write exists anywhere.
+//
+// M7.10 (ADR-007): after the transaction COMMITS, each act asks
+// lib/line-triggers what the customer should hear and sends it through the
+// one system seam (lib/line-updates). The message goes second and can never
+// fail the act — sendNoticesForAct never throws, and a LINE that is slow or
+// down leaves a FAILED / NOT_SENT row, not a car that is not Ready.
 
 export type FlowError =
   | "caseMissing"
@@ -129,6 +136,7 @@ export async function transitionJob(
     const to = JOB_FLOW_ACTIONS[action].to;
     const reasonChangeOnly = action === "SET_WAITING" && job.status === "WAITING";
     const caseId = job.repairCase.id;
+    const before = await snapshotCase(db, caseId);
 
     await db.$transaction(async (tx) => {
       await tx.job.update({
@@ -163,6 +171,16 @@ export async function transitionJob(
         await applyCaseReadiness(tx, session.shopId, caseId, session.staffId);
       }
     });
+
+    // ---- committed; now the customer (ADR-007) ----
+    if (before) {
+      await sendNoticesForAct(db, {
+        actor: { shopId: session.shopId, staffId: session.staffId },
+        caseId,
+        before,
+        act: { kind: "JOB_FLOW", action, jobId },
+      });
+    }
 
     revalidateCase(caseId);
     return { ok: true, value: await freshDto(db, jobId) };
@@ -206,6 +224,7 @@ export async function revertJobStep(jobId: string): Promise<FlowResult<JobDto>> 
     }
 
     const caseId = job.repairCase.id;
+    const before = await snapshotCase(db, caseId);
     await db.$transaction(async (tx) => {
       await tx.job.update({
         where: { id: jobId },
@@ -230,6 +249,17 @@ export async function revertJobStep(jobId: string): Promise<FlowResult<JobDto>> 
       }
     });
 
+    // A revert is never news (ADR-007's never-list) — the same path runs and
+    // derives nothing, so a revert can never quietly grow a message.
+    if (before) {
+      await sendNoticesForAct(db, {
+        actor: { shopId: session.shopId, staffId: session.staffId },
+        caseId,
+        before,
+        act: { kind: "REVERT", jobId },
+      });
+    }
+
     revalidateCase(caseId);
     return { ok: true, value: await freshDto(db, jobId) };
   } catch (error) {
@@ -245,8 +275,13 @@ export async function revertJobStep(jobId: string): Promise<FlowResult<JobDto>> 
  * Explicit Mark ready — the customer-collects-anyway path for cases whose
  * work never materialized (everything Declined, or no Jobs). Cases with
  * completed work flip on their own; cases with active work are refused.
+ * Ready is a Milestone whichever act produced it (M7.10): this one carries
+ * the dialog's optional note to the customer.
  */
-export async function markCaseReady(caseId: string): Promise<FlowResult<{ status: string }>> {
+export async function markCaseReady(
+  caseId: string,
+  input: { note?: string } = {},
+): Promise<FlowResult<{ status: string }>> {
   try {
     const { session, db } = await tenantContext();
     const repairCase = await db.repairCase.findUnique({
@@ -259,6 +294,7 @@ export async function markCaseReady(caseId: string): Promise<FlowResult<{ status
 
     const jobs = await db.job.findMany({ where: { caseId }, select: { status: true } });
     if (hasActiveWork(jobs)) throw new FlowInputError("activeWork");
+    const before = await snapshotCase(db, caseId);
 
     await db.$transaction(async (tx) => {
       await tx.repairCase.update({
@@ -269,6 +305,16 @@ export async function markCaseReady(caseId: string): Promise<FlowResult<{ status
         data: { shopId: session.shopId, caseId, type: "CASE_READY", actorStaffId: session.staffId },
       });
     });
+
+    if (before) {
+      await sendNoticesForAct(db, {
+        actor: { shopId: session.shopId, staffId: session.staffId },
+        caseId,
+        before,
+        act: { kind: "MARK_READY" },
+        note: cleanNote(input.note),
+      });
+    }
 
     revalidateCase(caseId);
     return { ok: true, value: { status: "READY" } };

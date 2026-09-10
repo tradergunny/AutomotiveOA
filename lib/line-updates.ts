@@ -24,6 +24,13 @@ import {
   type LineGateError,
 } from "@/lib/line-send";
 import type { LineUpdateKind } from "@/lib/generated/prisma/enums";
+import {
+  noticesFor,
+  type CaseSnapshot,
+  type NoticeKind,
+  type SendHistory,
+  type TriggerAct,
+} from "@/lib/line-triggers";
 import { caseBalance } from "@/lib/payments";
 import type { TenantDb } from "@/lib/tenant";
 
@@ -293,4 +300,84 @@ export async function sendSystemUpdate(
     console.error(`[line-updates] ${input.kind} for case ${input.caseId} failed:`, error);
     return { outcome: "ERROR", error: "failed" };
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Progress notices and Ready, hung on the flow actions (step 5).      */
+/* ------------------------------------------------------------------ */
+
+/** The case as the trigger rules see it: status plus each Job's status and wait. */
+export async function snapshotCase(db: TenantDb, caseId: string): Promise<CaseSnapshot | null> {
+  const repairCase = await db.repairCase.findUnique({
+    where: { id: caseId },
+    select: {
+      status: true,
+      jobs: { select: { id: true, status: true, waitingReason: true } },
+    },
+  });
+  return repairCase ? { caseStatus: repairCase.status, jobs: repairCase.jobs } : null;
+}
+
+/**
+ * What the case has already been told — every row, whatever its delivery
+ * status: a NOT_SENT or FAILED row still records that the act happened,
+ * and the free-form dialog is the retry (ADR-007).
+ */
+export async function sendHistoryFor(db: TenantDb, caseId: string): Promise<SendHistory> {
+  const rows = await db.lineUpdate.findMany({
+    where: { caseId },
+    orderBy: { sentAt: "asc" },
+    select: { kind: true, sentAt: true },
+  });
+  let lastJobCompletedAt: Date | null = null;
+  for (const row of rows) {
+    if (row.kind === "JOB_COMPLETED" && (!lastJobCompletedAt || row.sentAt > lastJobCompletedAt)) {
+      lastJobCompletedAt = row.sentAt;
+    }
+  }
+  return {
+    kinds: rows.map((row) => row.kind),
+    lastKind: rows.at(-1)?.kind ?? null,
+    lastJobCompletedAt,
+  };
+}
+
+/**
+ * After a flow act has COMMITTED: derive what the customer should hear
+ * (lib/line-triggers.ts) from the snapshot taken before the act and the
+ * case as it stands now, and send each kind in order. Returns what was
+ * attempted; never throws — the act is done, told or not.
+ */
+export async function sendNoticesForAct(
+  db: TenantDb,
+  input: {
+    actor: { shopId: string; staffId: string };
+    caseId: string;
+    before: CaseSnapshot;
+    act: TriggerAct;
+    /** A Milestone act's optional note (Mark ready); Progress notices carry none. */
+    note?: string | null;
+  },
+): Promise<{ kind: NoticeKind; result: SystemUpdateResult }[]> {
+  const sent: { kind: NoticeKind; result: SystemUpdateResult }[] = [];
+  try {
+    const after = await snapshotCase(db, input.caseId);
+    if (!after) return sent;
+    const history = await sendHistoryFor(db, input.caseId);
+    const kinds = noticesFor({ before: input.before, after, act: input.act, history, now: new Date() });
+    for (const kind of kinds) {
+      const jobId = kind === "JOB_COMPLETED" && input.act.kind === "JOB_FLOW" ? input.act.jobId : null;
+      const result = await sendSystemUpdate(db, {
+        actor: input.actor,
+        caseId: input.caseId,
+        kind,
+        jobId,
+        note: kind === "READY" ? input.note : null,
+      });
+      sent.push({ kind, result });
+    }
+  } catch (error) {
+    console.error(`[line-updates] notices for case ${input.caseId} failed:`, error);
+  }
+  return sent;
 }

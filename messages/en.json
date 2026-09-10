@@ -186,6 +186,14 @@
       "markReadyConfirm": "Confirm — nothing left to do?",
       "markDelivered": "Mark delivered",
       "markDeliveredConfirm": "Confirm handover — closes editing",
+      "readyDialog": {
+        "title": "Mark ready for pickup",
+        "question": "Nothing left to do? The customer is told the car is ready.",
+        "notePlaceholder": "Note to the customer (optional) — e.g. we washed it for you",
+        "noteHint": "Sent on LINE to {name} as the last line of the ready message.",
+        "confirm": "Mark ready",
+        "working": "Marking…"
+      },
       "errors": {
         "caseMissing": "Case not found",
         "caseDelivered": "This case is already delivered",

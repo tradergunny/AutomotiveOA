@@ -259,6 +259,17 @@ describe("IN_QC", () => {
     ).toEqual([]);
   });
 
+  it("does not fire while another Job is authorized but not started (work remains)", () => {
+    expect(
+      notices(
+        snap([job("a", "IN_PROGRESS"), job("b", "AUTHORIZED")]),
+        snap([job("a", "QC"), job("b", "AUTHORIZED")]),
+        flow("SEND_TO_QC"),
+        started,
+      ),
+    ).toEqual([]);
+  });
+
   it("fires beside a completed Job (done work is not active work)", () => {
     expect(
       notices(
@@ -336,6 +347,17 @@ describe("JOB_COMPLETED", () => {
         lastJobCompletedAt: null,
       }),
     ).toEqual([]);
+  });
+
+  it("fires when the other work is authorized but not yet started", () => {
+    expect(
+      notices(
+        snap([job("a", "QC"), job("b", "AUTHORIZED")]),
+        snap([job("a", "COMPLETED"), job("b", "AUTHORIZED")]),
+        flow("QC_PASS"),
+        started,
+      ),
+    ).toEqual(["JOB_COMPLETED"]);
   });
 
   it("fires when the other work is still waiting", () => {

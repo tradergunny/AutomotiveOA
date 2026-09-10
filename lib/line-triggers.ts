@@ -82,12 +82,18 @@ export type NoticeKind = Extract<
 /** Jobs completing within this window of the last completion notice coalesce into it. */
 export const JOB_COMPLETED_COALESCE_MS = 60 * 60 * 1000;
 
-/** The work stage the customer hears about: active work only, Waiting first. */
+/**
+ * The work stage the customer hears about: active work only, Waiting first.
+ * An authorized Job not yet started is open work too — "final quality check"
+ * is only true when nothing remains to be done.
+ */
 type WorkStage = "WAITING" | "IN_PROGRESS" | "IN_QC" | null;
 
 function workStageOf(jobs: TriggerJob[]): WorkStage {
   if (jobs.some((job) => job.status === "WAITING")) return "WAITING";
-  if (jobs.some((job) => job.status === "IN_PROGRESS")) return "IN_PROGRESS";
+  if (jobs.some((job) => job.status === "IN_PROGRESS" || job.status === "AUTHORIZED")) {
+    return "IN_PROGRESS";
+  }
   if (jobs.some((job) => job.status === "QC")) return "IN_QC";
   return null;
 }
