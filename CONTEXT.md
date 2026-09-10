@@ -99,6 +99,11 @@ A sent Update is an immutable snapshot of what the customer actually saw — bod
 
 Updates cover all Jobs on the visit regardless of Payer — an insurer footing the bill doesn't change who gets kept informed.
 
+⚠ Being redrawn (design session 2026-09-10): an Update is no longer always composed by hand. It comes in two kinds — a [[Milestone message]] carried by a Staff act, and a [[Progress notice]] the system sends on its own — and the rule that decides what a customer hears is **only status changes that affect their expectations**, never internal events.
+
+### Progress notice
+A LINE Update the system sends **without a Staff act aimed at the customer**, when the Repair Case's [[Stage]] changes in a way that moves the customer's expectation of when they get the car back. Exactly two Stage entries send one: **In progress** ("work has started"), once per case, and **Waiting — Parts** ("waiting for parts, expected {date}"), carrying the expected arrival from the Part Lines. Nothing else does: not In QC, not a QC bounce, not a Paint-booth or Technician wait, not a revert, cancellation or price change — those are the internal narrative and stay on the internal timeline (the reasoning ADR-003 recorded still holds for them). A Progress notice is worded by the system in customer-safe Thai and, like every Update, is an immutable record of what the customer saw.
+
 ### LINE Contact
 A LINE identity seen on one Shop's OA — a `userId`, plus the display name and picture LINE reports. It arrives when the person adds the OA as a friend or messages it, and starts out **unlinked**: Staff match it to a Customer by hand, via the same phone lookup as check-in (ADR-005), or the link is made for them when they confirm an [[Arrival]] the customer submitted inside LINE. A Customer with no linked LINE Contact simply can't be sent Updates yet — a normal state, not an error. userIds are per-OA, so the same person at two Shops is two Contacts.
 
