@@ -167,7 +167,7 @@ export function CustomerTimeline({
                   <div className="flex flex-col gap-2 px-4 pb-3 pl-9 sm:px-5 sm:pl-10">
                     <p
                       className={cn(
-                        "whitespace-pre-wrap text-[13px] leading-relaxed",
+                        "whitespace-pre-wrap break-words text-[13px] leading-relaxed",
                         update.deliveryStatus !== "SENT" && "text-muted-foreground",
                       )}
                     >
