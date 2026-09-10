@@ -117,7 +117,7 @@ A LINE identity seen on one Shop's OA — a `userId`, plus the display name and 
 A published Photo — one a human attached to a sent Update — is reachable by an unguessable link, because LINE's servers fetch images themselves. Photos are never public before that.
 
 ### Internal Timeline vs Customer Timeline
-Two deliberately separate narratives. The internal timeline records every operational event for Staff (QC failed, rework, waiting-reason changes). The Customer Timeline is only what Staff chose to send as LINE Updates — curated and human-worded ("Final quality check", not "QC failed — repaint"). No internal event ever auto-publishes to the customer (ADR-003).
+Two deliberately separate narratives. The internal timeline records every operational event for Staff (QC failed, rework, waiting-reason changes). The Customer Timeline is the record of what the customer heard — every LINE Update, sent or not-sent, whether the system carried it or Staff wrote it — curated and customer-worded ("Final quality check", not "QC failed — repaint"). Internal events reach the customer only through the named Milestone messages and Progress notices; nothing else ever does.
 
 ### Follow-up
 The CRM worklist. Sources: Declined Jobs worth chasing ("windshield still cracked — quoted 18,000฿ in March") and wear/near-expiration Findings that never became authorized work. Follow-ups are stored rows **minted at delivery** — the moment the work record freezes, so the candidate set is final (M7 ruling). Staff work the list by hand — open, compose a LINE Update on the source case, mark contacted — through states open / snoozed / contacted / dropped; a snoozed item resurfaces when its date passes, derived on read. Nothing here ever auto-sends or pings (ADR-003).
