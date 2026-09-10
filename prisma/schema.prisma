@@ -656,6 +656,10 @@ enum CaseEventType {
   /// event, never the reverse. LINKED/UNLINKED record identity linking.
   LINE_UPDATE_SENT
   LINE_UPDATE_FAILED
+  /// M7.10 (ADR-007): the Shop could not send a system Update at all — the
+  /// gate blocked it (no channel, no linked identity, unfollowed). The row
+  /// it points at is the NOT_SENT record naming the reason.
+  LINE_UPDATE_NOT_SENT
   LINE_CUSTOMER_LINKED
   LINE_CUSTOMER_UNLINKED
   /// M7: money against the case (append-only Payments + the one-way void)…

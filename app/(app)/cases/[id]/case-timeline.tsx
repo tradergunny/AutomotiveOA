@@ -203,6 +203,13 @@ export function CaseTimeline({
           tone: "text-bad",
           label: t("lineUpdateFailed", { name: event.subjectName ?? "—" }),
         };
+      case "LINE_UPDATE_NOT_SENT":
+        return {
+          ...base,
+          icon: MessageCircle,
+          tone: "text-muted-foreground",
+          label: t("lineUpdateNotSent", { name: event.subjectName ?? "—" }),
+        };
       case "LINE_CUSTOMER_LINKED":
         return {
           ...base,

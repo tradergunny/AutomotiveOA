@@ -498,6 +498,7 @@
     "lineUpdateSent": "ส่งอัปเดต LINE ถึง {name} · {count, plural, =0 {ไม่มีรูป} other {# รูป}}",
     "lineQuotationSent": "ส่งใบเสนอราคา {label} ถึง {name} ทาง LINE",
     "lineUpdateFailed": "ส่งอัปเดต LINE ถึง {name} ไม่สำเร็จ — ลูกค้าไม่ได้รับ",
+    "lineUpdateNotSent": "ส่งอัปเดต LINE ถึง {name} ไม่ได้ — ยังติดต่อลูกค้าทาง LINE ไม่ได้",
     "lineCustomerLinked": "เชื่อมบัญชี LINE แล้ว — {name}",
     "lineCustomerUnlinked": "ยกเลิกการเชื่อมบัญชี LINE — {name}",
     "paymentRecorded": "รับชำระเงิน {amount} · {method} · {payer}",
