@@ -12,7 +12,7 @@ Staff of a Thai automotive body-and-service garage, at a desk PC or a tablet bes
 
 ## Product Purpose
 
-AutomotiveOA runs one garage's day: every car in the yard is a Repair Case, every case's next move is derived from its Jobs, and every customer message is a deliberate, human-sent LINE Update. Success is a shop where nothing sitting in the yard is invisible, a newcomer reads any case's situation and next step in seconds, and the customer gets a numbered quotation and honest status without the advisor re-keying anything.
+AutomotiveOA runs one garage's day: every car in the yard is a Repair Case, every case's next move is derived from its Jobs, and the customer hears about every status change that affects their expectations without anyone having to remember to tell them. Success is a shop where nothing sitting in the yard is invisible, a newcomer reads any case's situation and next step in seconds, and the customer gets a numbered quotation and honest status without the advisor re-keying anything.
 
 ## Positioning
 
@@ -24,7 +24,7 @@ Bilingual Thai/English staff UI; Thai-first customer messages. Thai plates ("4�
 
 ## Capabilities and Constraints
 
-Check-in (from nothing or from a customer's Arrival), the Damage Map and Service Checklist inspection, Findings that fill the Offer, merge, pricing from the Service Catalog or by quote, versioned Quotations sent over LINE with an unguessable document link, one Response per payer authorizing or declining each Job, the fixed Job transition edge map with a mandatory QC gate, derived Ready, explicit Delivered, append-only Payments per payer side, the Follow-up worklist, the internal timeline, and the curated Customer Timeline. No automatic customer notifications ever (ADR-003). No inventory, no insurer integration, no technician logins, no light theme in MVP (dark-only, D-1). Fixed board grouping was ruled MVP scope in M5; M7.9 reopens it only for a plate/name search and a "Needs me" filter.
+Check-in (from nothing or from a customer's Arrival), the Damage Map and Service Checklist inspection, Findings that fill the Offer, merge, pricing from the Service Catalog or by quote, versioned Quotations sent over LINE with an unguessable document link, one Response per payer authorizing or declining each Job, the fixed Job transition edge map with a mandatory QC gate, derived Ready, explicit Delivered, append-only Payments per payer side, the Follow-up worklist, the internal timeline, and the curated Customer Timeline. Customer messages are sent by the system for a closed, named set of status changes and carried by the Staff acts that mark the visit's milestones (ADR-007); internal events — QC bounces, reverts, cancellations, price changes — never reach the customer. No inventory, no insurer integration, no technician logins, no light theme in MVP (dark-only, D-1). Fixed board grouping was ruled MVP scope in M5; M7.9 reopens it only for a plate/name search and a "Needs me" filter.
 
 ## Brand Commitments
 
