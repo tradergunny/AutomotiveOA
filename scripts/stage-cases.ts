@@ -4,12 +4,23 @@ import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { deflateSync } from "node:zlib";
 import { prismaUnscoped } from "../lib/db";
-import { fakeIdTokenFor } from "../lib/line";
-import { buildQuotationBody } from "../lib/line-draft";
+import { createFakeLineTransport, fakeIdTokenFor, LINE_OUTBOX_PATH, type LineMessage } from "../lib/line";
+import {
+  buildCheckinBody,
+  buildDeliveredBody,
+  buildInQcBody,
+  buildJobCompletedBody,
+  buildPartsArrivedBody,
+  buildQuotationBody,
+  buildReadyBody,
+  buildWaitingPartsBody,
+  buildWorkStartedBody,
+} from "../lib/line-draft";
 import type {
   DamageType,
   FindingCondition,
   JobStatus,
+  LineUpdateKind,
   PartOrderStatus,
   PayerType,
   WaitingReason,
@@ -33,8 +44,18 @@ import { newPhotoKey, photoStore } from "../lib/storage";
  * token the second one would have carried is `dev:U…` — the fake driver's
  * convention (lib/line.ts).
  *
+ * M7.10 adds the customer's side (ADR-007): one delivered case carries the
+ * whole story a customer now receives — check-in, quotation, work started,
+ * waiting for parts, parts arrived, a finished job with its photo, final
+ * check, ready, thank-you — as LineUpdate rows AND as pushes on the fake
+ * transport's outbox (.data/line/outbox.jsonl), so the outbox reads as a
+ * story on a fresh clone; and the fresh check-in carries a NOT_SENT row
+ * ("not on LINE yet") with an unmatched LINE contact waiting in Settings, so
+ * matching it sends the one catch-up.
+ *
  * Idempotent via .data/staged-cases.json: a re-run deletes what the last
- * run created, then stages afresh. Usage: npx tsx scripts/stage-cases.ts
+ * run created, then stages afresh (the outbox is append-only — delete it to
+ * start the story over). Usage: npx tsx scripts/stage-cases.ts
  */
 
 const STATE_FILE = path.join(process.cwd(), ".data", "staged-cases.json");
@@ -134,6 +155,7 @@ const EXTRA_CUSTOMERS: { name: string; phone: string; vehicle: StagedVehicle }[]
   { name: "กิตติ พูลสวัสดิ์", phone: "0845553311", vehicle: { plate: "ฒบ4433", province: "นนทบุรี", bodyType: "PICKUP", make: "Mitsubishi", model: "Triton", color: "เทา", hue: [120, 124, 130] } },
   { name: "วราภรณ์ สุขสันต์", phone: "0823334455", vehicle: { plate: "จร9911", province: "กรุงเทพมหานคร", bodyType: "SEDAN", make: "Nissan", model: "Almera", color: "น้ำเงิน", hue: [44, 74, 132] } },
   { name: "อนันต์ เรืองศรี", phone: "0867778899", vehicle: { plate: "ภน6644", province: "สมุทรปราการ", bodyType: "SEDAN", make: "Toyota", model: "Camry", color: "ดำ", hue: [40, 42, 46] } },
+  { name: "พิมพ์ชนก อารีย์", phone: "0895551212", vehicle: { plate: "งจ2468", province: "กรุงเทพมหานคร", bodyType: "SEDAN", make: "Mazda", model: "2", color: "แดง", hue: [150, 40, 44] } },
 ];
 
 /** Hues for the seed vehicles that get staged cases too. */
@@ -291,6 +313,19 @@ async function main() {
      * document link plus the LINE Update that carried it.
      */
     quotation?: { jobIndexes: number[]; sent?: boolean; hoursAgo?: number };
+    /**
+     * M7.10: checked in from nothing — the CHECKIN Milestone was recorded
+     * as not-sent (no LINE Contact), and an unmatched contact waits in the
+     * Settings inbox so matching it sends the catch-up.
+     */
+    checkinNotSent?: boolean;
+    /**
+     * M7.10: the whole customer-side story, as rows and as outbox pushes.
+     * Needs a sent quotation (the linked identity) and a delivered case with
+     * completed Jobs; the first completed Job is the one "finished mid-visit"
+     * with a photo. The note rides on the thank-you.
+     */
+    lineStory?: { note: string };
     payments?: {
       payerType: PayerType;
       insurerName?: string;
@@ -405,6 +440,7 @@ async function main() {
     // the jobs' current titles and prices. A sent one carries the document
     // token and the LINE Update the customer received.
     let quotationId: string | null = null;
+    let storyLineUserId: string | null = null;
     if (spec.quotation) {
       const covered = spec.quotation.jobIndexes.map((index) => jobRows[index]!);
       const issuedAt = hoursAgo(spec.quotation.hoursAgo ?? spec.checkedInHoursAgo - 2);
@@ -445,6 +481,7 @@ async function main() {
         // A linked LINE identity for the contact, so the send gate is open too.
         stagedLineUsers += 1;
         const lineUserId = `${STAGED_LINE_USER_PREFIX}${stagedLineUsers}`;
+        storyLineUserId = lineUserId;
         await prismaUnscoped.lineContact.deleteMany({
           where: { shopId, customerId: vehicle.primaryCustomerId },
         });
@@ -475,6 +512,7 @@ async function main() {
               totalSatang: covered.reduce((sum, job) => sum + (job.priceSatang ?? 0), 0),
               documentUrl: `http://localhost:3000/q/${quotation.publicToken}`,
             }),
+            kind: "QUOTATION",
             deliveryStatus: "SENT",
             lineRequestId: "staged",
             quotationId: quotation.id,
@@ -590,19 +628,190 @@ async function main() {
       });
     }
 
+    /* -------- M7.10: the customer's side -------- */
+
+    const customerFacts = {
+      shopName: SHOP_NAME,
+      customerName: vehicle.primaryCustomer.name,
+      plate: vehicle.plate,
+      reference,
+    };
+
+    if (spec.checkinNotSent) {
+      // Checked in from nothing: no LINE Contact, so the CHECKIN Milestone is
+      // a NOT_SENT row naming the reason — and an unmatched contact waits in
+      // the inbox for the founder to match (which sends the catch-up).
+      await prismaUnscoped.lineContact.deleteMany({
+        where: { shopId, customerId: vehicle.primaryCustomerId },
+      });
+      const notSentAt = new Date(checkedInAt.getTime() + 60_000);
+      const row = await prismaUnscoped.lineUpdate.create({
+        data: {
+          shopId,
+          caseId: repairCase.id,
+          customerId: vehicle.primaryCustomerId,
+          lineUserId: null,
+          recipientName: vehicle.primaryCustomer.name,
+          bodyText: buildCheckinBody(customerFacts),
+          kind: "CHECKIN",
+          deliveryStatus: "NOT_SENT",
+          errorCode: "noIdentity",
+          sentByStaffId: advisor.id,
+          sentAt: notSentAt,
+        },
+      });
+      await prismaUnscoped.caseEvent.create({
+        data: {
+          shopId,
+          caseId: repairCase.id,
+          type: "LINE_UPDATE_NOT_SENT",
+          lineUpdateId: row.id,
+          subjectName: vehicle.primaryCustomer.name,
+          actorStaffId: advisor.id,
+          at: notSentAt,
+        },
+      });
+      stagedLineUsers += 1;
+      await prismaUnscoped.lineContact.create({
+        data: {
+          shopId,
+          lineUserId: `${STAGED_LINE_USER_PREFIX}${stagedLineUsers}`,
+          displayName: `${vehicle.primaryCustomer.name.split(" ")[0]} (LINE)`,
+          firstSeenAt: notSentAt,
+          lastEventAt: notSentAt,
+        },
+      });
+      console.log(
+        `  · checked in from nothing — match "${vehicle.primaryCustomer.name.split(" ")[0]} (LINE)" to ${vehicle.primaryCustomer.phone} in Settings for the catch-up`,
+      );
+    }
+
+    if (spec.lineStory) {
+      if (!storyLineUserId) throw new Error(`lineStory needs quotation.sent (${reference})`);
+      const lineUserId = storyLineUserId;
+      const transport = createFakeLineTransport(LINE_OUTBOX_PATH);
+      const completed = jobRows.filter((job) => job.status === "COMPLETED");
+      const firstDone = completed[0];
+      if (!firstDone) throw new Error(`lineStory needs a completed Job (${reference})`);
+      const at = (hours: number) => new Date(checkedInAt.getTime() + hours * 3_600_000);
+      const quotationRow = await prismaUnscoped.lineUpdate.findFirstOrThrow({
+        where: { caseId: repairCase.id, kind: "QUOTATION" },
+        select: { bodyText: true, sentAt: true },
+      });
+      const customerOwed = (spec.jobs ?? [])
+        .filter((job) => job.status === "COMPLETED" && (job.payerType ?? "CUSTOMER") === "CUSTOMER")
+        .reduce((sum, job) => sum + baht(job.priceBaht ?? 0), 0);
+      const customerPaid = (spec.payments ?? [])
+        .filter((payment) => payment.payerType === "CUSTOMER")
+        .reduce((sum, payment) => sum + baht(payment.amountBaht), 0);
+
+      // The finished Job's own photo — the evidence the JOB_COMPLETED notice
+      // carries, and the READY message repeats (CONTEXT.md Photo).
+      const bytes = new Uint8Array(carPng([hue[0], Math.min(255, hue[1] + 40), hue[2]]));
+      const storageKey = newPhotoKey(shopId, repairCase.id, "image/png");
+      await photoStore.put(storageKey, bytes, "image/png");
+      const jobPhoto = await prismaUnscoped.photo.create({
+        data: {
+          shopId,
+          caseId: repairCase.id,
+          jobId: firstDone.id,
+          storageKey,
+          contentType: "image/png",
+          sizeBytes: bytes.byteLength,
+          capturedAt: at(50),
+          uploadedByStaffId: bodyTech.id,
+        },
+      });
+
+      const story: { kind: LineUpdateKind; body: string; sentAt: Date; jobId?: string; photoIds?: string[] }[] = [
+        { kind: "CHECKIN", body: buildCheckinBody(customerFacts), sentAt: at(0.02) },
+        { kind: "QUOTATION", body: quotationRow.bodyText, sentAt: quotationRow.sentAt },
+        { kind: "WORK_STARTED", body: buildWorkStartedBody(customerFacts), sentAt: at(20) },
+        { kind: "WAITING_PARTS", body: buildWaitingPartsBody({ ...customerFacts, etaDate: at(48) }), sentAt: at(22) },
+        { kind: "PARTS_ARRIVED", body: buildPartsArrivedBody(customerFacts), sentAt: at(46) },
+        {
+          kind: "JOB_COMPLETED",
+          body: buildJobCompletedBody({ ...customerFacts, jobTitle: firstDone.title }),
+          sentAt: at(51),
+          jobId: firstDone.id,
+          photoIds: [jobPhoto.id],
+        },
+        { kind: "IN_QC", body: buildInQcBody(customerFacts), sentAt: at(70) },
+        {
+          kind: "READY",
+          body: buildReadyBody({ ...customerFacts, customerOwedSatang: Math.max(0, customerOwed - customerPaid) }),
+          sentAt: spec.readyHoursAgo != null ? hoursAgo(spec.readyHoursAgo) : at(72),
+          photoIds: [jobPhoto.id],
+        },
+        {
+          kind: "DELIVERED",
+          body: buildDeliveredBody({ ...customerFacts, note: spec.lineStory.note }),
+          sentAt: spec.deliveredHoursAgo != null ? hoursAgo(spec.deliveredHoursAgo) : at(96),
+        },
+      ];
+
+      for (const step of story) {
+        const photos = (step.photoIds ?? []).map((photoId) => ({ photoId, token: randomBytes(16).toString("hex") }));
+        const messages: LineMessage[] = [
+          { type: "text", text: step.body },
+          ...photos.map(({ token }) => {
+            const url = `http://localhost:3000/api/line/photo/${token}`;
+            return { type: "image" as const, originalContentUrl: url, previewImageUrl: url };
+          }),
+        ];
+        // The outbox is the proof of the wire format: push exactly what the
+        // seam would have pushed, in story order.
+        await transport.push("dev-token", lineUserId, messages);
+        if (step.kind === "QUOTATION") continue; // its row already exists
+        const row = await prismaUnscoped.lineUpdate.create({
+          data: {
+            shopId,
+            caseId: repairCase.id,
+            customerId: vehicle.primaryCustomerId,
+            lineUserId,
+            recipientName: vehicle.primaryCustomer.name,
+            bodyText: step.body,
+            kind: step.kind,
+            jobId: step.jobId ?? null,
+            deliveryStatus: "SENT",
+            lineRequestId: "staged",
+            sentByStaffId: step.kind === "DELIVERED" ? manager.id : advisor.id,
+            sentAt: step.sentAt,
+            photos: {
+              create: photos.map(({ photoId, token }, index) => ({ photoId, sortOrder: index, publicToken: token })),
+            },
+          },
+        });
+        await prismaUnscoped.caseEvent.create({
+          data: {
+            shopId,
+            caseId: repairCase.id,
+            type: "LINE_UPDATE_SENT",
+            lineUpdateId: row.id,
+            subjectName: vehicle.primaryCustomer.name,
+            actorStaffId: step.kind === "DELIVERED" ? manager.id : advisor.id,
+            at: step.sentAt,
+          },
+        });
+      }
+      console.log(`  · the customer's whole story — ${story.length} pushes on ${LINE_OUTBOX_PATH}`);
+    }
+
     console.log(`staged ${reference} — ${spec.plate}`);
     return repairCase;
   }
 
   /* -------- one case per Stage -------- */
 
-  // 1 · In assessment, fresh check-in → "Open inspection"
+  // 1 · In assessment, fresh check-in → "Open inspection". Checked in from
+  //     nothing: the CHECKIN message is a not-sent line (M7.10).
   await stageCase({
     plate: "ขข1234",
     checkedInHoursAgo: 1,
     note: "เสียงดังจากล้อหน้าเวลาเบรก ขอตรวจช่วงล่างด้วย",
     odometerKm: 45_120,
     photos: 3,
+    checkinNotSent: true,
   });
 
   // 2 · In assessment, findings still being keyed in (unaccepted) → "Open inspection".
@@ -881,6 +1090,45 @@ async function main() {
     ],
     findings: [{ zone: "windshield", damageTypes: ["CRACK"], jobIndex: 1 }],
     payments: [{ payerType: "CUSTOMER", amountBaht: 1_200, method: "TRANSFER", daysAgo: 5 }],
+  });
+
+  // 11 · Delivered — the whole customer-side story (M7.10): two Jobs, the
+  //      first finished mid-visit with its photo, a Parts wait in between,
+  //      final check, ready with the amount, a thank-you with a note — as
+  //      rows on the Customer Updates log and as pushes on the outbox.
+  await stageCase({
+    plate: "งจ2468",
+    checkedInHoursAgo: 5 * 24,
+    status: "DELIVERED",
+    readyHoursAgo: 2 * 24 + 3,
+    deliveredHoursAgo: 2 * 24,
+    odometerKm: 74_310,
+    photos: 2,
+    note: "เฉี่ยวเสาลานจอด ประตูหน้าซ้าย",
+    jobs: [
+      {
+        title: "เคาะโป๊วประตูหน้าซ้าย + ทำสี",
+        status: "COMPLETED",
+        priceBaht: 6_500,
+        tech: bodyTech,
+        authorized: { channel: "LINE", againstQuotation: true },
+        parts: [{ name: "มือจับประตูหน้าซ้าย", costBaht: 850, supplier: "Mazda Spare", status: "ARRIVED" }],
+      },
+      {
+        title: "เปลี่ยนกระจกมองข้างซ้าย",
+        status: "COMPLETED",
+        priceBaht: 3_900,
+        tech: painter,
+        authorized: { channel: "LINE", againstQuotation: true },
+      },
+    ],
+    findings: [
+      { zone: "door-fl", damageTypes: ["DENT", "SCRATCH"], jobIndex: 0 },
+      { zone: "mirror-l", damageTypes: ["BROKEN"], jobIndex: 1 },
+    ],
+    quotation: { jobIndexes: [0, 1], sent: true, hoursAgo: 5 * 24 - 2 },
+    payments: [{ payerType: "CUSTOMER", amountBaht: 10_400, method: "TRANSFER", daysAgo: 2 }],
+    lineStory: { note: "ล้างรถและดูดฝุ่นให้เรียบร้อยแล้วนะคะ" },
   });
 
   /* -------- waiting Arrivals (M7.8 §12) -------- */

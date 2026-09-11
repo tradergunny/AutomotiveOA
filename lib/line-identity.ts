@@ -49,6 +49,13 @@ async function logIdentityEvent(
 export type LinkResult = {
   /** Cases whose internal timeline gained an event — revalidate them. */
   touchedCaseIds: string[];
+  /**
+   * The newly linked Customer's open cases — the ones that gained the
+   * LINKED event and now have someone to tell. M7.10 sends each one catch-up
+   * (CONTEXT.md Milestone message); a former customer's cases are in
+   * touchedCaseIds but never here.
+   */
+  linkedCaseIds: string[];
   /** The contact that lost the Customer, when relinking replaced one. */
   replaced: { id: string; displayName: string | null } | null;
   /** The Customer this contact left, when it was linked to someone else. */
@@ -114,17 +121,16 @@ export async function linkLineContactToCustomer(
     select: { displayName: true },
   });
 
-  touched.push(
-    ...(await logIdentityEvent(db, {
-      shopId: input.shopId,
-      customerId: input.customerId,
-      actorStaffId: input.actorStaffId,
-      type: "LINE_CUSTOMER_LINKED",
-      subjectName: updated.displayName,
-    })),
-  );
+  const linkedCaseIds = await logIdentityEvent(db, {
+    shopId: input.shopId,
+    customerId: input.customerId,
+    actorStaffId: input.actorStaffId,
+    type: "LINE_CUSTOMER_LINKED",
+    subjectName: updated.displayName,
+  });
+  touched.push(...linkedCaseIds);
 
-  return { touchedCaseIds: [...new Set(touched)], replaced: previous, formerCustomerId };
+  return { touchedCaseIds: [...new Set(touched)], linkedCaseIds, replaced: previous, formerCustomerId };
 }
 
 /** Remove a contact's link. Returns the cases whose timeline gained an event. */

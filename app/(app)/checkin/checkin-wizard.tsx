@@ -97,6 +97,7 @@ export function CheckinWizard({
   const [contactName, setContactName] = useState(arrival?.name ?? "");
   const [bodyType, setBodyType] = useState<BodyType | null>(arrival?.bodyType ?? null);
   const [note, setNote] = useState(arrival?.note ?? "");
+  const [customerNote, setCustomerNote] = useState("");
   const [odometer, setOdometer] = useState(
     arrival?.odometerKm != null ? String(arrival.odometerKm) : "",
   );
@@ -622,6 +623,19 @@ export function CheckinWizard({
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="checkin-customer-note">{t("customerNoteLabel")}</Label>
+            <Textarea
+              id="checkin-customer-note"
+              name="customerNote"
+              rows={2}
+              maxLength={300}
+              placeholder={t("customerNotePlaceholder")}
+              value={customerNote}
+              onChange={(e) => setCustomerNote(e.target.value)}
+            />
+            <p className="text-[10.5px] text-faint">{t("customerNoteHint")}</p>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="checkin-odometer">{t("odometerLabel")}</Label>

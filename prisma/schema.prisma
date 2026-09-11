@@ -475,6 +475,7 @@ model Job {
   createdBy         Staff               @relation("JobCreatedBy", fields: [shopId, createdByStaffId], references: [shopId, id])
   findings          Finding[]
   photos            Photo[]
+  lineUpdates       LineUpdate[]
   authorizations    JobAuthorization[]
   partLines         PartLine[]
   quotationLines    QuotationLine[]
@@ -655,6 +656,10 @@ enum CaseEventType {
   /// event, never the reverse. LINKED/UNLINKED record identity linking.
   LINE_UPDATE_SENT
   LINE_UPDATE_FAILED
+  /// M7.10 (ADR-007): the Shop could not send a system Update at all — the
+  /// gate blocked it (no channel, no linked identity, unfollowed). The row
+  /// it points at is the NOT_SENT record naming the reason.
+  LINE_UPDATE_NOT_SENT
   LINE_CUSTOMER_LINKED
   LINE_CUSTOMER_UNLINKED
   /// M7: money against the case (append-only Payments + the one-way void)…
@@ -939,6 +944,10 @@ model LineContact {
 enum LineDeliveryStatus {
   SENT
   FAILED
+  /// M7.10 (ADR-007): the Shop could not send at all — no channel, no linked
+  /// identity, unfollowed, crypto unavailable. Nothing was pushed; the row
+  /// records the gap and errorCode names the gate reason.
+  NOT_SENT
 }
 
 /// One LINE Update as SENT (CONTEXT.md): an immutable snapshot of what the
@@ -947,14 +956,35 @@ enum LineDeliveryStatus {
 /// rewrite history. Composed and sent by a human, always (ADR-003). Failures
 /// are recorded too, so "did we ever actually tell them?" stays answerable.
 /// Append-only: created complete, never touched again — no updatedAt.
+/// M7.10 (ADR-007): what a LINE Update IS, stored on the immutable row because
+/// every rule about sending ("work started once per case", "Ready subsumes the
+/// last completion", the hour-long coalescing window) and the compact log are
+/// rules about kinds. The set is closed (CONTEXT.md Milestone message /
+/// Progress notice); adding one is a CONTEXT.md change, never a one-line trigger.
+enum LineUpdateKind {
+  CHECKIN
+  QUOTATION
+  WORK_STARTED
+  WAITING_PARTS
+  PARTS_ARRIVED
+  JOB_COMPLETED
+  IN_QC
+  READY
+  DELIVERED
+  CATCH_UP
+  FREEFORM
+}
+
 model LineUpdate {
   id             String             @id @default(cuid())
   shopId         String             @map("shop_id")
   caseId         String             @map("case_id")
   /// Recipient snapshot: the Customer, the userId actually pushed to, and
-  /// the name as it read at send time.
+  /// the name as it read at send time. lineUserId is null on a NOT_SENT row
+  /// whose block was noIdentity — there was no userId to snapshot (M7.10).
   customerId     String             @map("customer_id")
-  lineUserId     String             @map("line_user_id")
+  lineUserId     String?            @map("line_user_id")
+  kind           LineUpdateKind
   recipientName  String             @map("recipient_name")
   /// Shop-authored, Thai-first, rendered verbatim — never i18n copy.
   bodyText       String             @map("body_text")
@@ -967,6 +997,13 @@ model LineUpdate {
   /// pushes the Thai summary plus the document link. Same-shop composite FK;
   /// quotations are immutable and never deleted, so a real FK is safe.
   quotationId    String?            @map("quotation_id")
+  /// M7.10: set when this Update is a JOB_COMPLETED notice — names its Job for
+  /// the coalescing guard and the log. Same shop AND case composite FK, like
+  /// Photo→Job; a completed Job is never deleted, so a real FK is safe.
+  jobId          String?            @map("job_id")
+  /// The Staff whose ACT caused the Update (M7.10, ADR-007): the composer or
+  /// Send quotation press as before, but also the QC pass that produced a
+  /// Progress notice, the Mark ready behind a Ready, the link behind a catch-up.
   sentByStaffId  String             @map("sent_by_staff_id")
   sentAt         DateTime           @default(now()) @map("sent_at")
 
@@ -974,6 +1011,7 @@ model LineUpdate {
   repairCase RepairCase        @relation(fields: [shopId, caseId], references: [shopId, id])
   customer   Customer          @relation(fields: [shopId, customerId], references: [shopId, id])
   quotation  Quotation?        @relation(fields: [shopId, quotationId], references: [shopId, id])
+  job        Job?              @relation(fields: [shopId, caseId, jobId], references: [shopId, caseId, id])
   sentBy     Staff             @relation(fields: [shopId, sentByStaffId], references: [shopId, id])
   photos     LineUpdatePhoto[]
   events     CaseEvent[]

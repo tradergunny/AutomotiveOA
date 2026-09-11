@@ -13,6 +13,7 @@ import {
   revalidateIdentityPaths,
   unlinkLineContactFromCustomer,
 } from "@/lib/line-identity";
+import { sendCatchUps } from "@/lib/line-updates";
 import { normalizePhone } from "@/lib/normalize";
 import { can } from "@/lib/permissions";
 import { tenantContext } from "@/lib/session";
@@ -268,6 +269,14 @@ export async function linkLineContact(
         actorStaffId: session.staffId,
       }),
     );
+    // The link committed; now the customer hears where their car stands —
+    // one catch-up per open case (M7.10, ADR-007). The mislink worry of
+    // ADR-005 is answered by this message: a wrongly linked person receives
+    // a message about a car that is not theirs, and says so.
+    await sendCatchUps(db, {
+      actor: { shopId: session.shopId, staffId: session.staffId },
+      caseIds: touched.linkedCaseIds,
+    });
     revalidateIdentityPaths(customerId, touched.touchedCaseIds);
     if (touched.formerCustomerId) revalidatePath(`/customers/${touched.formerCustomerId}`);
 

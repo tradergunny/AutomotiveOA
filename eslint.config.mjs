@@ -16,6 +16,9 @@ const eslintConfig = defineConfig([
     "lib/generated/**",
     // Reference artifacts and docs, not app code
     "docs/**",
+    // Claude Code session worktrees checked out inside the repo (git-excluded,
+    // which ESLint does not read) — each one is a whole second copy of the app
+    ".claude/**",
   ]),
   {
     // The tenant guard intercepts every Prisma operation generically; its

@@ -281,6 +281,7 @@ beforeAll(async () => {
       lineUserId: SHARED_LINE_USER_ID,
       recipientName: `${run} Customer A`,
       bodyText: "อัปเดตงานซ่อม",
+      kind: "FREEFORM",
       deliveryStatus: "SENT",
       sentByStaffId: staffA.id,
       photos: {
@@ -1132,6 +1133,7 @@ describe("M6 — LINE integration", () => {
           lineUserId: SHARED_LINE_USER_ID,
           recipientName: "x",
           bodyText: "x",
+          kind: "FREEFORM",
           deliveryStatus: "SENT",
           sentByStaffId: staffB.id,
         },
@@ -1147,6 +1149,7 @@ describe("M6 — LINE integration", () => {
           lineUserId: SHARED_LINE_USER_ID,
           recipientName: "x",
           bodyText: "x",
+          kind: "FREEFORM",
           deliveryStatus: "SENT",
           sentByStaffId: staffB.id,
         },
@@ -1339,6 +1342,7 @@ describe("M7.7 — the quotation document link and the Update that carried it", 
           lineUserId: SHARED_LINE_USER_ID,
           recipientName: `${run} Customer B`,
           bodyText: "ใบเสนอราคา",
+          kind: "QUOTATION",
           deliveryStatus: "SENT",
           quotationId: quotationA.id, // shop A's quotation
           sentByStaffId: staffB.id,
@@ -1356,6 +1360,7 @@ describe("M7.7 — the quotation document link and the Update that carried it", 
           lineUserId: SHARED_LINE_USER_ID,
           recipientName: `${run} Customer B`,
           bodyText: "ใบเสนอราคา",
+          kind: "QUOTATION",
           deliveryStatus: "SENT",
           quotationId: quotationA.id,
           sentByStaffId: staffB.id,
@@ -1429,5 +1434,101 @@ describe("M7.8 model is scoped (Arrival) and its public key resolves to one shop
     const rows = await resolved!.db.arrival.findMany({ where: { name: { startsWith: run } } });
     expect(rows.map((row) => row.shopId)).toEqual([shopA.id]);
     expect(await forShop(shopA.id).shop.findUnique({ where: { arrivalToken: ARRIVAL_TOKEN_B } })).toBeNull();
+  });
+});
+
+describe("M7.10 — every Update carries its kind, and a blocked send is a row too", () => {
+  const base = () => ({
+    shopId: shopA.id,
+    caseId: caseA.id,
+    customerId: customerA.id,
+    recipientName: `${run} Customer A`,
+    sentByStaffId: staffA.id,
+  });
+
+  it("a NOT_SENT row exists with no lineUserId, naming the gate reason in errorCode", async () => {
+    const row = await forShop(shopA.id).lineUpdate.create({
+      data: {
+        ...base(),
+        lineUserId: null,
+        bodyText: "รับรถแล้ว",
+        kind: "CHECKIN",
+        deliveryStatus: "NOT_SENT",
+        errorCode: "noIdentity",
+      },
+    });
+    expect(row.kind).toBe("CHECKIN");
+    expect(row.lineUserId).toBeNull();
+    expect(row.deliveryStatus).toBe("NOT_SENT");
+    expect(row.errorCode).toBe("noIdentity");
+    // Still one shop's row: the other shop cannot see it.
+    expect(await forShop(shopB.id).lineUpdate.findUnique({ where: { id: row.id } })).toBeNull();
+    expect(
+      (await forShop(shopA.id).lineUpdate.findUnique({ where: { id: row.id } }))?.kind,
+    ).toBe("CHECKIN");
+  });
+
+  it("LineUpdate→Job pins the Job to the Update's own shop AND case", async () => {
+    // Shop B's row naming shop A's Job.
+    await expect(
+      prismaUnscoped.lineUpdate.create({
+        data: {
+          shopId: shopB.id,
+          caseId: caseB.id,
+          customerId: customerB.id,
+          lineUserId: SHARED_LINE_USER_ID,
+          recipientName: `${run} Customer B`,
+          bodyText: "งานเสร็จแล้ว",
+          kind: "JOB_COMPLETED",
+          deliveryStatus: "SENT",
+          jobId: jobA.id,
+          sentByStaffId: staffB.id,
+        },
+      }),
+    ).rejects.toThrow();
+    // Same shop, but another case's Job.
+    await expect(
+      prismaUnscoped.lineUpdate.create({
+        data: {
+          ...base(),
+          caseId: caseA2.id,
+          lineUserId: SHARED_LINE_USER_ID,
+          bodyText: "งานเสร็จแล้ว",
+          kind: "JOB_COMPLETED",
+          deliveryStatus: "SENT",
+          jobId: jobA.id,
+        },
+      }),
+    ).rejects.toThrow();
+    // The Job's own case is accepted.
+    const row = await forShop(shopA.id).lineUpdate.create({
+      data: {
+        ...base(),
+        lineUserId: SHARED_LINE_USER_ID,
+        bodyText: "งานเสร็จแล้ว",
+        kind: "JOB_COMPLETED",
+        deliveryStatus: "SENT",
+        jobId: jobA.id,
+      },
+    });
+    expect(row.jobId).toBe(jobA.id);
+  });
+
+  it("a nested create through the guard cannot smuggle another shop's Job either", async () => {
+    await expect(
+      forShop(shopB.id).lineUpdate.create({
+        data: {
+          caseId: caseB.id,
+          customerId: customerB.id,
+          lineUserId: SHARED_LINE_USER_ID,
+          recipientName: `${run} Customer B`,
+          bodyText: "งานเสร็จแล้ว",
+          kind: "JOB_COMPLETED",
+          deliveryStatus: "SENT",
+          jobId: jobA.id,
+          sentByStaffId: staffB.id,
+        } as never,
+      }),
+    ).rejects.toThrow();
   });
 });

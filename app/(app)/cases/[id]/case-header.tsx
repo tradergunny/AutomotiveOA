@@ -329,6 +329,7 @@ export function CaseHeader({
             canMarkReady={canMarkReady}
             canDeliver={canDeliver}
             deliverPrimary={move.primary === "MARK_DELIVERED"}
+            recipientName={contact.name}
           />
           {moneyLine && (
             <span className={cn("num ml-auto text-[13px]", moneyLine.tone)}>
