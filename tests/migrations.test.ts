@@ -105,12 +105,21 @@ describe("migrations", () => {
     const updates = await prismaUnscoped.lineUpdate.findMany({
       where: { shopId: pilot.id, caseId: { in: state.cases } },
     });
-    // The staging script writes the sent-Offer cases' Updates directly.
+    // The staging script writes Updates directly: the sent Offers, one
+    // case's whole story (step 8) and one not-sent check-in — every row
+    // carries its kind, a QUOTATION names its document, a NOT_SENT row has
+    // no userId to snapshot.
     expect(updates.length).toBeGreaterThan(0);
+    const kinds = new Set(updates.map((update) => update.kind));
     for (const update of updates) {
-      expect(update.kind).toBe("QUOTATION");
-      expect(update.quotationId).not.toBeNull();
-      expect(update.deliveryStatus).toBe("SENT");
+      expect(update.kind).toBeTruthy();
+      if (update.kind === "QUOTATION") expect(update.quotationId).not.toBeNull();
+      if (update.deliveryStatus === "NOT_SENT") expect(update.lineUserId).toBeNull();
+      else expect(update.lineUserId).not.toBeNull();
     }
+    for (const kind of ["CHECKIN", "QUOTATION", "WORK_STARTED", "WAITING_PARTS", "PARTS_ARRIVED", "JOB_COMPLETED", "IN_QC", "READY", "DELIVERED"]) {
+      expect(kinds.has(kind as never)).toBe(true);
+    }
+    expect(updates.some((update) => update.kind === "CHECKIN" && update.deliveryStatus === "NOT_SENT")).toBe(true);
   }, 200_000);
 });

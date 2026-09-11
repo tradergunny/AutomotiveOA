@@ -79,6 +79,14 @@ npm run line:simulate -- follow
 
 The customer's **Arrival form** (M7.8) has a LINE door too: inside LINE it carries a LINE Login ID token, which the server verifies before taking the userId from it. The stand-in transport verifies tokens of the form `dev:U…` (`dev:` followed by a LINE userId) and returns that userId with a stand-in name, so the whole path is walkable without a LINE Login channel: in development the form shows a small **LINE identity (dev)** field where you paste such a token, and `npm run cases:stage` prints the one its conflicting Arrival would have carried. Enable the form in `/settings` first; the URL it mints is the one to open.
 
+**Reading the outbox as a story.** Since M7.10 ([ADR-007](docs/adr/ADR-007-system-sent-customer-updates.md)) the app sends most customer messages itself, so the outbox is the customer's side of a visit. `npm run cases:stage` writes one whole story (check-in → quotation → work started → waiting for parts → parts arrived → a finished job with its photo → final check → ready → thank-you) for the staged Mazda 2, and every case you walk in the app appends its own. One line per push, the recipient's id, the image count, and the first line of what was said:
+
+```bash
+jq -r '"\(.payload.to[-6:])  \(.payload.messages | length - 1) img  \(.payload.messages[0].text | split("\n\n")[1] | split("\n")[0])"' .data/line/outbox.jsonl
+```
+
+The outbox is append-only; delete the file to start a story over. What a customer never receives — a failed QC, a cancelled job, a price change — is exactly what is missing from it.
+
 Note that a real OA needs a publicly reachable HTTPS app for both webhooks and photo delivery, so the live pass belongs on the deployed staging URL, not `localhost`.
 
 Check-in and inspection photos are stored in `.data/photos/` (gitignored) by the local storage driver; production swaps in Vercel Blob behind the same seam ([lib/storage.ts](lib/storage.ts)) at deploy time.

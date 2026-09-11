@@ -83,18 +83,22 @@ That is the whole connection.
 
 ---
 
-## Part 5 — Prove it works end to end (about 5 minutes)
+## Part 5 — Prove it works end to end (about 10 minutes)
+
+The app now sends the customer's updates itself ([ADR-007](adr/ADR-007-system-sent-customer-updates.md)): nobody at the desk writes them. So the proof is a visit walked in the app while your own phone plays the customer.
 
 1. On your phone, open LINE, search for your **Basic ID** (`@abc1234`) and **add the account as a friend**.
 2. In the app, go back to **Settings**. Within a few seconds your own LINE profile appears under **LINE contacts**, unmatched.
    - Nothing appeared? The webhook is the usual culprit: re-check "Use webhook" is ON and the URL is exactly what the app showed. Sending a chat message to the account also triggers it.
    - It says **(no display name)**? That is fine, and nothing to fix before continuing. The app only asks LINE for a name and picture when someone newly adds the account — and creating an OA usually makes you a friend of it already, so your "add" fires nothing and the contact arrives from a chat message instead. The LINE user ID beside it is the part that matters; once you match the contact to a customer, the app shows the customer's name everywhere anyway.
-3. Press **Match to customer**, type the phone number of a customer record (use your own test customer), press **Find**, then **Match**.
-4. Open any repair case for that customer. In the **Customer timeline** panel you will find a Thai draft already written from the case's actual jobs.
-5. Edit the wording however you like, tick one or two photos, press **Preview** to see exactly what will be sent, then **Send** — and press it a second time to confirm.
-6. Your phone buzzes. The message and photos arrive in your own LINE.
+3. Press **Match to customer**, type the phone number of a customer record (use your own test customer), press **Find**, then **Match**. If that customer already has an open case, your phone buzzes right away with a **catch-up** — where the car stands now. That message is also how a wrong match shows itself: the person receives news about a car that is not theirs.
+4. **Check in** that customer's car. Your phone receives *we have your car, we will inspect it and send a quotation* — with whatever you typed in the check-in's "Note to the customer" box as its last line.
+5. Add a job or two, set prices, press **Send quotation**. The quotation arrives with a link to the numbered document.
+6. Record the response as authorized, then work the jobs: **Start work** (*work has started*), **Waiting… → Parts** with an expected date on the part line (*waiting for parts, expected …*), **Start work** again (*parts arrived, work continued*), a job through **Send to QC → QC pass** while another is still in progress (*job finished*, with that job's photos), the last job to QC (*final quality check*), and its pass (*ready to collect*, with the amount you owe — and the finished work's photos).
+7. Press **Mark delivered**, type a note, confirm. The thank-you arrives with your note as its last line and no money in it.
+8. Fail a QC, cancel a job, change a price along the way: your phone stays silent for each of those. Those stay inside the shop.
 
-If you got that message, the milestone's goal is met: *a customer's LINE receives a real update*.
+If your phone told the story without anyone at the desk writing a word, the milestone's goal is met. On the case page, the **Customer updates** section is the same story as a compact log — each line says sent, not sent (and why), or failed — and **Send a message** opens the one dialog left for writing by hand.
 
 ---
 
@@ -137,7 +141,7 @@ If you later press **Rotate link** in Settings, the plain QR stops working immed
 
 ## Things worth knowing before you hand this to staff
 
-- **From M7.10, the app sends most updates itself** ([ADR-007](adr/ADR-007-system-sent-customer-updates.md)). Your customers receive, without anyone pressing anything: a message when their car is checked in, the quotation when you send it, "work has started", "waiting for parts (expected …)" and "parts arrived", a photo message each time a job is finished, "final quality check", "ready to collect" with the amount, and a thank-you at handover. They never receive anything about a failed quality check, a cancelled job, or a price change — those stay inside the shop. Staff can still write a message by hand on the case page. Until M7.10 ships, the app behaves as Part 5 describes: a person writes and sends every message.
+- **From M7.10, the app sends most updates itself** ([ADR-007](adr/ADR-007-system-sent-customer-updates.md)). Your customers receive, without anyone pressing anything: a message when their car is checked in, the quotation when you send it, "work has started", "waiting for parts (expected …)" and "parts arrived", a photo message each time a job is finished, "final quality check", "ready to collect" with the amount, and a thank-you at handover. They never receive anything about a failed quality check, a cancelled job, or a price change — those stay inside the shop. Staff can still write a message by hand on the case page (**Send a message**). A customer with no LINE contact yet is not an error: every message they would have received is recorded as **not sent** on the case page, and matching them in Settings later sends one catch-up rather than the backlog.
 - **Expect more pushes per car.** A typical visit sends around ten messages instead of two or three. Watch the free plan's monthly allowance in OA Manager during the first month.
 - **Customers must add your account first.** There is no way around this — LINE gives no way to message someone who has not added you. A QR code poster at the counter is the practical answer; OA Manager can print one.
 - **Replies do not come into this app.** They arrive in the LINE OA inbox (the OA Manager app on a phone works well for this). Staff answer there.
