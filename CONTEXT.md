@@ -4,6 +4,8 @@ Canonical language for the workshop management + CRM platform. These terms are u
 
 ## Product shape
 
+**Direction change (founder ruling, 2026-11-08):** the product is becoming a per-vehicle repair record for in-house fleet workshops, replacing the garage product rather than running beside it. The name and brand below will change too; no new name is chosen yet. Terms in this glossary still describe the garage product until each one is revisited.
+
 The product is **AutomotiveOA** — multi-tenant B2B SaaS, built first with a pilot Shop, sold to other garages. Every domain object below belongs to exactly one Shop.
 
 Shared multi-tenant deployment: one system, one database, every row scoped to its Shop (ADR-001). One Shop = one physical location in MVP — a garage with branches runs as multiple Shops (revisit if a real pilot customer has branches).
@@ -13,6 +15,34 @@ Field-validation note: earlier ⚠ flags were converted to working assumptions o
 The staff UI is bilingual (Thai/English) from day one; customer-facing LINE messages are Thai-first. Look, feel, and frontend conventions live in docs/design/DESIGN.md.
 
 ## Core concepts
+
+### Driver
+Any person who drives a taxi or brings one in for repair. Being a Driver says nothing about owing money: a friend who brings the car in is a Driver and is recorded on the visit as the person who brought it.
+
+### Contract Holder
+The Driver responsible for a car under a contract, for a stated period. A repair is charged to whoever is the car's Contract Holder at the time of the visit, not to whoever brought it in. The car's history stays with the car when its Contract Holder changes.
+
+The cooperative's contract program is the official record of who holds a contract. If the clerk knows better at the counter, the correction changes who that one Visit charges and is flagged to the office as a **Contract Mismatch**; it does not change the car's Contract Holder, and the office settles it in their own program. A closed Visit keeps the name it charged, whatever the records say later. Working assumption pending the site visit (ruled 2026-11-08): the interviews support this only for rent-to-own; ordinary rentals, members' own cars and a car with no current contract are unconfirmed.
+
+### Visit
+One car's stay at the workshop, from arrival to the bill. A Visit is either open or closed, and nothing in between. It is opened on arrival with the car, its mileage and the symptom, and closed when the work, parts and cost are recorded and the bill is printed. Mileage is required to open a Visit unless the Clerk records why it could not be read, such as a broken display. The open Visits are the list of cars currently in the workshop. A Visit records what happened; it does not track work as it moves through the workshop (ruled 2026-11-08). Replaces Repair Case and its Stages for the fleet product.
+
+### Repair Bill
+The printed statement that closes a Visit: what was done, the parts, the cost, and who is charged. It records what a repair cost, not whether it has been paid, and it is not a receipt: official receipts stay with the cooperative's own program. Collecting the money and tracking instalments stay in the cooperative's own program (ruled 2026-11-08).
+
+### Clerk
+The person at the repair counter who opens and closes Visits and prints the Repair Bill. The Clerk enters everything about a Visit, including the work, parts and cost reported by the mechanic; mechanics do not use the system (ruled 2026-11-08). Replaces Service Advisor for the fleet product.
+
+### Repair Type
+An entry in the workshop's own short list of common repairs, in its own words, each belonging to a **Repair Group** such as suspension, engine, gearbox or brakes. The Clerk picks a Repair Type for each piece of work and may add a note, or types freely when nothing fits. Parts used are recorded in that note, with no separate parts cost (ruled 2026-11-08). Repeat repairs are recognised by matching Repair Types and Repair Groups, so freely typed work counts toward history but not toward those warnings (ruled 2026-11-08).
+
+A Repair Type may carry a suggested price. The Clerk can change the price on any Visit without approval, because the same repair can cost different amounts (a reconditioned part costs less than a new one). Every changed price stays visible to the manager, with who changed it and from what amount. Working assumption pending the site visit: how they set prices today is unconfirmed.
+
+### Workshop
+One physical repair location and the tenant for the fleet product, replacing Shop. A Workshop serves every car that comes to its counter, whichever Cooperative the car belongs to (ruled 2026-11-08).
+
+### Cooperative
+The organisation a car belongs to, such as Ratchaphruk or Boworn, shown as a label on the car. One Workshop can serve cars from several Cooperatives. Working assumption pending the site visit: that both use this Workshop, who can approve sharing each one's data, and whether each needs its own bills are unconfirmed.
 
 ### Shop
 A garage business using the platform — the tenant. Owns its customers, vehicles, repair cases, staff accounts, and LINE Official Account integration.

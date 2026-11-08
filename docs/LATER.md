@@ -13,4 +13,15 @@ Deliberate deferrals, so MVP scope stays honest. Each entry was consciously excl
 - **Insurer integration:** all insurer coordination happens outside the system in MVP; the Claim record only mirrors outcomes.
 - **Inventory/stock management:** Part Lines on Jobs only; no stock, no purchasing module.
 - **Tax invoices (ใบกำกับภาษี) / receipts:** MVP records Payments only; compliant invoice documents are a later module.
-- **Fleet/corporate accounts:** Customer stays a person with an optional company tag in MVP; organization→contacts→vehicles modeling and company billing come later.
+- **Fleet/corporate accounts:** Customer stays a person with an optional company tag in MVP; organization→contacts→vehicles modeling and company billing come later. *Replaced for the fleet product by CONTEXT.md **Driver**, **Contract Holder** and **Cooperative** (M9).*
+
+## Fleet product (parked by the M9 grill, 2026-11-08)
+
+- **Live workshop tracking:** stages and a live board. M9 records Visits as open or closed.
+- **Mechanic entry:** a phone or shared tablet in the workshop. M9 has the Clerk enter everything.
+- **Parts tracking:** separate rows, parts cost, stock and suppliers. M9 keeps parts as a note.
+- **Instalments and receipts:** M9 stops at the Repair Bill; their program keeps both. Receipt double entry is the next problem to solve if the trial shows its cost.
+- **Live connection to their contract program:** M9 uses files.
+- **Warnings and manager reports without past data:** M9 includes them only if past repairs can be imported; otherwise they follow the trial.
+- **Driver reminders on LINE:** unconfirmed demand, and some older drivers' phones have no screens.
+- **Fines handling:** check the August 2026 tax-sticker rule with them first.
