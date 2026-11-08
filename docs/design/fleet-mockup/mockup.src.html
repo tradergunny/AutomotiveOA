@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>สมุดซ่อม · ตัวอย่าง</title>
+<style>
+/*__FONTS__*/
+:root{
+  --ground:#e9e9ea;--ground-2:#c9c9cb;--card:#fff;--soft:#f4f4f5;--soft-2:#ececee;
+  --ink:#111113;--ink-2:#5c5d63;--ink-3:#77787e;--line:#e6e6e8;
+  --blue:#0a6fe6;--blue-hi:#1a86f4;--blue-lo:#0559c6;--blue-soft:#e9f2fe;
+  --warn:#ad4a08;--warn-dot:#c4560c;--warn-soft:#fdf2e8;--ok:#16a34a;--bad:#b42318;
+  --r-card:22px;--r-in:14px;
+  --shadow:0 1px 2px rgba(17,17,19,.04),0 10px 30px -18px rgba(17,17,19,.18);
+  --font:"Geist","Plex Thai",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:400 15px/1.5 var(--font);color:var(--ink);background:linear-gradient(180deg,var(--ground) 0%,var(--ground) 62%,var(--ground-2) 100%) fixed;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+::selection{background:#cfe3fd;color:var(--ink)}
+h1,h2,h3,p{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0}
+a{color:inherit;text-decoration:none}
+svg{display:block}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+*{scrollbar-width:thin;scrollbar-color:#d4d4d6 transparent}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* shell */
+.app{height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr);gap:18px;padding:16px 24px 20px}
+.top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:18px}
+.mark{width:30px;height:30px;border-radius:50%;background:linear-gradient(180deg,var(--blue-hi),var(--blue-lo));color:#fff;display:grid;place-items:center;font-size:15px;box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.nav{display:flex;gap:2px;background:#fff;border-radius:999px;padding:6px;box-shadow:var(--shadow)}
+.nav a{display:flex;align-items:center;gap:8px;padding:8px 18px;border-radius:999px;color:var(--ink-2);font-weight:500;transition:color .15s,background .15s}
+.nav a:hover{color:var(--ink);background:var(--soft)}
+.nav a.on{color:#fff;background:linear-gradient(180deg,var(--blue-hi),var(--blue-lo));box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 4px 12px -4px rgba(10,111,230,.6)}
+.who{justify-self:end;display:flex;align-items:center;gap:10px;background:#fff;border-radius:999px;padding:6px 16px 6px 6px;box-shadow:var(--shadow);line-height:1.25}
+.who small{display:block;color:var(--ink-2);font-size:12.5px}
+.who b{font-weight:500;font-size:14px}
+.ava{width:36px;height:36px;border-radius:50%;background:var(--soft-2);display:grid;place-items:center;font-weight:600;font-size:14px;color:var(--ink-2)}
+.grid{display:grid;grid-template-columns:340px minmax(0,1fr) 320px;gap:16px;min-height:0}
+.col{min-height:0;display:flex;flex-direction:column;gap:12px;overflow:auto;border-radius:var(--r-card)}
+.card{background:var(--card);border-radius:var(--r-card);padding:20px;box-shadow:var(--shadow)}
+.col>.card{flex:none}
+.side{background:var(--card);border-radius:var(--r-card);box-shadow:var(--shadow);padding:20px;display:flex;flex-direction:column;gap:14px;min-height:0;overflow:auto}
+.main{background:var(--card);border-radius:var(--r-card);box-shadow:var(--shadow);padding:24px 28px;overflow:auto;min-height:0}
+.ttl{font-size:18px;font-weight:600;line-height:1.3}
+.ttl small{font-size:14px;font-weight:400;color:var(--ink-2);margin-left:6px}
+.h3{font-size:15px;font-weight:500}
+.muted{color:var(--ink-2)}
+.tiny{font-size:13px;line-height:1.45}
+
+/* chips */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:4px 12px;border-radius:999px;background:var(--soft);font-size:13.5px;color:var(--ink-2);transition:background .15s,color .15s}
+.chip:hover{background:var(--soft-2);color:var(--ink)}
+.chip.on{background:var(--ink);color:#fff}
+.plate{display:inline-block;padding:1px 8px;border:1px solid #d9d9dc;border-radius:7px;font-weight:600;font-size:13.5px;background:#fff;white-space:nowrap}
+.dot{display:inline-flex;align-items:center;gap:6px;padding:4px 12px 4px 10px;background:var(--soft);border-radius:999px;font-size:13.5px;font-weight:500;white-space:nowrap}
+.dot::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.dot.grey::before{background:#9b9ca1}
+
+/* car cards */
+.carcard{display:block;width:100%;text-align:left;background:var(--soft);border-radius:18px;padding:10px 14px 12px;border:2px solid transparent;transition:background .15s,border-color .15s}
+.carcard:hover{background:var(--soft-2)}
+.carcard.on{background:#fff;border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-soft)}
+.carcard .pic{max-width:210px;margin:0 auto 4px}
+.carcard b{font-weight:600;font-size:15px}
+.carcard p{font-size:13px;color:var(--ink-2);line-height:1.5}
+.carhead{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.flag{display:inline-flex;align-items:center;gap:4px;color:var(--warn);font-size:12.5px;font-weight:500}
+.flag svg{width:14px;height:14px}
+.list{display:flex;flex-direction:column;gap:10px}
+
+/* plate box */
+.platebox{position:relative}
+.bigin{display:flex;align-items:center;gap:12px;background:var(--soft);border-radius:16px;padding:0 16px;height:62px;border:2px solid transparent;transition:border-color .15s,background .15s}
+.bigin:focus-within{background:#fff;border-color:var(--blue)}
+.bigin svg{color:var(--ink-3);flex:none}
+.bigin input{border:0;background:none;outline:0;width:100%;font-size:24px;font-weight:600;letter-spacing:-.01em}
+.bigin input::placeholder{font-weight:400;color:var(--ink-3);font-size:18px;letter-spacing:0}
+.iconbtn{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:var(--ink-2);flex:none}
+.iconbtn:hover{background:var(--soft-2);color:var(--ink)}
+.sug{position:absolute;left:0;right:0;top:calc(100% + 6px);background:#fff;border-radius:16px;box-shadow:0 18px 50px -14px rgba(17,17,19,.32),0 0 0 1px var(--line);padding:6px;z-index:20;max-height:320px;overflow:auto}
+.sug button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 12px;border-radius:11px}
+.sug button.hi,.sug button:hover{background:var(--soft)}
+.sug .r{margin-left:auto;color:var(--ink-2);font-size:13.5px;white-space:nowrap}
+
+/* hero */
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.h1{font-size:32px;line-height:1.2;font-weight:600;letter-spacing:-.022em}
+.sub{color:var(--ink-2);margin-top:4px}
+.hero{position:relative;max-width:640px;margin:8px auto 4px;aspect-ratio:1000/350}
+.hero svg{width:100%;height:100%;overflow:visible}
+.pin{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;background:#fff;border:3px solid var(--blue);box-shadow:0 1px 5px rgba(0,0,0,.35);transition:transform .15s}
+.pin:hover{transform:scale(1.15)}
+.pin.warn{background:var(--warn-dot);border-color:#fff;width:24px;height:24px;margin:-12px 0 0 -12px}
+.pin.on{outline:3px solid rgba(17,17,19,.14)}
+.tip{position:absolute;background:#fff;border-radius:12px;padding:9px 14px;box-shadow:0 14px 34px -12px rgba(17,17,19,.34),0 0 0 1px rgba(17,17,19,.05);font-size:13.5px;line-height:1.45;width:max-content;max-width:280px;z-index:3}
+.tip b{font-weight:500;display:block}
+.tip span{color:var(--ink-2)}
+.stats{display:flex;gap:28px;align-items:center;margin:8px 0 14px}
+.stat b{display:block;font-size:30px;font-weight:600;line-height:1.15;letter-spacing:-.02em}
+.stat span{color:var(--ink-2);font-size:14px}
+.vr{width:1px;height:44px;background:var(--line)}
+.strip{display:flex;flex-wrap:wrap;background:var(--soft);border-radius:var(--r-in);padding:11px 6px}
+.strip>div{display:flex;align-items:center;gap:8px;padding:2px 14px;border-right:1px solid #dedee0;font-size:14px;white-space:nowrap}
+.strip>div:last-child{border:0}
+.strip svg{color:var(--ink-2);width:17px;height:17px}
+.strip span{color:var(--ink-2)}
+.sect{font-weight:500;margin:20px 0 8px;display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+
+/* form */
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;margin-top:12px}
+.full{grid-column:1/-1}
+label.f{display:block;font-size:14px;color:var(--ink-2)}
+label.f .opt{color:var(--ink-3)}
+.inp{display:block;width:100%;margin-top:4px;background:var(--soft);border:2px solid transparent;border-radius:12px;padding:9px 12px;outline:0;color:var(--ink);transition:border-color .15s,background .15s}
+.inp:focus{background:#fff;border-color:var(--blue)}
+.inp::placeholder{color:var(--ink-3)}
+.inp.err{border-color:var(--bad);background:#fff}
+.msg{font-size:13px;margin-top:4px}
+.msg.err{color:var(--bad)}
+.msg.warn{color:var(--warn)}
+.link{color:var(--blue-lo);font-weight:500;font-size:13.5px}
+.link:hover{text-decoration:underline;text-underline-offset:3px}
+.holder{display:flex;align-items:center;gap:12px;background:var(--soft);border-radius:var(--r-in);padding:11px 14px}
+.holder .ava{background:#fff}
+.holder b{font-weight:600;display:block;line-height:1.3}
+.holder .act{margin-left:auto}
+.note{background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:9px 13px;font-size:13.5px;margin-top:8px;display:flex;gap:8px;align-items:flex-start}
+.note svg{width:16px;height:16px;margin-top:2px;flex:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:46px;padding:0 22px;border-radius:14px;font-weight:500;transition:filter .15s,background .15s}
+.btn.pri{color:#fff;background:linear-gradient(180deg,var(--blue-hi),var(--blue-lo));box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 6px 16px -8px rgba(10,111,230,.8)}
+.btn.pri:hover{filter:brightness(1.07)}
+.btn.sec{background:var(--soft)}
+.btn.sec:hover{background:var(--soft-2)}
+.btn.w{width:100%}
+.rowend{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:16px}
+.closebar{position:sticky;bottom:-24px;z-index:5;background:#fff;margin:12px -8px -8px;padding:10px 8px 14px;display:flex;align-items:center;gap:16px;border-top:1px solid var(--line)}
+.closebar .sum{margin-right:auto;display:flex;align-items:baseline;gap:10px}
+.closebar .sum b{font-size:28px;font-weight:600;letter-spacing:-.02em}
+
+/* lines */
+.line{background:var(--soft);border-radius:var(--r-in);padding:12px 14px;margin-bottom:8px}
+.line .a{display:grid;grid-template-columns:minmax(0,1fr) 120px 34px;gap:10px;align-items:center}
+.line b{font-weight:500}
+.line .g{font-size:13px;color:var(--ink-2)}
+.line .inp{margin:0;background:#fff;padding:7px 10px}
+.line .price{text-align:right;font-weight:600}
+.line .b{margin-top:8px}
+
+/* history */
+.vis{display:grid;grid-template-columns:104px minmax(0,1fr) auto;gap:14px;padding:12px 0;border-top:1px solid var(--line)}
+.vis:first-of-type{border-top:0}
+.vis .d{font-size:14px}
+.vis .d small{display:block;color:var(--ink-2);font-size:12.5px}
+.vis .w div+div{margin-top:2px}
+.vis .w .n{color:var(--ink-2);font-size:13px}
+.vis .c{text-align:right;font-weight:500;white-space:nowrap}
+.vis .c small{display:block;font-weight:400;color:var(--ink-2);font-size:12.5px}
+.swap{display:flex;align-items:center;gap:10px;color:var(--ink-2);font-size:13px;padding:8px 0;border-top:1px solid var(--line)}
+.swap::before,.swap::after{content:"";flex:1;height:1px;background:repeating-linear-gradient(90deg,#c9c9cc 0 4px,transparent 4px 8px)}
+.imp{display:inline-block;background:var(--soft);border-radius:6px;padding:0 6px;font-size:12px;color:var(--ink-2);margin-left:6px}
+
+/* rail */
+.bars{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:9px;height:96px;align-items:end;margin-top:12px}
+.bars i{display:block;border-radius:9px 9px 3px 3px;background:linear-gradient(180deg,#ececee,#e2e2e4)}
+.bars i.on{background:linear-gradient(180deg,var(--blue-hi),var(--blue) 70%,#5fa8f5)}
+.barl{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:9px;margin-top:6px;text-align:center;font-size:12px;color:var(--ink-2)}
+.big{font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1.2}
+.seg{display:flex;gap:3px;margin-top:10px}
+.seg i{flex:1;height:28px;border-radius:3px;background:var(--soft-2)}
+.seg i.on{background:linear-gradient(180deg,var(--blue-hi),var(--blue))}
+.rows>div{display:flex;justify-content:space-between;gap:12px;padding:5px 0}
+.rows>div span:last-child{font-weight:500}
+.rep{padding:11px 0;border-top:1px solid var(--line)}
+.rep:first-of-type{border:0;padding-top:4px}
+.rep b{font-weight:500}
+.warnhead{display:flex;align-items:center;gap:8px;color:var(--warn);font-weight:500}
+.warnhead svg{width:18px;height:18px}
+.warnrow{display:flex;justify-content:space-between;font-size:13.5px;color:var(--ink-2);padding-top:3px}
+.minirow{display:block;padding:11px 0;border-top:1px solid var(--line)}
+a.minirow:hover b{color:var(--blue-lo)}
+.minirow:first-of-type{border:0}
+.minirow b{font-weight:500;display:block}
+.minirow .m{display:flex;gap:8px;align-items:center;margin-top:3px;font-size:13px;color:var(--ink-2)}
+
+/* empty */
+.empty{text-align:center;padding:10px 0 4px}
+.empty .hero{opacity:.96;max-width:560px}
+.empty h2{font-size:22px;font-weight:600;letter-spacing:-.01em}
+.try{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:14px}
+
+/* sign in */
+.signin{height:100dvh;display:grid;grid-template-columns:1fr 1fr;padding:14px;background:#f6f6f7}
+.signin .l{display:flex;align-items:center;justify-content:center;padding:32px}
+.signin form{width:100%;max-width:420px;display:flex;flex-direction:column;gap:18px}
+.signin h1{font-size:44px;font-weight:500;letter-spacing:-.03em;line-height:1.15}
+.signin .inp{padding:13px 14px;background:#fff;border:1px solid var(--line);border-radius:14px;margin-top:6px}
+.signin .inp:focus{border:1px solid var(--blue);box-shadow:0 0 0 3px var(--blue-soft)}
+.pw{position:relative}
+.pw button{position:absolute;right:8px;top:calc(50% - 14px)}
+.signin .btn{height:52px}
+.signin .r{border-radius:26px;background:linear-gradient(170deg,#f1f1f2 0%,#dcdcde 58%,#a9a9ad 100%);display:flex;flex-direction:column;justify-content:center;padding:40px;overflow:hidden;position:relative}
+.signin .r .hero{max-width:none;width:112%;margin:0 -6% 0 -6%}
+.signin .cap{position:absolute;left:36px;bottom:32px;right:36px;font-size:26px;font-weight:500;letter-spacing:-.02em;line-height:1.3;color:#111113}
+.demo{position:fixed;left:24px;bottom:6px;font-size:11.5px;color:#3f4045;pointer-events:none}
+
+/* bill */
+.paper{max-width:680px;margin:0 auto;padding:6px 4px;font-size:15px}
+.bhead{display:flex;justify-content:space-between;gap:20px;padding-bottom:16px;border-bottom:2px solid var(--ink)}
+.bhead h1{font-size:30px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
+.bhead .ref{text-align:right;line-height:1.55}
+.bhead .ref b{font-weight:600;font-size:17px}
+.bgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:16px 0}
+.bgrid h3{font-size:13px;font-weight:400;color:var(--ink-2)}
+.bgrid b{font-weight:600;font-size:18px;display:block;line-height:1.35}
+.btab{width:100%;border-collapse:collapse}
+.btab th{font-size:13px;font-weight:400;color:var(--ink-2);text-align:left;padding:8px 0;border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
+.btab td{padding:11px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.btab .n{width:34px}
+.btab .m{text-align:right;width:120px;font-weight:500}
+.btab small{display:block;color:var(--ink-2);font-size:13.5px}
+.bsum{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:14px 0;border-bottom:2px solid var(--ink)}
+.bsum b{font-size:26px;font-weight:600}
+.bsum span{color:var(--ink-2);font-size:14px}
+.bnote{margin-top:14px;padding:10px 14px;border:1px solid var(--ink);border-radius:8px;font-weight:500;text-align:center}
+.bsign{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:44px;text-align:center;font-size:13.5px;color:var(--ink-2)}
+.bsign div{border-top:1px solid #8b8c91;padding-top:6px}
+.bfoot{margin-top:18px;font-size:12px;color:var(--ink-3);text-align:center}
+
+@media (max-height:820px){.hero.sm{max-width:270px!important;margin-top:0;margin-bottom:0}.main{padding-top:20px}.h1{font-size:28px}}
+@media (max-width:1240px){.grid{grid-template-columns:290px minmax(0,1fr) 270px}.nav a{padding:8px 13px}.h1{font-size:28px}}
+@media (max-width:1040px){
+  .app{height:auto;min-height:100dvh}
+  .grid{grid-template-columns:1fr}.col,.side,.main{overflow:visible}.main{order:-1}.closebar{bottom:0}
+  .top{grid-template-columns:1fr auto;gap:10px}.nav{grid-row:2;grid-column:1/-1;justify-self:center}
+  .signin{grid-template-columns:1fr;height:auto}.signin .r{display:none}
+}
+@media (max-width:560px){
+  .app{padding:12px 16px}.who div:last-child{display:none}.who{padding:4px}
+  .nav a{padding:8px 10px;font-size:13.5px}.nav a svg{display:none}
+  .main{padding:18px 16px}.form{grid-template-columns:1fr}.stats{gap:16px}.stat b{font-size:24px}
+  .vis{grid-template-columns:1fr auto}.vis .d{grid-column:1/-1}
+  .line .a{grid-template-columns:1fr 92px 34px}.bgrid{grid-template-columns:1fr}.tip{display:none}
+  .strip>div{border:0;white-space:normal}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@page{size:A4 portrait;margin:16mm}
+@media print{
+  html,body{height:auto;background:#fff}
+  .noprint,.demo{display:none!important}
+  .app,.grid,.main{display:block;height:auto;padding:0;margin:0;overflow:visible;box-shadow:none;background:none}
+  .paper{max-width:none;padding:0}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" id="defs"></svg>
+<div id="root"></div>
+<script>
+/* PROTOTYPE: fake data, memory only. A reload resets everything. */
+const BRAND = 'สมุดซ่อม', BRAND_INITIAL = 'ส'; // placeholder name: change here
+const WORKSHOP = 'อู่ซ่อมสหกรณ์ราชพฤกษ์';
+const TODAY = new Date('2026-11-09T10:40:00');
+const ICON = /*__ICONS__*/{};
+const ic = (n) => ICON[n] || '';
+
+const MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const thDate = (iso) => { const d = new Date(iso); return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()+543}`; };
+const daysAgo = (iso) => Math.floor((TODAY - new Date(iso)) / 864e5);
+const n0 = (n) => Number(n).toLocaleString('en-US');
+const baht = (n) => '฿' + n0(n);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const initial = (s) => (s || '?').trim().replace(/^[เแโใไ]/, '').charAt(0);
+const digits = (s) => String(s).replace(/[^\d]/g, '');
+const normPlate = (s) => String(s).replace(/\s+/g, '').toLowerCase();
+
+function bahtText(num) {
+  const D = ['ศูนย์','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'], U = ['','สิบ','ร้อย','พัน','หมื่น','แสน'];
+  const chunk = (s) => { let o = ''; const L = s.length; [...s].forEach((c, i) => { const d = +c, p = L - i - 1; if (!d) return;
+    if (p === 0 && d === 1 && L > 1) o += 'เอ็ด'; else if (p === 1 && d === 2) o += 'ยี่'; else if (!(p === 1 && d === 1)) o += D[d];
+    o += U[p]; }); return o; };
+  const s = String(Math.round(num)); if (+s === 0) return 'ศูนย์บาทถ้วน';
+  const hi = s.slice(0, -6), lo = s.slice(-6);
+  return (hi ? chunk(hi) + 'ล้าน' : '') + chunk(lo) + 'บาทถ้วน';
+}
+
+/* ---------- the taxi, drawn once per colour ---------- */
+const COLORS = {
+  green: {hi:'#3fbf73', mid:'#159a50', lo:'#0b6a37', roof:'#f4cf2c', roofHi:'#ffe56b', roofLo:'#d9ae0f'},
+  blue:  {hi:'#4d9bf0', mid:'#1267d4', lo:'#0a3f8e'},
+  pink:  {hi:'#f58fbd', mid:'#e04f94', lo:'#a82a68'},
+  orange:{hi:'#fbaa5b', mid:'#ee7a1a', lo:'#ad4e08'},
+  white: {hi:'#ffffff', mid:'#e6e7ea', lo:'#a9abb2'},
+};
+const BODY = 'M58 250C52 228 58 206 78 196C120 178 200 166 292 156C340 126 390 92 440 80C500 68 590 68 650 78C700 88 745 122 782 148C830 152 885 156 918 166C936 172 946 190 946 214L950 252C950 268 940 282 918 284L830 286A68 68 0 1 0 694 286L280 286A68 68 0 1 0 144 286L88 284C70 282 60 270 58 250Z';
+function wheel(cx, id) {
+  let slots = '';
+  for (let i = 0; i < 10; i++) slots += `<rect x="${cx-3.2}" y="240" width="6.4" height="17" rx="3.2" fill="#6c6f76" transform="rotate(${i*36} ${cx} 268)"/>`;
+  return `<circle cx="${cx}" cy="268" r="56" fill="#17181a"/><circle cx="${cx}" cy="268" r="50" fill="none" stroke="#2c2d31" stroke-width="2"/>
+  <circle cx="${cx}" cy="268" r="37" fill="url(#rim)"/><circle cx="${cx}" cy="268" r="37" fill="none" stroke="#8d9097" stroke-width="1.5"/>${slots}
+  <circle cx="${cx}" cy="268" r="10" fill="url(#hub)"/><circle cx="${cx}" cy="268" r="10" fill="none" stroke="#7b7e85"/>`;
+}
+function carSymbol(key) {
+  const c = COLORS[key], two = !!c.roof, g = `b-${key}`;
+  return `<linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${two?c.roofHi:c.hi}"/><stop offset=".3" stop-color="${two?c.roof:c.mid}"/><stop offset=".62" stop-color="${two?c.roofLo:c.mid}"/><stop offset="1" stop-color="${two?c.roofLo:c.lo}"/></linearGradient>
+  ${two?`<linearGradient id="${g}-l" x1="0" y1="186" x2="0" y2="290" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${c.hi}"/><stop offset=".35" stop-color="${c.mid}"/><stop offset="1" stop-color="${c.lo}"/></linearGradient>`:''}
+  <symbol id="car-${key}" viewBox="0 0 1000 350">
+    <ellipse cx="505" cy="326" rx="455" ry="13" fill="#000" opacity=".2" filter="url(#soft)"/>
+    <ellipse cx="212" cy="326" rx="80" ry="8" fill="#000" opacity=".28" filter="url(#soft)"/><ellipse cx="762" cy="326" rx="80" ry="8" fill="#000" opacity=".28" filter="url(#soft)"/>
+    <path d="M524 66L528 50C529 45 533 42 538 42L612 42C617 42 621 45 622 50L626 66Z" fill="#fbfbfb" stroke="#b8bac0"/>
+    <text x="575" y="60.5" text-anchor="middle" font-family="Geist,sans-serif" font-size="15" font-weight="700" letter-spacing="1" fill="#17181a">TAXI</text>
+    <circle cx="212" cy="270" r="66" fill="#0f1011"/><circle cx="762" cy="270" r="66" fill="#0f1011"/>
+    <path d="${BODY}" fill="url(#${g})"/>
+    ${two?`<clipPath id="${g}-c"><path d="${BODY}"/></clipPath><rect x="40" y="186" width="930" height="110" fill="url(#${g}-l)" clip-path="url(#${g}-c)"/>`:''}
+    <path d="M78 198C120 180 205 168 292 158C230 170 130 186 78 208Z" fill="#fff" opacity=".28"/>
+    <path d="M300 186C480 180 700 174 925 180L930 190C700 184 480 190 298 197Z" fill="#fff" opacity=".22"/>
+    <path d="M318 160C360 130 400 104 446 92C500 82 585 82 645 90C690 98 725 124 752 148C650 150 430 156 318 160Z" fill="url(#glass)"/>
+    <path d="M530 85L546 85L548 155L533 155Z" fill="#17181b"/><path d="M700 111L714 121L700 150L684 150Z" fill="#17181b"/>
+    <path d="M372 137C400 118 428 104 452 98L470 96L420 149L352 152Z" fill="#fff" opacity=".12"/><path d="M566 88L630 92L606 147L552 149Z" fill="#fff" opacity=".1"/>
+    <path d="M300 168C340 164 360 150 352 144C340 140 316 142 306 148C298 154 294 164 300 168Z" fill="#1d1e21"/>
+    <path d="M318 160C430 156 650 150 752 148" fill="none" stroke="#111214" stroke-width="2.5" opacity=".65"/>
+    <g fill="none" stroke="#0b0c0d" stroke-opacity=".42" stroke-width="1.7">
+      <path d="M322 162C316 200 304 250 296 285"/><path d="M541 155L536 285"/><path d="M750 150C745 168 716 190 704 236C700 252 698 270 697 284"/>
+    </g>
+    <rect x="456" y="178" width="44" height="10" rx="5" fill="#000" opacity=".3"/><rect x="664" y="173" width="44" height="10" rx="5" fill="#000" opacity=".3"/>
+    <path d="M280 283L694 283L694 287L280 287Z" fill="#101113" opacity=".85"/>
+    <path d="M70 203C100 188 140 180 172 176C168 192 126 208 73 216C68 212 68 207 70 203Z" fill="url(#lamp)" stroke="#7d8087" stroke-width="1"/>
+    <path d="M60 256C95 254 118 255 136 262L132 274C110 272 84 272 66 270Z" fill="#16171a"/>
+    <path d="M908 170L938 180C944 190 946 202 946 214L918 208C916 194 912 182 908 170Z" fill="url(#tail)"/>
+    <path d="M924 238L950 240L950 252L924 250Z" fill="#17181a" opacity=".55"/>
+    ${wheel(212)}${wheel(762)}
+  </symbol>`;
+}
+document.getElementById('defs').innerHTML = `<defs>
+  <filter id="soft" x="-20%" y="-200%" width="140%" height="500%"><feGaussianBlur stdDeviation="9"/></filter>
+  <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#596370"/><stop offset=".55" stop-color="#2a3038"/><stop offset="1" stop-color="#181b20"/></linearGradient>
+  <radialGradient id="rim" cx=".42" cy=".36" r=".85"><stop offset="0" stop-color="#f4f5f7"/><stop offset=".6" stop-color="#b9bcc3"/><stop offset="1" stop-color="#7e8188"/></radialGradient>
+  <radialGradient id="hub" cx=".4" cy=".35"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#9fa2a9"/></radialGradient>
+  <linearGradient id="lamp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#b6c2cf"/></linearGradient>
+  <linearGradient id="tail" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e5484d"/><stop offset="1" stop-color="#8c1d21"/></linearGradient>
+  ${Object.keys(COLORS).map(carSymbol).join('')}</defs>`;
+const carImg = (color) => `<svg viewBox="0 0 1000 350" role="img" aria-label="ภาพรถแท็กซี่"><use href="#car-${color}"/></svg>`;
+
+/* ---------- fake data ---------- */
+const GROUP_PIN = {'ช่วงล่าง':[20,78],'เครื่องยนต์':[17,56],'เกียร์':[36,70],'เบรก':[76,78],'ยาง':[76,78],'ไฟฟ้า':[12,62],'แอร์':[31,50],'ของเหลว':[24,52],'แก๊ส':[86,52],'แบตเตอรี่ EV':[50,72],'ตัวถังและสี':[52,56]};
+const TYPES = [
+  ['เปลี่ยนโช้คอัพหน้า','ช่วงล่าง',2800],['เปลี่ยนโช้คอัพหลัง','ช่วงล่าง',2400],['เปลี่ยนลูกหมากปีกนกล่าง','ช่วงล่าง',850],['เปลี่ยนบูชปีกนก','ช่วงล่าง',600],['ตั้งศูนย์ถ่วงล้อ','ช่วงล่าง',500],
+  ['ถ่ายน้ำมันเครื่องพร้อมกรอง','ของเหลว',650],['เปลี่ยนน้ำมันเกียร์','เกียร์',900],['ซ่อมเกียร์ออโต้','เกียร์',12500],
+  ['เปลี่ยนยางแท่นเครื่อง','เครื่องยนต์',1400],['เปลี่ยนสายพานหน้าเครื่อง','เครื่องยนต์',950],['ล้างหัวฉีด','เครื่องยนต์',800],['เปลี่ยนหม้อน้ำ','เครื่องยนต์',3200],
+  ['เปลี่ยนผ้าเบรกหน้า','เบรก',900],['เปลี่ยนผ้าเบรกหลัง','เบรก',800],['เจียรจานเบรก','เบรก',500],
+  ['เปลี่ยนยาง 1 เส้น','ยาง',1900],['ปะยาง','ยาง',150],
+  ['เปลี่ยนแบตเตอรี่ 12V','ไฟฟ้า',2200],['เปลี่ยนไดชาร์จ','ไฟฟ้า',3500],
+  ['เติมน้ำยาแอร์','แอร์',700],['เปลี่ยนคอมเพรสเซอร์แอร์','แอร์',6500],
+  ['ซ่อมระบบแก๊ส','แก๊ส',1800],['ตรวจโมดูลแบตเตอรี่ EV','แบตเตอรี่ EV',1500],['เคาะพ่นสีบานประตู','ตัวถังและสี',2500],
+].map(([title,group,price],id)=>({id,title,group,price}));
+const T = (title, price, note) => { const t = TYPES.find(x=>x.title===title); return {title, group:t.group, price: price ?? t.price, suggested:t.price, note:note||'', typeId:t.id}; };
+const FREE = (title, price, note) => ({title, group:null, price, suggested:null, note:note||'', free:true});
+const H = (ref,date,km,charged,lines,imported=true) => ({ref,date,km,charged,lines,imported});
+
+const SOMCHAI='สมชาย แก้วมณี', WICHAI='วิชัย ศรีสุข';
+const CARS = [
+ {plate:'ทน 5201',model:'Toyota Corolla Altis',year:2016,fuel:'แก๊ส LPG',coop:'ราชพฤกษ์',color:'green',holder:SOMCHAI,since:'2026-03-03',contract:'เช่าซื้อ',km:612480,prevHolder:WICHAI,oilDueKm:613900,history:[
+   H('V-10441','2026-10-28',611940,SOMCHAI,[T('เปลี่ยนโช้คอัพหน้า',2800,'โช้คซ้ายตัวใหม่')]),
+   H('V-10233','2026-09-02',609120,SOMCHAI,[T('เปลี่ยนลูกหมากปีกนกล่าง'),T('ถ่ายน้ำมันเครื่องพร้อมกรอง')]),
+   H('V-10017','2026-07-18',605700,SOMCHAI,[T('เปลี่ยนโช้คอัพหน้า',1900,'โช้คซ้าย ของซ่อมสภาพ')]),
+   H('V-09842','2026-05-02',601300,SOMCHAI,[T('เปลี่ยนยางแท่นเครื่อง')]),
+   H('V-09610','2026-03-12',596880,SOMCHAI,[T('ถ่ายน้ำมันเครื่องพร้อมกรอง'),T('ตั้งศูนย์ถ่วงล้อ')]),
+   H('V-09288','2026-01-20',591400,WICHAI,[T('เปลี่ยนโช้คอัพหน้า',2800,'โช้คขวาตัวใหม่')]),
+   H('V-08990','2025-11-29',584210,WICHAI,[T('ซ่อมเกียร์ออโต้')]),
+ ]},
+ {plate:'ทก 7733',model:'Toyota Corolla Altis',year:2015,fuel:'แก๊ส NGV',coop:'ราชพฤกษ์',color:'blue',holder:'ประยุทธ ทองดี',since:'2025-06-10',contract:'เช่าซื้อ',km:688210,oilDueKm:691000,history:[H('V-10390','2026-10-11',686900,'ประยุทธ ทองดี',[T('ซ่อมระบบแก๊ส')])]},
+ {plate:'ทข 1946',model:'Toyota Vios',year:2017,fuel:'แก๊ส LPG',coop:'ราชพฤกษ์',color:'pink',holder:'สุนีย์ บุญมา',since:'2024-11-01',contract:'เช่า',km:540115,oilDueKm:544000,history:[H('V-10102','2026-08-14',533900,'สุนีย์ บุญมา',[T('เติมน้ำยาแอร์')])]},
+ {plate:'ทค 4210',model:'Toyota Corolla Altis',year:2014,fuel:'แก๊ส NGV',coop:'ราชพฤกษ์',color:'orange',holder:'อำนาจ พูลสวัสดิ์',since:'2026-08-20',contract:'เช่าซื้อ',km:742380,prevHolder:'มานะ ใจดี',oilDueKm:743500,history:[H('V-10300','2026-09-25',738100,'อำนาจ พูลสวัสดิ์',[T('เปลี่ยนยางแท่นเครื่อง')])]},
+ {plate:'ทน 8867',model:'BYD e6',year:2022,fuel:'ไฟฟ้า',coop:'บวร',color:'white',holder:'ธนพล ศรีเมือง',since:'2025-02-14',contract:'เช่าซื้อ',km:188400,history:[H('V-10211','2026-08-30',181200,'ธนพล ศรีเมือง',[T('ตรวจโมดูลแบตเตอรี่ EV')])]},
+ {plate:'ทจ 3051',model:'Toyota Vios',year:2018,fuel:'แก๊ส LPG',coop:'บวร',color:'green',holder:null,since:null,contract:'สมาชิก',km:402760,oilDueKm:403000,history:[H('V-10055','2026-07-29',397200,'บุญส่ง มีทรัพย์',[T('ถ่ายน้ำมันเครื่องพร้อมกรอง')])]},
+ {plate:'ทฉ 6620',model:'Toyota Corolla Altis',year:2016,fuel:'แก๊ส LPG',coop:'ราชพฤกษ์',color:'blue',holder:'จิราพร คำแก้ว',since:'2026-05-05',contract:'เช่าซื้อ',km:598300,oilDueKm:600500,history:[]},
+ {plate:'ทพ 2288',model:'Toyota Corolla Altis',year:2015,fuel:'แก๊ส NGV',coop:'ราชพฤกษ์',color:'pink',holder:'ไพศาล รุ่งเรือง',since:'2023-09-12',contract:'เช่าซื้อ',km:655020,oilDueKm:658000,history:[]},
+ {plate:'ทร 9014',model:'Toyota Vios',year:2017,fuel:'แก๊ส LPG',coop:'บวร',color:'orange',holder:'เกรียงไกร ดวงดี',since:'2026-01-08',contract:'เช่า',km:501240,oilDueKm:503000,history:[]},
+];
+const car = (p) => CARS.find(c=>c.plate===p);
+let seq = 10503;
+const openV = (ref,plate,time,dayOffset,symptom,km,lines=[],extra={}) => ({ref,plate,opened:{time,dayOffset},symptom,km,mileageReason:null,brought:'',charged:car(plate).holder||extra.charged,mismatch:false,status:'open',lines,date:'2026-11-09',...extra});
+const S = {
+  signedIn:!!location.hash && !location.hash.startsWith('#/signin'), showPw:false,
+  plateQ:'', sugI:0, draft:null,
+  lineQ:'', lineI:0, lineErr:false,
+  coop:'ทั้งหมด', carQ:'', pinGroup:null,
+  visits:[
+    openV('V-10498','ทค 4210','16:20',-1,'เครื่องสั่นตอนรอบเดินเบา',742380),
+    openV('V-10499','ทก 7733','07:50',0,'เบรกมีเสียงดัง',688210,[T('เปลี่ยนผ้าเบรกหน้า')]),
+    openV('V-10500','ทข 1946','08:15',0,'แอร์ไม่เย็น',540115),
+    openV('V-10501','ทน 8867','09:05',0,'ชาร์จไฟไม่เข้า',188400),
+    openV('V-10502','ทจ 3051','09:30',0,'ถึงกำหนดถ่ายน้ำมันเครื่อง',402760,[],{charged:'บุญส่ง มีทรัพย์',mismatch:true}),
+    openV('V-10503','ทฉ 6620','10:10',0,'ยางหน้าขวาแตก',598300),
+    {ref:'V-10497',plate:'ทพ 2288',opened:{time:'08:05',dayOffset:0},closedAt:'10:05',symptom:'ลูกหมากหลวม ล้อสั่น',km:655020,brought:'',charged:'ไพศาล รุ่งเรือง',status:'closed',date:'2026-11-09',lines:[T('เปลี่ยนลูกหมากปีกนกล่าง'),T('ตั้งศูนย์ถ่วงล้อ')]},
+    {ref:'V-10496',plate:'ทร 9014',opened:{time:'07:40',dayOffset:0},closedAt:'09:20',symptom:'ถ่ายน้ำมันเครื่อง ผ้าเบรกหมด',km:501240,brought:'พี่ชาย',charged:'เกรียงไกร ดวงดี',status:'closed',date:'2026-11-09',lines:[T('ถ่ายน้ำมันเครื่องพร้อมกรอง'),T('เปลี่ยนผ้าเบรกหน้า',750,'ผ้าเบรกยี่ห้อทั่วไป')]},
+  ],
+};
+const visit = (ref) => S.visits.find(v=>v.ref===ref);
+const openVisits = () => S.visits.filter(v=>v.status==='open');
+const closedVisits = () => S.visits.filter(v=>v.status==='closed');
+const sum = (lines) => lines.reduce((a,l)=>a+(+l.price||0),0);
+const allHistory = (c) => [...S.visits.filter(v=>v.status==='closed'&&v.plate===c.plate).map(v=>({ref:v.ref,date:v.date,km:v.km,charged:v.charged,lines:v.lines,imported:false,mileageReason:v.mileageReason})),...c.history].sort((a,b)=>b.date.localeCompare(a.date));
+
+/* A group warns at 3 matching repairs in 180 days. Freely typed work never counts. */
+function repeats(c) {
+  const by = {};
+  allHistory(c).forEach(h => h.lines.forEach(l => { if (!l.group || l.group==='ของเหลว') return; (by[l.group] ||= []).push({date:h.date,title:l.title,price:+l.price,note:l.note}); }));
+  return Object.entries(by).map(([group,items])=>({group,items,recent:items.filter(i=>daysAgo(i.date)<=180)})).filter(g=>g.recent.length>=3).sort((a,b)=>b.recent.length-a.recent.length);
+}
+function touched(c) { const s = new Set(); allHistory(c).forEach(h=>{ if (daysAgo(h.date)<=365) h.lines.forEach(l=>{ if (l.group && GROUP_PIN[l.group]) s.add(l.group); }); }); return [...s]; }
+
+/* ---------- small pieces ---------- */
+const plateChip = (p) => `<span class="plate">${esc(p)}</span>`;
+const since = (o) => o.dayOffset===0 ? `วันนี้ ${o.time}` : `เมื่อวาน ${o.time}`;
+function shell(tab, body) {
+  const tabs = [['counter','เคาน์เตอร์','#/counter'],['car','รถ','#/cars'],['bill','บิลซ่อม','#/bills']];
+  return `<div class="app"><header class="top noprint">
+    <a class="brand" href="#/counter"><span class="mark">${BRAND_INITIAL}</span>${BRAND}</a>
+    <nav class="nav" aria-label="เมนูหลัก">${tabs.map(([k,l,h])=>`<a href="${h}" class="${k===tab?'on':''}" ${k===tab?'aria-current="page"':''}>${ic(k)}${l}</a>`).join('')}</nav>
+    <button class="who" data-act="signout" title="ออกจากระบบ"><span class="ava">น</span><div style="text-align:left"><b>นิภา สุขเจริญ</b><small>เจ้าหน้าที่เคาน์เตอร์</small></div></button>
+  </header><div class="grid">${body}</div></div><div class="demo noprint">ข้อมูลตัวอย่างทั้งหมด</div>`;
+}
+function openList(activeRef) {
+  const list = openVisits().filter(v=>S.coop==='ทั้งหมด'||car(v.plate).coop===S.coop);
+  return `<aside class="side noprint" aria-label="รถในอู่">
+    <div class="ttl">รถในอู่<small>${openVisits().length} คัน</small></div>
+    ${coopChips()}
+    <div class="list">${list.map(v=>{ const c=car(v.plate), rep=repeats(c).length; return `<a class="carcard ${v.ref===activeRef?'on':''}" href="#/visit/${v.ref}">
+      <div class="pic">${carImg(c.color)}</div>
+      <div class="carhead"><b>${esc(v.plate)}</b>${rep?`<span class="flag">${ic('alert')}ซ่อมซ้ำ</span>`:''}</div>
+      <p>${esc(v.symptom)}</p><p>${since(v.opened)} · ${esc(v.charged||'ไม่มีชื่อ')}</p></a>`; }).join('') || `<p class="muted tiny">ไม่มีรถของสหกรณ์นี้ในอู่</p>`}</div>
+  </aside>`;
+}
+const coopChips = () => `<div class="chips">${['ทั้งหมด','ราชพฤกษ์','บวร'].map(x=>`<button class="chip ${S.coop===x?'on':''}" data-act="coop" data-v="${x}">${x}</button>`).join('')}</div>`;
+
+/* ---------- counter ---------- */
+function plateMatches(q) {
+  const nq = normPlate(q), dq = digits(q); if (!nq) return [];
+  return CARS.filter(c=>normPlate(c.plate).includes(nq) || (dq && dq===nq && digits(c.plate).includes(dq)));
+}
+function sugHTML() {
+  if (!S.plateQ || S.draft) return '';
+  const m = plateMatches(S.plateQ);
+  const rows = m.map((c,i)=>{ const o = openVisits().find(v=>v.plate===c.plate); return `<button type="button" class="${i===S.sugI?'hi':''}" data-act="pick" data-v="${esc(c.plate)}">${plateChip(c.plate)}<span>${esc(c.model)}</span><span class="r">${o?'อยู่ในอู่':esc(c.holder||'ไม่มีผู้ถือสัญญา')}</span></button>`; });
+  if (!m.length) rows.push(`<button type="button" class="${m.length===S.sugI?'hi':''}" data-act="newcar">${ic('plus')}<span>เพิ่มรถใหม่ <b style="font-weight:600">${esc(S.plateQ)}</b></span><span class="r">ไม่พบในรายการ</span></button>`);
+  return `<div class="sug" role="listbox">${rows.join('')}</div>`;
+}
+function plateBox() {
+  return `<div class="platebox"><label class="sr" for="plate">เลขทะเบียน</label><div class="bigin">${ic('search')}
+    <input id="plate" autocomplete="off" placeholder="พิมพ์เลขทะเบียน เช่น 5201" value="${esc(S.plateQ)}" data-in="plate">
+    ${S.plateQ?`<button class="iconbtn" data-act="clearplate" aria-label="ล้าง">${ic('x')}</button>`:''}</div><div id="sug">${sugHTML()}</div></div>`;
+}
+function counterEmpty() {
+  return `<div class="empty"><div class="hero">${carImg('green')}</div>
+    <h2>รถคันไหนเข้ามา</h2><p class="muted" style="margin-top:4px">พิมพ์เลขทะเบียน แล้วระบบจะแสดงรถ ผู้ถือสัญญา และงานซ่อมล่าสุด</p>
+    <div class="try"><button class="chip" data-act="pick" data-v="ทน 5201">รถที่ซ่อมซ้ำ · 5201</button><button class="chip" data-act="pick" data-v="ทร 9014">รถปกติ · 9014</button></div></div>`;
+}
+function draftForm() {
+  const d = S.draft, c = d.car, below = !d.noKm && d.km && c.km && +digits(d.km) < c.km;
+  const noHolder = !c.holder;
+  const holderBlock = (d.editing || noHolder) ? `<label class="f">ชื่อที่จะเรียกเก็บ
+      <input class="inp ${d.err.holder?'err':''}" id="hname" data-in="d.holderName" value="${esc(d.holderName)}" placeholder="พิมพ์ชื่อผู้รับผิดชอบค่าซ่อม"></label>
+      ${d.err.holder?`<p class="msg err">กรุณาใส่ชื่อที่จะเรียกเก็บ</p>`:''}
+      <div class="note">${ic('alert')}<span>${noHolder?'รถคันนี้ไม่มีผู้ถือสัญญาในรายการ':'ผู้ถือสัญญาในรายการคือ '+esc(c.holder)}. งานนี้จะเรียกเก็บตามชื่อที่พิมพ์ และแจ้งสำนักงานให้ตรวจสอบ</span></div>
+      ${noHolder?'':`<button type="button" class="link" style="margin-top:6px" data-act="undoholder">ใช้ชื่อ ${esc(c.holder)}</button>`}`
+    : `<div class="holder"><span class="ava">${esc(initial(c.holder))}</span><div><b>${esc(c.holder)}</b><span class="muted tiny">ผู้ถือสัญญา · ${esc(c.contract)} · ตั้งแต่ ${thDate(c.since)}</span></div>
+       <button type="button" class="act link" data-act="editholder">ชื่อไม่ถูกต้อง</button></div>`;
+  return `<div style="margin-top:16px" class="head"><div><h1 class="h1">${esc(c.model)}</h1><p class="sub">${esc(c.plate)} · สหกรณ์${esc(c.coop)} · ${esc(c.fuel)}</p></div>${d.isNew?`<span class="dot grey">รถใหม่</span>`:''}</div>
+  <div class="hero sm" style="max-width:430px;margin-top:4px">${carImg(c.color)}</div>
+  <form data-form="open" novalidate>
+    ${holderBlock}
+    <div class="form">
+      <div><label class="f">เลขไมล์ ${c.km?`<span class="opt">· ครั้งก่อน ${n0(c.km)}</span>`:''}
+        ${d.noKm?`<select class="inp ${d.err.km?'err':''}" id="kmr" data-in="d.reason"><option value="">เลือกเหตุผล</option>${['หน้าจอไมล์เสีย','เข็มไมล์ไม่ทำงาน','อ่านไม่ออก','อื่น ๆ'].map(r=>`<option ${d.reason===r?'selected':''}>${r}</option>`).join('')}</select>`
+        :`<input class="inp ${d.err.km?'err':''}" id="km" inputmode="numeric" data-in="d.km" value="${esc(d.km)}" placeholder="เช่น ${n0((c.km||100000)+540)}">`}</label>
+        <div id="kmmsg">${d.err.km?`<p class="msg err">${d.noKm?'กรุณาเลือกเหตุผล':'กรุณาใส่เลขไมล์ หรือบอกเหตุผลที่อ่านไม่ได้'}</p>`:below?`<p class="msg warn">ต่ำกว่าครั้งก่อน กรุณาตรวจอีกครั้ง</p>`:''}</div>
+        <button type="button" class="link" style="margin-top:4px" data-act="togglekm">${d.noKm?'กลับไปใส่เลขไมล์':'อ่านเลขไมล์ไม่ได้'}</button></div>
+      <label class="f">ผู้นำรถมา <span class="opt">(ไม่บังคับ)</span><input class="inp" data-in="d.brought" value="${esc(d.brought)}" placeholder="ถ้าไม่ใช่ผู้ถือสัญญา"></label>
+      <div class="full"><label class="f">อาการ<input class="inp ${d.err.symptom?'err':''}" id="sym" data-in="d.symptom" value="${esc(d.symptom)}" placeholder="เช่น ล้อหน้าซ้ายมีเสียงดังตอนเลี้ยว"></label>
+        ${d.err.symptom?`<p class="msg err">กรุณาใส่อาการ</p>`:''}</div>
+    </div>
+    <div class="rowend"><button class="btn pri" type="submit">เปิดงาน${ic('right')}</button></div>
+  </form>`;
+}
+function rail() {
+  if (S.draft && !S.draft.isNew) return carRail(S.draft.car);
+  const week=[34,38,31,36,40,22,14], lb=['อ.','พ.','พฤ.','ศ.','ส.','อา.','จ.'], mx=Math.max(...week);
+  const closed=closedVisits(), inToday=closed.length+openVisits().filter(v=>v.opened.dayOffset===0).length+6;
+  const done=closed.length+6;
+  return `<aside class="col noprint" aria-label="สรุปวันนี้">
+    <div class="card"><div class="h3">รถเข้าอู่ 7 วันล่าสุด</div><div class="big" style="margin-top:6px">215 <span class="muted tiny" style="font-weight:400;letter-spacing:0">คัน · วันนี้ ${inToday} คัน</span></div>
+      <div class="bars">${week.map((w,i)=>`<i class="${i===6?'on':''}" style="height:${w/mx*100}%"></i>`).join('')}</div><div class="barl">${lb.map(l=>`<span>${l}</span>`).join('')}</div></div>
+    <div class="card"><div class="h3">ปิดงานวันนี้</div><div class="big" style="margin-top:6px">${done} <span class="muted tiny" style="font-weight:400;letter-spacing:0">จาก ${inToday} คันที่เข้ามา</span></div>
+      <div class="seg">${Array.from({length:inToday},(_,i)=>`<i class="${i<done?'on':''}"></i>`).join('')}</div></div>
+    <div class="card"><div class="sect" style="margin:0 0 4px">บิลล่าสุด<a class="link" href="#/bills">ดูทั้งหมด</a></div>
+      ${closed.slice().reverse().slice(0,3).map(v=>`<a class="minirow" href="#/bill/${v.ref}"><b>${esc(v.lines[0].title)}${v.lines.length>1?` และอีก ${v.lines.length-1} งาน`:''}</b><span class="m">${plateChip(v.plate)} ${v.closedAt} · ${baht(sum(v.lines))}</span></a>`).join('')}</div>
+  </aside>`;
+}
+function repeatCard(c, note=true) {
+  const r = repeats(c); if (!r.length) return '';
+  return `<div class="card"><div class="warnhead">${ic('alert')}ซ่อมซ้ำ</div>
+    ${r.map(g=>`<div class="rep"><b>${esc(g.group)} ซ่อม ${g.recent.length} ครั้งใน 6 เดือน</b>
+      ${g.recent.map(i=>`<div class="warnrow"><span>${esc(i.title)}</span><span>${thDate(i.date).replace(/ \d{4}$/,'')}</span></div>`).join('')}</div>`).join('')}
+    ${note?`<p class="muted tiny" style="margin-top:8px">นับจากงานที่เลือกจากรายการเท่านั้น งานที่พิมพ์เองไม่นับ</p>`:''}</div>`;
+}
+function carRail(c) {
+  const h = allHistory(c).slice(0,4);
+  return `<aside class="col noprint" aria-label="ประวัติย่อ">${repeatCard(c,false)}
+    <div class="card"><div class="sect" style="margin:0 0 4px">ซ่อมล่าสุด<a class="link" href="#/car/${encodeURIComponent(c.plate)}">ดูทั้งหมด</a></div>
+    ${h.length?h.map(v=>`<div class="minirow"><b>${esc(v.lines[0].title)}${v.lines.length>1?` และอีก ${v.lines.length-1} งาน`:''}</b><span class="m">${thDate(v.date)} · ${baht(sum(v.lines))}</span></div>`).join(''):`<p class="muted tiny">ยังไม่มีประวัติในระบบ</p>`}</div></aside>`;
+}
+function counterPage() {
+  const already = S.draft && openVisits().find(v=>v.plate===S.draft.car.plate);
+  return shell('counter', `${openList()}<main class="main">${plateBox()}
+    ${already?`<div class="note" style="margin-top:16px">${ic('alert')}<span>รถคันนี้มีงานเปิดอยู่แล้ว · <a class="link" href="#/visit/${already.ref}">ไปที่งาน ${already.ref}</a></span></div>`:S.draft?draftForm():(S.plateQ?'':counterEmpty())}
+  </main>${rail()}`);
+}
+
+/* ---------- open visit ---------- */
+function lineSug() {
+  const q = S.lineQ.trim(); if (!q) return '';
+  const m = TYPES.filter(t=>t.title.includes(q)||t.group.includes(q)).slice(0,6);
+  const rows = m.map((t,i)=>`<button type="button" class="${i===S.lineI?'hi':''}" data-act="addtype" data-v="${t.id}"><span>${esc(t.title)}</span><span class="r">${esc(t.group)} · ${baht(t.price)}</span></button>`);
+  rows.push(`<button type="button" class="${m.length===S.lineI?'hi':''}" data-act="addfree">${ic('pencil')}<span>พิมพ์เอง: <b style="font-weight:600">${esc(q)}</b></span><span class="r">ไม่นับในคำเตือนซ่อมซ้ำ</span></button>`);
+  return `<div class="sug">${rows.join('')}</div>`;
+}
+function lineChanged(l) { return l.suggested!=null && +l.price!==l.suggested ? `แก้จาก ${baht(l.suggested)} · ผู้จัดการเห็นรายการนี้` : ''; }
+function visitPage(v) {
+  const c = car(v.plate), reps = repeats(c);
+  const rows = v.lines.map((l,i)=>{ const rep = l.group && reps.find(r=>r.group===l.group);
+    return `<div class="line"><div class="a"><div><b>${esc(l.title)}</b><div class="g">${l.free?'พิมพ์เอง':esc(l.group)}</div></div>
+      <input class="inp price" inputmode="numeric" aria-label="ราคา" data-in="price" data-i="${i}" value="${esc(n0(l.price||0))}">
+      <button class="iconbtn" aria-label="ลบ" data-act="rmline" data-i="${i}">${ic('trash')}</button></div>
+      <div class="b"><input class="inp" aria-label="หมายเหตุอะไหล่" data-in="note" data-i="${i}" value="${esc(l.note)}" placeholder="หมายเหตุอะไหล่ เช่น ของใหม่ ของซ่อมสภาพ"></div>
+      <p class="msg warn" id="chg${i}">${lineChanged(l)}</p>
+      ${rep?`<div class="note">${ic('alert')}<span>${esc(rep.group)}ของรถคันนี้ซ่อมไปแล้ว ${rep.recent.length} ครั้งใน 6 เดือน</span></div>`:''}</div>`; }).join('');
+  return shell('counter', `${openList(v.ref)}<main class="main">
+    <div class="head"><div><h1 class="h1">${esc(c.model)}</h1><p class="sub">${esc(v.plate)} · สหกรณ์${esc(c.coop)} · งาน ${esc(v.ref)}</p></div><span class="dot">อยู่ในอู่</span></div>
+    <div class="hero sm" style="max-width:400px">${carImg(c.color)}</div>
+    <div class="strip"><div>${ic('gauge')}<b style="font-weight:500">${v.km?n0(v.km)+' กม.':esc(v.mileageReason)}</b></div><div>${ic('clock')}${since(v.opened)}</div><div>${ic('wrench')}${esc(v.symptom)}</div></div>
+    <div class="holder" style="margin-top:10px"><span class="ava">${esc(initial(v.charged))}</span><div><b>${esc(v.charged)}</b><span class="muted tiny">เรียกเก็บ${v.mismatch?' · ชื่อไม่ตรงสัญญา แจ้งสำนักงานแล้ว':' · ผู้ถือสัญญา'}${v.brought?` · ผู้นำรถมา ${esc(v.brought)}`:''}</span></div></div>
+    <div class="sect">งานที่ทำ</div>
+    ${rows}
+    <div class="platebox"><div class="bigin" style="height:50px;border-radius:12px">${ic('plus')}<input id="lineq" style="font-size:16px;font-weight:400" autocomplete="off" placeholder="พิมพ์งาน เช่น โช้ค เบรก น้ำมัน" data-in="lineq" value="${esc(S.lineQ)}" aria-label="เพิ่มงาน"></div><div id="linesug">${lineSug()}</div></div>
+    ${S.lineErr?`<p class="msg err">เพิ่มงานอย่างน้อย 1 รายการก่อนปิดงาน</p>`:''}
+    <div class="closebar"><div class="sum"><span class="muted">รวม</span><b id="tot">${baht(sum(v.lines))}</b></div><a class="btn sec" href="#/car/${encodeURIComponent(v.plate)}">ดูประวัติรถ</a><button class="btn pri" data-act="close" data-v="${v.ref}">${ic('printer')}ปิดงานและออกบิล</button></div>
+  </main>${carRail(c)}`);
+}
+
+/* ---------- cars ---------- */
+function carsSide(active) {
+  const q = normPlate(S.carQ);
+  const list = CARS.filter(c=>(S.coop==='ทั้งหมด'||c.coop===S.coop)&&(!q||normPlate(c.plate).includes(q)||normPlate(c.holder||'').includes(q)));
+  return `<aside class="side noprint" aria-label="รถทั้งหมด"><div class="ttl">รถทั้งหมด<small>${CARS.length} คัน</small></div>
+    <div class="bigin" style="height:42px;border-radius:12px;padding:0 12px">${ic('search')}<input id="carq" style="font-size:15px;font-weight:400" data-in="carq" value="${esc(S.carQ)}" placeholder="ค้นหาทะเบียนหรือชื่อ" aria-label="ค้นหารถ"></div>
+    ${coopChips()}<div class="list">${list.map(c=>`<a class="carcard ${c.plate===active?'on':''}" href="#/car/${encodeURIComponent(c.plate)}"><div class="pic">${carImg(c.color)}</div>
+      <div class="carhead"><b>${esc(c.plate)} · ${esc(c.model.replace('Toyota ','').replace('Corolla ',''))}</b>${repeats(c).length?`<span class="flag">${ic('alert')}ซ่อมซ้ำ</span>`:''}</div>
+      <p>${esc(c.fuel)} · ${n0(c.km)} กม.</p><p>${esc(c.holder||'ไม่มีผู้ถือสัญญา')}</p></a>`).join('')||`<p class="muted tiny">ไม่พบรถ</p>`}</div></aside>`;
+}
+function carPage(c) {
+  const hist = allHistory(c), reps = repeats(c), tg = touched(c);
+  const sel = S.pinGroup && tg.includes(S.pinGroup) ? S.pinGroup : (reps[0]?.group || tg[0]);
+  const yearH = hist.filter(h=>daysAgo(h.date)<=365);
+  const cost = {}; yearH.forEach(h=>h.lines.forEach(l=>{ const g=l.group||'อื่น ๆ'; cost[g]=(cost[g]||0)+ +l.price; }));
+  const total = Object.values(cost).reduce((a,b)=>a+b,0);
+  const open = openVisits().find(v=>v.plate===c.plate);
+  // last six calendar months
+  const mths=[]; for(let i=5;i>=0;i--){ const d=new Date(TODAY.getFullYear(),TODAY.getMonth()-i,1); const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); mths.push({l:MONTHS[d.getMonth()],n:hist.filter(h=>h.date.startsWith(key)).length}); }
+  const mx=Math.max(1,...mths.map(m=>m.n));
+  const pins = tg.map(g=>{ const [x,y]=GROUP_PIN[g]; const isR=reps.find(r=>r.group===g); return `<button class="pin ${isR?'warn':''} ${g===sel?'on':''}" style="left:${x}%;top:${y}%" data-act="pin" data-v="${esc(g)}" aria-label="${esc(g)}"></button>`; }).join('');
+  let tip='';
+  if (sel) { const [x,y]=GROUP_PIN[sel], r=reps.find(g=>g.group===sel); const rel=hist.flatMap(h=>h.lines.filter(l=>l.group===sel).map(l=>({...l,date:h.date})));
+    const pos = x>55 ? `right:${100-x+2}%` : `left:${Math.max(x-8,0)}%`, vp = y>60 ? `bottom:${100-y+7}%` : `top:${y+8}%`;
+    tip=`<div class="tip" style="${pos};${vp}"><b>${esc(sel)} — ${r?`ซ่อม ${r.recent.length} ครั้งใน 6 เดือน`:`ซ่อม ${rel.length} ครั้งในรอบปี`}</b><span>ล่าสุด ${thDate(rel[0].date)} · ${baht(rel.reduce((a,l)=>a+ +l.price,0))} รวม</span></div>`; }
+  const oilLeft = c.oilDueKm ? c.oilDueKm - c.km : null;
+  // history with holder-change divider
+  let prev=null, hrows='';
+  hist.forEach(h=>{ if(prev && prev!==h.charged && c.prevHolder===h.charged){ hrows+=`<div class="swap">เปลี่ยนผู้ถือสัญญาเป็น ${esc(c.holder)} · ${thDate(c.since)}</div>`; }
+    prev=h.charged;
+    hrows+=`<div class="vis"><div class="d">${thDate(h.date)}<small>${h.km?n0(h.km)+' กม.':esc(h.mileageReason||'')}</small></div>
+      <div class="w">${h.lines.map(l=>`<div>${esc(l.title)}${l.note?`<span class="n"> · ${esc(l.note)}</span>`:''}</div>`).join('')}<div class="n">เรียกเก็บ ${esc(h.charged)}${h.imported?'<span class="imp">นำเข้า</span>':''}</div></div>
+      <div class="c">${baht(sum(h.lines))}<small>${esc(h.ref)}</small></div></div>`; });
+  return shell('car', `${carsSide(c.plate)}<main class="main">
+    <div class="head"><div><h1 class="h1">${esc(c.model)}</h1><p class="sub">${esc(c.plate)} · ปี ${c.year+543} · ${esc(c.fuel)}</p></div>${open?`<a class="dot" href="#/visit/${open.ref}">อยู่ในอู่</a>`:`<span class="dot grey">ไม่อยู่ในอู่</span>`}</div>
+    <div class="hero">${carImg(c.color)}${pins}${tip}</div>
+    <div class="stats"><div class="stat"><b>${n0(c.km)} กม.</b><span>เลขไมล์ล่าสุด</span></div><div class="vr"></div><div class="stat"><b>${hist.length}</b><span>ครั้งที่เข้าซ่อม</span></div>${!open?`<div style="margin-left:auto"><a class="btn sec" href="#/counter" data-act="startvisit" data-v="${esc(c.plate)}">${ic('plus')}เปิดงาน</a></div>`:''}</div>
+    <div class="strip"><div>${ic('user')}<b style="font-weight:500">${esc(c.holder||'ไม่มีผู้ถือสัญญา')}</b>${c.since?`<span>ตั้งแต่ ${thDate(c.since)}</span>`:''}</div><div>${ic('building')}<b style="font-weight:500">${esc(c.coop)}</b><span>${esc(c.contract)}</span></div>
+      ${oilLeft!=null?`<div>${ic('droplet')}<b style="font-weight:500">ถ่ายน้ำมันเครื่อง</b><span>อีก ${n0(oilLeft)} กม.</span></div>`:''}</div>
+    <div class="sect">ประวัติซ่อม<span class="muted tiny" style="font-weight:400">ประวัติอยู่กับรถ แม้เปลี่ยนผู้ถือสัญญา</span></div>
+    ${hrows||`<p class="muted tiny">ยังไม่มีประวัติในระบบ</p>`}
+  </main><aside class="col noprint" aria-label="สรุปรถ">${repeatCard(c)}
+    <div class="card"><div class="h3">ค่าซ่อม 12 เดือนล่าสุด</div><div class="big" style="margin:6px 0 8px">${baht(total)}</div>
+      <div class="rows">${Object.entries(cost).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([g,v])=>`<div><span class="muted">${esc(g)}</span><span>${baht(v)}</span></div>`).join('')}</div></div>
+    <div class="card"><div class="h3">เข้าซ่อม 6 เดือนล่าสุด</div><div class="bars" style="height:72px">${mths.map((m,i)=>`<i class="${i===5?'on':''}" style="height:${Math.max(m.n/mx*100,8)}%"></i>`).join('')}</div><div class="barl">${mths.map(m=>`<span>${m.l}</span>`).join('')}</div></div>
+  </aside>`);
+}
+
+/* ---------- bill ---------- */
+function billDoc(v) {
+  const c = car(v.plate);
+  return `<article class="paper"><header class="bhead"><div><h1>บิลค่าซ่อม</h1><p class="muted">${WORKSHOP}</p></div><div class="ref"><b>${esc(v.ref)}</b><br>${thDate(v.date)}</div></header>
+    <section class="bgrid"><div><h3>เรียกเก็บ</h3><b>${esc(v.charged)}</b><span class="muted tiny">${v.mismatch?'ชื่อตามที่เคาน์เตอร์แจ้ง':'ผู้ถือสัญญา'} · ${esc(c.contract)}</span></div>
+      <div><h3>รถ</h3><b>${esc(v.plate)}</b><span class="muted tiny">${esc(c.model)} · สหกรณ์${esc(c.coop)} · ${v.km?n0(v.km)+' กม.':'ไมล์: '+esc(v.mileageReason)}</span></div></section>
+    <table class="btab"><thead><tr><th class="n">#</th><th>รายการซ่อม</th><th class="m" style="text-align:right">บาท</th></tr></thead>
+      <tbody>${v.lines.map((l,i)=>`<tr><td class="n">${i+1}</td><td>${esc(l.title)}${l.note?`<small>อะไหล่: ${esc(l.note)}</small>`:''}</td><td class="m">${n0(l.price)}.00</td></tr>`).join('')}</tbody></table>
+    <div class="bsum"><span>${bahtText(sum(v.lines))}</span><div style="white-space:nowrap"><span>รวม&nbsp;&nbsp;</span><b>${n0(sum(v.lines))}.00</b></div></div>
+    <p class="bnote">เอกสารนี้แจ้งค่าซ่อมเท่านั้น ไม่ใช่ใบเสร็จรับเงิน</p>
+    <div class="bsign"><div>ผู้ออกบิล · นิภา สุขเจริญ</div><div>ผู้รับรถ</div></div>
+    <p class="bfoot">ข้อมูลตัวอย่างเพื่อการสาธิต</p></article>`;
+}
+function billSide(active) {
+  return `<aside class="side noprint" aria-label="บิลวันนี้"><div class="ttl">บิลวันนี้<small>${closedVisits().length} ใบ</small></div>
+    <div class="list">${closedVisits().slice().reverse().map(v=>{const c=car(v.plate);return `<a class="carcard ${v.ref===active?'on':''}" href="#/bill/${v.ref}"><div class="carhead"><b>${esc(v.plate)}</b><span style="font-weight:500">${baht(sum(v.lines))}</span></div><p>${esc(v.charged)}</p><p>${esc(v.ref)} · ${v.closedAt}</p></a>`}).join('')}</div></aside>`;
+}
+function billPage(v) {
+  const c = car(v.plate);
+  return shell('bill', `${billSide(v.ref)}<main class="main">${billDoc(v)}</main>
+    <aside class="col noprint" aria-label="การทำงานกับบิล"><div class="card"><button class="btn pri w" data-act="print">${ic('printer')}พิมพ์บิล</button>
+      <a class="btn sec w" style="margin-top:8px" href="#/counter">${ic('back')}กลับเคาน์เตอร์</a></div>
+      <div class="card"><div class="h3">หลังออกบิล</div><p class="muted tiny" style="margin-top:6px">งานนี้ปิดแล้ว และอยู่ในประวัติของรถ ${esc(v.plate)} สำนักงานรับยอดจากไฟล์ส่งออกเพื่อตั้งงวดในระบบเช่าซื้อ</p>
+      <a class="link" style="display:inline-block;margin-top:8px" href="#/car/${encodeURIComponent(v.plate)}">ดูประวัติรถ</a></div></aside>`);
+}
+
+/* ---------- sign in ---------- */
+function signinPage() {
+  return `<div class="signin"><section class="l"><form data-form="signin">
+    <div class="brand"><span class="mark">${BRAND_INITIAL}</span>${BRAND}</div>
+    <div><h1>ยินดีต้อนรับ</h1><p class="muted" style="margin-top:6px">เข้าสู่ระบบเพื่อเปิดงานที่เคาน์เตอร์</p></div>
+    <label class="f">ชื่อผู้ใช้<input class="inp" value="nipa" autocomplete="off"></label>
+    <label class="f">รหัสผ่าน<div class="pw"><input class="inp" type="${S.showPw?'text':'password'}" value="demo1234" autocomplete="off"><button type="button" class="iconbtn" data-act="showpw" aria-label="แสดงรหัสผ่าน">${ic(S.showPw?'eyeoff':'eye')}</button></div></label>
+    <button class="btn pri" type="submit">เข้าสู่ระบบ</button>
+    <p class="muted tiny" style="text-align:center">ข้อมูลตัวอย่างทั้งหมด กดเข้าสู่ระบบได้เลย</p>
+  </form></section><section class="r" aria-hidden="true"><div class="hero">${carImg('green')}</div><p class="cap">ทุกคันมีประวัติซ่อมของตัวเอง<br>แม้เปลี่ยนคนขับ</p></section></div>`;
+}
+
+/* ---------- router ---------- */
+const root = document.getElementById('root');
+function view() {
+  const [, a, b] = location.hash.split('/');
+  const arg = b ? decodeURIComponent(b) : '';
+  if (!S.signedIn) return signinPage();
+  if (a === 'visit' && visit(arg)?.status === 'open') return visitPage(visit(arg));
+  if (a === 'cars') return carPage(CARS[0]);
+  if (a === 'car' && car(arg)) return carPage(car(arg));
+  if (a === 'bills') { const c = closedVisits(); return billPage(c[c.length-1]); }
+  if (a === 'bill' && visit(arg)?.status === 'closed') return billPage(visit(arg));
+  return counterPage();
+}
+function render(focus) {
+  const scrolls = [...root.querySelectorAll('.side,.main,.col')].map(e=>e.scrollTop);
+  root.innerHTML = view();
+  [...root.querySelectorAll('.side,.main,.col')].forEach((e,i)=>{ if (scrolls[i]!=null && render.keep) e.scrollTop = scrolls[i]; });
+  render.keep = false;
+  if (focus) { const el = root.querySelector(focus); if (el) { el.focus(); if (el.setSelectionRange && el.type!=='select-one') { try { const l=el.value.length; el.setSelectionRange(l,l);} catch{} } } }
+}
+const keep = (focus) => { render.keep = true; render(focus); };
+function newDraft(c, isNew) { return {car:c,isNew,km:'',noKm:false,reason:'',symptom:'',brought:'',editing:false,holderName:c.holder?'':'',err:{}}; }
+function pickPlate(p) { S.plateQ = p; S.sugI = 0; S.draft = newDraft(car(p)); keep(openVisits().find(v=>v.plate===p) ? null : (car(p).holder ? '#km' : '#hname')); }
+
+addEventListener('hashchange', () => { S.lineQ=''; S.lineErr=false; S.pinGroup=null; S.carQ=''; const[,a]=location.hash.split('/'); if(a!=='counter'&&a){S.draft=null;S.plateQ='';} render(location.hash.startsWith('#/counter')?'#plate':null); root.querySelector('.main')?.scrollTo(0,0); });
+
+root.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-act]'); if (!t) return;
+  const v = t.dataset.v, i = +t.dataset.i, act = t.dataset.act;
+  const cur = visit(decodeURIComponent(location.hash.split('/')[2]||''));
+  if (act==='coop') { S.coop=v; keep(); }
+  else if (act==='pick') pickPlate(v);
+  else if (act==='clearplate') { S.plateQ='';S.draft=null;S.sugI=0; keep('#plate'); }
+  else if (act==='newcar') { const p=S.plateQ.trim(); const c={plate:p,model:'รถใหม่',year:2015,fuel:'ยังไม่ระบุ',coop:'ยังไม่ระบุ',color:'white',holder:null,since:null,contract:'ยังไม่ระบุ',km:0,history:[]}; CARS.push(c); S.draft=newDraft(c,true); keep('#hname'); }
+  else if (act==='editholder') { S.draft.editing=true; keep('#hname'); }
+  else if (act==='undoholder') { S.draft.editing=false;S.draft.holderName=''; keep('#km'); }
+  else if (act==='togglekm') { S.draft.noKm=!S.draft.noKm; S.draft.err.km=false; keep(S.draft.noKm?'#kmr':'#km'); }
+  else if (act==='addtype') addLine(cur, {...T(TYPES[+v].title)});
+  else if (act==='addfree') addLine(cur, FREE(S.lineQ.trim(),0));
+  else if (act==='rmline') { cur.lines.splice(i,1); keep(); }
+  else if (act==='close') closeVisit(visit(v));
+  else if (act==='pin') { S.pinGroup=v; keep(); }
+  else if (act==='print') window.print();
+  else if (act==='showpw') { S.showPw=!S.showPw; render(); }
+  else if (act==='signout') { S.signedIn=false; location.hash='#/signin'; render(); }
+  else if (act==='startvisit') { e.preventDefault(); S.plateQ=v; S.draft=newDraft(car(v)); location.hash='#/counter'; setTimeout(()=>render('#km')); }
+});
+function addLine(v, l) { v.lines.push(l); S.lineQ='';S.lineI=0;S.lineErr=false; keep(l.free?null:'#lineq'); if (l.free) { root.querySelector(`[data-in="price"][data-i="${v.lines.length-1}"]`)?.select(); root.querySelector(`[data-in="price"][data-i="${v.lines.length-1}"]`)?.focus(); } }
+function closeVisit(v) {
+  if (!v.lines.length) { S.lineErr=true; keep('#lineq'); return; }
+  v.status='closed'; v.closedAt=`${String(TODAY.getHours()).padStart(2,'0')}:${String(TODAY.getMinutes()).padStart(2,'0')}`;
+  const c=car(v.plate); if (v.km) c.km=Math.max(c.km,v.km);
+  location.hash=`#/bill/${v.ref}`;
+}
+root.addEventListener('input', (e) => {
+  const t = e.target, k = t.dataset.in; if (!k) return;
+  if (k==='plate') {
+    S.plateQ=t.value;S.sugI=0;
+    if (S.draft) { S.draft=null; keep('#plate'); return; }
+    const empty = !root.querySelector('.empty'); if ((!!S.plateQ)===!empty) { keep('#plate'); return; }
+    document.getElementById('sug').innerHTML=sugHTML(); return;
+  }
+  if (k.startsWith('d.')) { const f=k.slice(2); S.draft[f]=t.value; if (S.draft.err[f==='holderName'?'holder':f==='reason'?'km':f]) { S.draft.err={...S.draft.err,[f==='holderName'?'holder':f==='reason'?'km':f]:false}; }
+    if (f==='km') { const c=S.draft.car, b=t.value&&c.km&&+digits(t.value)<c.km; document.getElementById('kmmsg').innerHTML=b?`<p class="msg warn">ต่ำกว่าครั้งก่อน กรุณาตรวจอีกครั้ง</p>`:''; t.classList.remove('err'); }
+    return; }
+  if (k==='lineq') { S.lineQ=t.value;S.lineI=0; document.getElementById('linesug').innerHTML=lineSug(); return; }
+  if (k==='carq') { S.carQ=t.value; const side=root.querySelector('.side'); const tmp=document.createElement('div'); const c=CARS.find(x=>root.querySelector('.carcard.on')?.getAttribute('href')===`#/car/${encodeURIComponent(x.plate)}`); tmp.innerHTML=carsSide(c?.plate); side.querySelector('.list').replaceWith(tmp.querySelector('.list')); return; }
+  const v = visit(decodeURIComponent(location.hash.split('/')[2]||'')), i=+t.dataset.i;
+  if (k==='price') { v.lines[i].price=+digits(t.value)||0; document.getElementById('tot').textContent=baht(sum(v.lines)); document.getElementById('chg'+i).textContent=lineChanged(v.lines[i]); }
+  if (k==='note') v.lines[i].note=t.value;
+});
+root.addEventListener('focusout', (e) => { const t=e.target; if (t.dataset?.in==='price') t.value=n0(digits(t.value)||0); });
+root.addEventListener('keydown', (e) => {
+  const k=e.target.dataset?.in;
+  const nav=(cont,get,set,go)=>{ const n=root.querySelectorAll(`#${cont} .sug button`).length; if(!n) return;
+    if(e.key==='ArrowDown'){e.preventDefault();set((get()+1)%n);} else if(e.key==='ArrowUp'){e.preventDefault();set((get()-1+n)%n);} else if(e.key==='Enter'){e.preventDefault();root.querySelectorAll(`#${cont} .sug button`)[get()].click();return;} else return;
+    go(); };
+  if (k==='plate') nav('sug',()=>S.sugI,x=>S.sugI=x,()=>{document.getElementById('sug').innerHTML=sugHTML();});
+  if (k==='lineq') nav('linesug',()=>S.lineI,x=>S.lineI=x,()=>{document.getElementById('linesug').innerHTML=lineSug();});
+});
+root.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (e.target.dataset.form==='signin') { S.signedIn=true; location.hash='#/counter'; render('#plate'); return; }
+  const d=S.draft, c=d.car, needName=d.editing||!c.holder, err={};
+  if (needName && !d.holderName.trim()) err.holder=true;
+  if (d.noKm ? !d.reason : !digits(d.km)) err.km=true;
+  if (!d.symptom.trim()) err.symptom=true;
+  d.err=err;
+  if (Object.keys(err).length) { keep(err.holder?'#hname':err.km?(d.noKm?'#kmr':'#km'):'#sym'); return; }
+  const ref='V-'+(++seq), km=d.noKm?null:+digits(d.km);
+  S.visits.push({ref,plate:c.plate,opened:{time:'10:40',dayOffset:0},symptom:d.symptom.trim(),km,mileageReason:d.noKm?d.reason:null,brought:d.brought.trim(),charged:needName?d.holderName.trim():c.holder,mismatch:needName,status:'open',lines:[],date:'2026-11-09'});
+  if (km) c.km=Math.max(c.km,km);
+  S.draft=null;S.plateQ=''; location.hash=`#/visit/${ref}`;
+});
+render();
+</script>
+</body>
+</html>
