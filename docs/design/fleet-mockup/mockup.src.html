@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>สมุดซ่อม · ตัวอย่าง</title>
+<link rel="icon" href="__LOGO__">
 <style>
 /*__FONTS__*/
 :root{
@@ -32,7 +33,7 @@ svg{display:block}
 .app{height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr);gap:18px;padding:16px 24px 20px}
 .top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center}
 .brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:18px}
-.mark{width:30px;height:30px;border-radius:50%;background:linear-gradient(180deg,var(--blue-hi),var(--blue-lo));color:#fff;display:grid;place-items:center;font-size:15px;box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.logo{width:44px;height:44px;flex:none;border-radius:50%;background:#fff;box-shadow:var(--shadow)}
 .nav{display:flex;gap:2px;background:#fff;border-radius:999px;padding:6px;box-shadow:var(--shadow)}
 .nav a{display:flex;align-items:center;gap:8px;padding:8px 18px;border-radius:999px;color:var(--ink-2);font-weight:500;transition:color .15s,background .15s}
 .nav a:hover{color:var(--ink);background:var(--soft)}
@@ -199,6 +200,7 @@ a.minirow:hover b{color:var(--blue-lo)}
 .signin{height:100dvh;display:grid;grid-template-columns:1fr 1fr;padding:14px;background:#f6f6f7}
 .signin .l{display:flex;align-items:center;justify-content:center;padding:32px}
 .signin form{width:100%;max-width:420px;display:flex;flex-direction:column;gap:18px}
+.signin .brand .logo{width:96px;height:96px}
 .signin h1{font-size:44px;font-weight:500;letter-spacing:-.03em;line-height:1.15}
 .signin .inp{padding:13px 14px;background:#fff;border:1px solid var(--line);border-radius:14px;margin-top:6px}
 .signin .inp:focus{border:1px solid var(--blue);box-shadow:0 0 0 3px var(--blue-soft)}
@@ -213,6 +215,8 @@ a.minirow:hover b{color:var(--blue-lo)}
 /* bill */
 .paper{max-width:680px;margin:0 auto;padding:6px 4px;font-size:15px}
 .bhead{display:flex;justify-content:space-between;gap:20px;padding-bottom:16px;border-bottom:2px solid var(--ink)}
+.bhead .bfrom{display:flex;align-items:center;gap:14px}
+.bhead .logo{width:72px;height:72px;box-shadow:none}
 .bhead h1{font-size:30px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
 .bhead .ref{text-align:right;line-height:1.55}
 .bhead .ref b{font-weight:600;font-size:17px}
@@ -264,7 +268,8 @@ a.minirow:hover b{color:var(--blue-lo)}
 <div id="root"></div>
 <script>
 /* PROTOTYPE: fake data, memory only. A reload resets everything. */
-const BRAND = 'สมุดซ่อม', BRAND_INITIAL = 'ส'; // placeholder name: change here
+const BRAND = 'สมุดซ่อม'; // placeholder name: change here
+const LOGO = '<img class="logo" src="__LOGO__" alt="ตราสหกรณ์ราชพฤกษ์แท็กซี่ จำกัด">';
 const WORKSHOP = 'อู่ซ่อมสหกรณ์ราชพฤกษ์';
 const TODAY = new Date('2026-11-09T10:40:00');
 const ICON = /*__ICONS__*/{};
@@ -422,7 +427,7 @@ const since = (o) => o.dayOffset===0 ? `วันนี้ ${o.time}` : `เม�
 function shell(tab, body) {
   const tabs = [['counter','เคาน์เตอร์','#/counter'],['car','รถ','#/cars'],['bill','บิลซ่อม','#/bills']];
   return `<div class="app"><header class="top noprint">
-    <a class="brand" href="#/counter"><span class="mark">${BRAND_INITIAL}</span>${BRAND}</a>
+    <a class="brand" href="#/counter">${LOGO}${BRAND}</a>
     <nav class="nav" aria-label="เมนูหลัก">${tabs.map(([k,l,h])=>`<a href="${h}" class="${k===tab?'on':''}" ${k===tab?'aria-current="page"':''}>${ic(k)}${l}</a>`).join('')}</nav>
     <button class="who" data-act="signout" title="ออกจากระบบ"><span class="ava">น</span><div style="text-align:left"><b>นิภา สุขเจริญ</b><small>เจ้าหน้าที่เคาน์เตอร์</small></div></button>
   </header><div class="grid">${body}</div></div><div class="demo noprint">ข้อมูลตัวอย่างทั้งหมด</div>`;
@@ -605,7 +610,7 @@ function carPage(c) {
 /* ---------- bill ---------- */
 function billDoc(v) {
   const c = car(v.plate);
-  return `<article class="paper"><header class="bhead"><div><h1>บิลค่าซ่อม</h1><p class="muted">${WORKSHOP}</p></div><div class="ref"><b>${esc(v.ref)}</b><br>${thDate(v.date)}</div></header>
+  return `<article class="paper"><header class="bhead"><div class="bfrom">${LOGO}<div><h1>บิลค่าซ่อม</h1><p class="muted">${WORKSHOP}</p></div></div><div class="ref"><b>${esc(v.ref)}</b><br>${thDate(v.date)}</div></header>
     <section class="bgrid"><div><h3>เรียกเก็บ</h3><b>${esc(v.charged)}</b><span class="muted tiny">${v.mismatch?'ชื่อตามที่เคาน์เตอร์แจ้ง':'ผู้ถือสัญญา'} · ${esc(c.contract)}</span></div>
       <div><h3>รถ</h3><b>${esc(v.plate)}</b><span class="muted tiny">${esc(c.model)} · สหกรณ์${esc(c.coop)} · ${v.km?n0(v.km)+' กม.':'ไมล์: '+esc(v.mileageReason)}</span></div></section>
     <table class="btab"><thead><tr><th class="n">#</th><th>รายการซ่อม</th><th class="m" style="text-align:right">บาท</th></tr></thead>
@@ -631,7 +636,7 @@ function billPage(v) {
 /* ---------- sign in ---------- */
 function signinPage() {
   return `<div class="signin"><section class="l"><form data-form="signin">
-    <div class="brand"><span class="mark">${BRAND_INITIAL}</span>${BRAND}</div>
+    <div class="brand">${LOGO}${BRAND}</div>
     <div><h1>ยินดีต้อนรับ</h1><p class="muted" style="margin-top:6px">เข้าสู่ระบบเพื่อเปิดงานที่เคาน์เตอร์</p></div>
     <label class="f">ชื่อผู้ใช้<input class="inp" value="nipa" autocomplete="off"></label>
     <label class="f">รหัสผ่าน<div class="pw"><input class="inp" type="${S.showPw?'text':'password'}" value="demo1234" autocomplete="off"><button type="button" class="iconbtn" data-act="showpw" aria-label="แสดงรหัสผ่าน">${ic(S.showPw?'eyeoff':'eye')}</button></div></label>

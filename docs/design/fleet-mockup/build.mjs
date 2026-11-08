@@ -1,4 +1,4 @@
-// PROTOTYPE. Inlines fonts and icons into one offline file: node docs/design/fleet-mockup/build.mjs
+// PROTOTYPE. Inlines fonts, icons and the logo into one offline file: node docs/design/fleet-mockup/build.mjs
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,7 +35,10 @@ const icons = Object.fromEntries(
   }),
 );
 
+const logo = `data:image/webp;base64,${readFileSync(join(here, 'logo.webp')).toString('base64')}`;
+
 const html = readFileSync(join(here, 'mockup.src.html'), 'utf8')
+  .replaceAll('__LOGO__', () => logo)
   .replace('/*__FONTS__*/', () => fonts)
   .replace('/*__ICONS__*/{}', () => JSON.stringify(icons));
 writeFileSync(join(here, 'index.html'), html);

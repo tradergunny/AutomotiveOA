@@ -12,6 +12,8 @@ node docs/design/fleet-mockup/build.mjs
 
 **Demo path:** sign in → type `5201` → open a Visit → add `โช้ค` → close → print the bill → the car's page.
 
+**Logo:** `logo.webp` is the สหกรณ์ราชพฤกษ์แท็กซี่ จำกัด crest supplied by the founder on 2026-11-08, cut to a round badge because the source has a solid white background. Ask for the vector original at the visit.
+
 **Placeholders to replace**
 - The name สมุดซ่อม (`BRAND` at the top of the script).
 - The drawn taxi: swap for real photos of their cars taken at the visit.
