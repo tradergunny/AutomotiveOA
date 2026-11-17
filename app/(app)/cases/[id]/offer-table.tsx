@@ -8,27 +8,20 @@ import {
   Lock,
   Merge,
   Pencil,
-  Plus,
-  Send,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Segmented } from "@/components/blocks/segmented";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { downscalePhoto } from "@/lib/downscale";
 import {
-  coveringQuotation,
-  latestQuotationForPart,
   offerParts,
   partKey,
   partOf,
-  pricedOfferLines,
   samePart,
   type JobDto,
-  type OfferPart,
-  type QuotationDto,
 } from "@/lib/jobs";
 import { formatBaht, satangToBahtInput } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -42,63 +35,38 @@ import {
   type JobError,
 } from "./job-actions";
 import { PartsTable, partsCostSatang, selectCls } from "./parts-table";
+import { JobEvidence } from "./job-evidence";
 
-/**
- * The Offer (D-19, D-21, D-24): every Proposed line as a table — Job, Payer,
- * Price — with the price cell live, because the Offer is the one part of the
- * page being built rather than read. Everything else about a line sits under
- * its expanded row behind Edit (D-7). Mixed payers split into sub-tables,
- * the insurer's name titling the second. A checkbox column appears once two
- * lines exist so panels can be merged into one job; the foot carries the
- * set-level tooling — Add job, the last send, Send quotation, Record
- * response — because a Quotation is issued for the set and the payer answers
- * about the set.
- */
+/** Compact, payer-grouped repair review. Editing and merge tools are disclosed on demand. */
 
 type Props = {
   caseId: string;
   jobs: JobDto[]; // PROPOSED only, oldest first
-  quotations: QuotationDto[]; // newest first
   staffOptions: { id: string; name: string }[];
   isManager: boolean;
   readOnly: boolean;
-  /** Mirrors the header: Send quotation is the loud one while the Offer is unsent or stale. */
-  sendPrimary: boolean;
   /** Bumped by the header's Set prices: scroll here and focus the first empty cell. */
   focusNonce: number;
   onChanged: (dto: JobDto) => void;
   onDeleted: (jobId: string) => void;
   onMerged: (survivor: JobDto, absorbedIds: string[]) => void;
-  onAddJob: () => void;
-  onSend: (part: OfferPart) => void;
-  onRespond: (part: OfferPart) => void;
 };
 
 type Result = { ok: true; value: JobDto } | { ok: false; error: JobError };
 
-const ROW_COLS =
-  "grid-cols-[14px_minmax(0,1fr)_7rem] sm:grid-cols-[14px_minmax(0,1fr)_7.5rem_7rem]";
-const ROW_COLS_MERGE =
-  "grid-cols-[18px_14px_minmax(0,1fr)_7rem] sm:grid-cols-[18px_14px_minmax(0,1fr)_7.5rem_7rem]";
-
 export function OfferTable({
   caseId,
   jobs,
-  quotations,
   staffOptions,
   isManager,
   readOnly,
-  sendPrimary,
   focusNonce,
   onChanged,
   onDeleted,
   onMerged,
-  onAddJob,
-  onSend,
-  onRespond,
 }: Props) {
   const t = useTranslations("jobs");
-  const format = useFormatter();
+  const [mergeMode, setMergeMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [mergeBusy, setMergeBusy] = useState(false);
   const [mergeError, setMergeError] = useState<JobError | null>(null);
@@ -106,8 +74,7 @@ export function OfferTable({
   const rootRef = useRef<HTMLDivElement>(null);
 
   const parts = offerParts(jobs);
-  const mixed = parts.length > 1;
-  const mergeable = !readOnly && jobs.length >= 2;
+  const mergeable = mergeMode && !readOnly && jobs.length >= 2;
 
   // The header's Set prices lands on the first empty live cell (D-21).
   useEffect(() => {
@@ -153,75 +120,33 @@ export function OfferTable({
     }
   }
 
-  const canSend = parts.some((part) => pricedOfferLines(jobs, part).length > 0);
-  const canRespond = jobs.length > 0;
-  const partLabel = (part: OfferPart) =>
-    part.payerType === "CUSTOMER" ? t("payer.CUSTOMER") : (part.insurerName ?? t("payer.INSURER"));
-
-  /** "Q-1031 · sent Sep 2 via LINE" / "Not sent", plus the staleness word. */
-  const lastSendLine = (part: OfferPart) => {
-    const latest = latestQuotationForPart(quotations, part);
-    const priced = pricedOfferLines(jobs, part);
-    const stale = latest != null && priced.length > 0 && coveringQuotation(quotations, priced) == null;
-    return (
-      <span key={partKey(part)} className="flex flex-wrap items-baseline gap-x-1.5 text-[11px]">
-        {mixed && <span className="text-faint">{partLabel(part)} ·</span>}
-        {latest ? (
-          <>
-            <Link
-              href={`/cases/${caseId}/quotations/${latest.id}`}
-              className="font-mono text-[12px] font-semibold text-primary hover:underline"
-            >
-              {latest.label}
-            </Link>
-            <span className="num text-muted-foreground">
-              {latest.sentAt
-                ? t("offer.sentVia", {
-                    date: format.dateTime(new Date(latest.sentAt), { day: "numeric", month: "short" }),
-                  })
-                : format.dateTime(new Date(latest.issuedAt), { day: "numeric", month: "short" })}
-            </span>
-            {stale && <span className="text-warn">· {t("offer.stale")}</span>}
-          </>
-        ) : (
-          <span className="text-faint">{t("offer.notSent")}</span>
-        )}
-      </span>
-    );
-  };
-
-  const rowCols = mergeable ? ROW_COLS_MERGE : ROW_COLS;
+  const partLabel = (part: (typeof parts)[number]) =>
+    part.payerType === "CUSTOMER" ? t("review.customerPays") : t("review.insurerPays", { name: part.insurerName ?? t("payer.INSURER") });
+  const unpriced = jobs.filter((job) => job.priceSatang == null).length;
+  const missingCosts = jobs.filter((job) => job.partLines.some((line) => line.unitCostSatang == null)).length;
 
   return (
     <div ref={rootRef} className="scroll-mt-16">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
+        <div aria-live="polite" className="text-xs text-muted-foreground">
+          <p className={unpriced > 0 ? "text-warn" : undefined}>{t(unpriced > 0 ? "review.unpricedCount" : "review.allPriced", { count: unpriced })}</p>
+          {missingCosts > 0 && <p className="mt-1 text-warn">{t("review.missingCosts", { count: missingCosts })}</p>}
+        </div>
+        {!readOnly && jobs.length >= 2 && <button type="button" aria-pressed={mergeMode} className="text-xs text-muted-foreground hover:text-primary" onClick={() => { setMergeMode(!mergeMode); setSelected(new Set()); }}>{t(mergeMode ? "review.finishSelection" : "review.selectToMerge")}</button>}
+      </div>
       {parts.map((part) => {
         const rows = jobs.filter((job) => samePart(partOf(job), part));
         return (
           <div key={partKey(part)}>
-            {mixed && (
-              <div className="px-4 pt-2 text-[11px] font-medium text-muted-foreground sm:px-5">
-                {partLabel(part)}
-              </div>
-            )}
-            {/* column heads — a table's, in a grid so rows can expand */}
-            <div
-              className={cn(
-                "grid items-center gap-x-2.5 px-4 pt-1.5 pb-1 text-[10.5px] text-faint sm:px-5",
-                rowCols,
-              )}
-            >
-              {mergeable && <span />}
-              <span />
-              <span>{t("offer.colJob")}</span>
-              <span className="hidden sm:block">{t("offer.colPayer")}</span>
-              <span className="text-right">{t("offer.colPrice")}</span>
+            <div className="flex flex-wrap items-baseline justify-between gap-2 border-y bg-surface-2/50 px-4 py-2.5 sm:px-5">
+              <h4 className="text-xs font-medium">{partLabel(part)} <span className="font-normal text-muted-foreground">· {t("phaseSub.jobs", { count: rows.length })}</span></h4>
+              <span className="num text-xs text-muted-foreground">{formatBaht(rows.reduce((sum, job) => sum + (job.priceSatang ?? 0), 0))}{rows.some((job) => job.priceSatang == null) && ` · ${t("review.partialTotal")}`}</span>
             </div>
             {rows.map((job) => (
               <OfferRow
                 key={job.id}
                 caseId={caseId}
                 job={job}
-                rowCols={rowCols}
                 mergeable={mergeable}
                 checked={selected.has(job.id)}
                 onCheck={(on) =>
@@ -247,14 +172,7 @@ export function OfferTable({
         );
       })}
 
-      {/* the foot: set-level tooling (D-19, D-25) */}
-      <div className="flex flex-wrap items-center gap-2 border-t border-dashed px-4 py-2.5 sm:px-5">
-        {!readOnly && (
-          <Button type="button" size="sm" variant="outline" className="h-8" onClick={onAddJob}>
-            <Plus data-icon="inline-start" />
-            {t("offer.addJob")}
-          </Button>
-        )}
+      <div className="flex flex-wrap items-center gap-2 px-4 sm:px-5">
         {selectedJobs.length >= 2 && (
           <Button
             type="button"
@@ -274,35 +192,7 @@ export function OfferTable({
             {t(`errors.${mergeError}` as never)}
           </span>
         )}
-        <span className="ml-auto flex flex-col items-end gap-0.5">
-          {parts.map((part) => lastSendLine(part))}
-        </span>
-        {!readOnly && (
-          <>
-            <Button
-              type="button"
-              size="sm"
-              variant={sendPrimary ? "default" : "outline"}
-              disabled={!canSend}
-              title={!canSend ? t("offer.nothingPriced") : undefined}
-              className={cn("h-8", sendPrimary && "font-semibold")}
-              onClick={() => onSend(parts[0]!)}
-            >
-              <Send data-icon="inline-start" />
-              {t("offer.sendQuotation")}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={sendPrimary ? "outline" : "default"}
-              disabled={!canRespond}
-              className={cn("h-8", !sendPrimary && "font-semibold")}
-              onClick={() => onRespond(parts[0]!)}
-            >
-              {t("offer.recordResponse")}
-            </Button>
-          </>
-        )}
+
       </div>
     </div>
   );
@@ -315,7 +205,6 @@ export function OfferTable({
 function OfferRow({
   caseId,
   job,
-  rowCols,
   mergeable,
   checked,
   onCheck,
@@ -328,7 +217,6 @@ function OfferRow({
 }: {
   caseId: string;
   job: JobDto;
-  rowCols: string;
   mergeable: boolean;
   checked: boolean;
   onCheck: (on: boolean) => void;
@@ -351,8 +239,6 @@ function OfferRow({
 
   const priceLive = !readOnly && (!job.catalogItemId || isManager);
   const unpriced = job.priceSatang == null;
-  const payerText =
-    job.payerType === "CUSTOMER" ? t("payer.CUSTOMER") : (job.insurerName ?? t("payer.INSURER"));
   const findingLabel = (f: JobDto["findings"][number]) =>
     f.zone ? ti(`zones.${f.zone}` as never) : ti(`checklist.${f.checklistItem}` as never);
 
@@ -427,49 +313,21 @@ function OfferRow({
 
   return (
     <div className="border-t border-dashed">
-      <div
-        className={cn(
-          "grid min-h-10 items-center gap-x-2.5 px-4 py-1 sm:px-5",
-          rowCols,
-          expanded && "bg-surface-2/40",
-        )}
-      >
-        {mergeable && (
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={(e) => onCheck(e.currentTarget.checked)}
-            aria-label={t("offer.selectRow", { title: job.title })}
-            className="size-3.5 accent-[var(--primary)]"
-          />
-        )}
-        <button
-          type="button"
-          onClick={() => {
-            setExpanded((v) => {
-              if (v) setEditing(false);
-              return !v;
-            });
-          }}
-          aria-expanded={expanded}
-          aria-label={job.title}
-          className="flex size-5 items-center justify-center text-faint hover:text-foreground"
-        >
-          {expanded ? (
-            <ChevronDown className="size-3.5" aria-hidden />
-          ) : (
-            <ChevronRight className="size-3.5" aria-hidden />
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="min-w-0 truncate text-left text-[13px] font-medium hover:text-primary"
-        >
-          {job.title}
-          {subWord && <span className="ml-1.5 text-[11px] font-normal text-faint">· {subWord}</span>}
-        </button>
-        <span className="hidden truncate text-[11px] text-faint sm:block">{payerText}</span>
+      <div className={cn("flex items-start gap-3 px-4 py-3.5 sm:gap-4 sm:px-5", expanded && "bg-surface-2/40")}>
+        {mergeable && <input type="checkbox" checked={checked} onChange={(e) => onCheck(e.currentTarget.checked)} aria-label={t("offer.selectRow", { title: job.title })} className="mt-7 size-4 shrink-0 accent-[var(--primary)]" />}
+        <div className="w-20 shrink-0 sm:w-28"><JobEvidence job={job} /></div>
+        <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0 flex-1 basis-40">
+          <h5 className="text-[13px] font-medium leading-snug">{job.title}</h5>
+          {subWord && <p className="mt-1 text-[11px] text-muted-foreground">{subWord}</p>}
+          <p className="mt-2 text-[11px] text-muted-foreground">{job.partLines.length === 0 ? t("review.noPartsRecorded") : t("review.partsSummary", { count: job.partLines.length, cost: formatBaht(partsCostSatang(job)) })}</p>
+          {job.partLines.some((line) => line.unitCostSatang == null) && <p className="mt-0.5 text-[11px] text-warn">{t("review.checkPartsCost")}</p>}
+          <button type="button" onClick={() => { setExpanded(!expanded); setEditing(false); }} aria-expanded={expanded} className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary">
+            {expanded ? <ChevronDown className="size-3" aria-hidden /> : <ChevronRight className="size-3" aria-hidden />}{t("review.jobDetails")}
+          </button>
+        </div>
+        <div className="flex w-28 shrink-0 flex-col gap-1 sm:items-end">
+          <span className="text-[10px] text-muted-foreground">{t("offer.colPrice")}</span>
         <span className="flex justify-end">
           {priceLive ? (
             <Input
@@ -502,7 +360,11 @@ function OfferRow({
             </span>
           )}
         </span>
+        <span className={cn("text-[11px]", unpriced ? "text-warn" : "text-muted-foreground")}>{t(unpriced ? "review.priceMissing" : "review.priceSet")}</span>
+        </div>
+        </div>
       </div>
+      {error && <p role="alert" className="mx-4 mb-3 border border-bad/45 px-2 py-1 text-xs text-bad sm:mx-5">{t(`errors.${error}` as never)}</p>}
 
       {expanded && (
         <div className="flex flex-col gap-2.5 border-t border-dashed bg-surface-2/40 px-4 py-2.5 sm:px-5 sm:pl-12">
@@ -647,7 +509,7 @@ function OfferRow({
                     <img
                       src={`/api/photos/${photo.id}`}
                       alt={t("photoAlt", { n: i + 1 })}
-                      className="h-11 w-14 border object-cover opacity-90 group-hover:opacity-100"
+                      className="h-20 w-24 border object-cover"
                       loading="lazy"
                     />
                   </a>
@@ -655,7 +517,7 @@ function OfferRow({
                     <button
                       type="button"
                       onClick={() => void run(() => removeJobPhoto(photo.id))}
-                      className="absolute -right-1.5 -top-1.5 hidden size-4 items-center justify-center border bg-background text-[10px] text-faint hover:text-bad group-hover:flex"
+                      className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center border bg-background text-[10px] text-faint hover:text-bad"
                       aria-label={t("removePhoto")}
                     >
                       ×
@@ -720,11 +582,7 @@ function OfferRow({
             </div>
           )}
 
-          {error && (
-            <p role="alert" className="border border-bad/45 px-2 py-1 text-[11px] text-bad">
-              {t(`errors.${error}` as never)}
-            </p>
-          )}
+
         </div>
       )}
     </div>

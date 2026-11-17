@@ -763,6 +763,52 @@
       "noDecisions": "Mark at least one line Yes or No",
       "nothingToSend": "No priced line to send",
       "insurerPrintOnly": "Insurers are printed for, never messaged"
+    },
+    "review": {
+      "sectionDescription": "Review repairs, quotation and approval",
+      "customerPays": "Customer pays",
+      "insurerPays": "Insurer pays · {name}",
+      "noPhotos": "No photos",
+      "viewPhotos": "View {count} photos for {title}",
+      "evidenceAlt": "{title} — evidence photo {n}",
+      "photoCount": "{count, plural, one {# photo} other {# photos}}",
+      "photoDescription": "Inspection and job photos. Use the arrows to browse.",
+      "previousPhoto": "Previous",
+      "nextPhoto": "Next",
+      "photoPosition": "{n} of {count}",
+      "unpricedCount": "{count, plural, one {# job needs a price} other {# jobs need prices}}",
+      "allPriced": "All proposed repairs are priced",
+      "missingCosts": "{count, plural, one {# job has missing parts costs — review before quoting} other {# jobs have missing parts costs — review before quoting}}",
+      "finishSelection": "Finish selecting",
+      "selectToMerge": "Select jobs to merge",
+      "partialTotal": "priced jobs only",
+      "noPartsRecorded": "No parts recorded",
+      "partsSummary": "{count, plural, one {# part} other {# parts}} · cost {cost}",
+      "checkPartsCost": "Parts cost incomplete",
+      "jobDetails": "Job details",
+      "priceMissing": "Price missing",
+      "priceSet": "Price set",
+      "quotations": "Quotations & approval",
+      "documentPrepared": "Document prepared",
+      "draftCount": "Draft · {count, plural, one {# priced job} other {# priced jobs}}",
+      "decisions": "{approved} approved · {declined} declined",
+      "pendingCount": "{count} awaiting a decision",
+      "insurerDelivery": "Print for insurer submission",
+      "customerDelivery": "Customer delivery through LINE or print",
+      "reviewQuotation": "Review quotation",
+      "completePrices": "Complete prices",
+      "next": {
+        "prices": "Next: complete {count, plural, one {# missing price} other {# missing prices}}",
+        "review": "Next: review quotation · {payer}",
+        "response": "Next: record response · {payer}",
+        "manager": "Manager needed for catalog pricing"
+      },
+      "hint": {
+        "prices": "Review missing details, then check each payer’s quotation.",
+        "review": "Check the included repairs and total before sending or printing.",
+        "response": "Record each repair’s decision against the quotation shown.",
+        "manager": "A manager must set the missing catalog price. Other quotations remain available above."
+      }
     }
   },
   "quotations": {

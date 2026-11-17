@@ -7,14 +7,15 @@ import { JobRollupLine } from "@/components/blocks/job-rollup";
 import { Dialog } from "@/components/ui/dialog";
 import { isActiveJob } from "@/lib/case-flow";
 import {
-  offerNeedsSending,
   offerParts,
   type JobDto,
   type OfferPart,
   type QuotationDto,
 } from "@/lib/jobs";
 import type { SentUpdateDto } from "@/lib/line-send";
-import { formatBaht } from "@/lib/money";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
+import { QuotationReview } from "./quotation-review";
 import { AddJobDialog } from "./add-job-dialog";
 import type { SendBlockedReason } from "./customer-timeline";
 import { JobCard } from "./job-card";
@@ -77,6 +78,7 @@ export function JobsPanel({
   blockedReason,
   recipientName,
   deliveredAt,
+  onUpdateSent,
 }: Props) {
   const t = useTranslations("jobs");
   const format = useFormatter();
@@ -132,9 +134,6 @@ export function JobsPanel({
   const populated = [phases.offer, phases.work, phases.done].filter((list) => list.length > 0).length;
   const showHeadings = !readOnly && populated >= 2;
 
-  const offerTotal = phases.offer.reduce((sum, job) => sum + (job.priceSatang ?? 0), 0);
-  const offerUnpriced = phases.offer.filter((job) => job.priceSatang == null).length;
-  const sendPrimary = offerNeedsSending(jobs, quotations);
   const parts = offerParts(jobs);
   const insurerName = jobs.find((job) => job.insurerName)?.insurerName ?? null;
 
@@ -166,9 +165,10 @@ export function JobsPanel({
   return (
     <section id="jobs" className="relative scroll-mt-16 border bg-card">
       <CornerTicks />
-      <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-dashed px-4 py-2.5 sm:px-5">
-        <h3 className="text-[13px] font-semibold">{t("sectionTitle")}</h3>
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-4 sm:px-5">
+        <div><h3 className="text-base font-semibold">{t("sectionTitle")}</h3>{!readOnly && <p className="mt-0.5 text-[11px] text-muted-foreground">{t("review.sectionDescription")}</p>}</div>
         <span className="num text-[11px] text-faint">{jobs.length}</span>
+        {!readOnly && <Button type="button" size="sm" variant="outline" className="ml-auto" onClick={() => setDialog({ kind: "add" })}><Plus aria-hidden />{t("offer.addJob")}</Button>}
         {readOnly && deliveredAt && (
           <span className="ml-auto text-[11px] text-muted-foreground">
             {t("deliveredLine", {
@@ -193,36 +193,24 @@ export function JobsPanel({
         <>
           {phases.offer.length > 0 && (
             <div>
-              {phaseHead(
-                t("phase.offer"),
-                <>
-                  <span>{t("phaseSub.jobs", { count: phases.offer.length })}</span>
-                  {offerTotal > 0 && (
-                    <span className="num">· {t("phaseSub.proposed", { amount: formatBaht(offerTotal) })}</span>
-                  )}
-                  {offerUnpriced > 0 && (
-                    <span className="text-warn">· {t("phaseSub.unpriced", { count: offerUnpriced })}</span>
-                  )}
-                </>,
-              )}
               <OfferTable
                 caseId={caseId}
                 jobs={phases.offer}
-                quotations={quotations}
                 staffOptions={staffOptions}
                 isManager={isManager}
                 readOnly={readOnly}
-                sendPrimary={sendPrimary}
                 focusNonce={focusNonce}
                 onChanged={jobChanged}
                 onDeleted={jobDeleted}
                 onMerged={jobsMerged}
-                onAddJob={() => setDialog({ kind: "add" })}
-                onSend={(part) => setDialog({ kind: "send", part })}
-                onRespond={(part) => setDialog({ kind: "respond", part })}
               />
             </div>
           )}
+
+          <QuotationReview caseId={caseId} jobs={jobs} quotations={quotations} isManager={isManager}
+            onPrices={() => setFocusNonce((n) => n + 1)}
+            onSend={(part) => setDialog({ kind: "send", part })}
+            onRespond={(part) => setDialog({ kind: "respond", part })} />
 
           {phases.work.length > 0 && (
             <div className={phases.offer.length > 0 ? "border-t" : undefined}>
@@ -253,18 +241,7 @@ export function JobsPanel({
             </div>
           )}
 
-          {/* An Offer with nothing in it yet still offers Add job. */}
-          {phases.offer.length === 0 && (
-            <div className="flex items-center border-t border-dashed px-4 py-2 sm:px-5">
-              <button
-                type="button"
-                onClick={() => setDialog({ kind: "add" })}
-                className="text-[11px] text-faint hover:text-primary"
-              >
-                + {t("offer.addJob")}
-              </button>
-            </div>
-          )}
+
         </>
       )}
 
@@ -288,7 +265,7 @@ export function JobsPanel({
             initialPart={dialog.part}
             blockedReason={blockedReason}
             recipientName={recipientName}
-            onSent={(quotation) => quotationStamped(quotation)}
+            onSent={(quotation, update) => { quotationStamped(quotation); if (update) onUpdateSent?.(update); }}
             onClose={() => setDialog(null)}
           />
         )}

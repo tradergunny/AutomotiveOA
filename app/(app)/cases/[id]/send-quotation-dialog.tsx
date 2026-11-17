@@ -122,7 +122,7 @@ export function SendQuotationDialog({
         : t("errors.failed");
 
   return (
-    <DialogContent title={t("send.title")} description={t("send.description")}>
+    <DialogContent title={t("review.reviewQuotation")} description={t("send.description")}>
       <DialogBody>
         {parts.length > 1 && (
           <DialogRow label={t("send.partLabel")}>
@@ -165,7 +165,7 @@ export function SendQuotationDialog({
                   key={job.id}
                   className="flex items-center gap-3 border-b border-dashed px-3 py-2 text-[13px] last:border-b-0"
                 >
-                  <span className="min-w-0 flex-1 truncate">{job.title}</span>
+                  <span className="min-w-0 flex-1">{job.title}</span>
                   <span className="num">{formatBaht(job.priceSatang!)}</span>
                 </li>
               ))}

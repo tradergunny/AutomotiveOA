@@ -62,6 +62,8 @@ export type AuthorizationDto = {
 
 /** What a Job card needs to render a fulfilled Finding as a chip. */
 export type JobFindingRef = {
+  /** Inspection evidence stays attached to its original finding. */
+  photos?: { id: string }[];
   id: string;
   source: "DAMAGE_MAP" | "CHECKLIST";
   zone: string | null;

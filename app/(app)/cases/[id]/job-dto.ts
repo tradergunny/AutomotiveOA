@@ -13,7 +13,7 @@ export const JOB_INCLUDE = {
   priceOverriddenBy: { select: { name: true } },
   assignedStaff: { select: { name: true } },
   findings: {
-    select: { id: true, source: true, zone: true, checklistItem: true },
+    select: { id: true, source: true, zone: true, checklistItem: true, photos: { select: { id: true }, orderBy: { capturedAt: "asc" } } },
     orderBy: { recordedAt: "asc" },
   },
   partLines: { orderBy: { createdAt: "asc" } },

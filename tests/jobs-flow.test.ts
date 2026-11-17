@@ -139,6 +139,23 @@ describe("accept fills the Offer (D-24)", () => {
     expect(events[0]!.jobId).toBe(job.id);
   });
 
+  it("returns inspection photos with a job after a price update", async () => {
+    const caseId = await newCase();
+    const finding = await mapFinding(caseId, "hood", ["REPAINT"]);
+    const accepted = await setFindingConfirmed(finding.id, true);
+    expect(accepted.ok).toBe(true);
+    if (!accepted.ok || !accepted.value.jobId) return;
+    const photo = await prismaUnscoped.photo.create({ data: {
+      shopId, caseId, findingId: finding.id, storageKey: `${run}/evidence.jpg`,
+      contentType: "image/jpeg", sizeBytes: 1, uploadedByStaffId: staffId,
+    } });
+    const updated = await updateJobPrice(accepted.value.jobId, "4500");
+    expect(updated.ok).toBe(true);
+    if (!updated.ok) return;
+    expect(updated.value.findings[0]?.photos).toEqual([{ id: photo.id }]);
+    expect(updated.value.photos).toEqual([]); // Evidence retains its finding ownership.
+  });
+
   it("creates nothing for a due-soon wear item proposing no work", async () => {
     const caseId = await newCase();
     const finding = await prismaUnscoped.finding.create({
