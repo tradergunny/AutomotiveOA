@@ -7,12 +7,6 @@
       "runtimeArgs": ["run", "dev"],
       "port": 3000,
       "autoPort": true
-    },
-    {
-      "name": "fleet-mockup",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "docs/design/fleet-mockup"],
-      "port": 8765
     }
   ]
 }
